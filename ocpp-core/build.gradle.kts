@@ -2,8 +2,68 @@
 
 dependencies {
     api(libs.jackson.databind)
+    // 세션 계층의 공개 API 가 suspend 함수와 Duration 을 쓴다 (M4)
+    api(libs.kotlinx.coroutines.core)
     implementation(libs.json.schema.validator)
     implementation(libs.tsid.creator)
+
+    testImplementation(libs.kotlinx.coroutines.test)
+    // 이벤트 로그만으로 파생 상태를 재구성할 수 있음을 증명하는 데 M3 상태머신을 쓴다 (PLAN §11.1).
+    // 테스트 전용이다 — main 의존 방향은 그대로 ocpp-core → (없음) 이다.
+    testImplementation(project(":swap-domain"))
+}
+
+// runTest / advanceUntilIdle / currentTime — 가상 시간 API 는 아직 실험 단계로 표시돼 있다.
+// 테스트 소스에서만 opt-in 한다 (PLAN §7.3 L1: "테스트가 실제 시간을 기다리지 않는다").
+tasks.named<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>("compileTestKotlin") {
+    compilerOptions.optIn.add("kotlinx.coroutines.ExperimentalCoroutinesApi")
+}
+
+/**
+ * 이 모듈은 프레임워크도 전송도 모른다 (PLAN §6 설계원칙 1).
+ *
+ * 그리고 **현재 시각을 직접 조회하지 않는다** — 시각과 타임아웃은 주입받는다. 그래야 세션
+ * 계층 테스트가 실제로 몇 초를 기다리지 않고 결정적으로 돈다.
+ *
+ * 산문으로 적어두면 지켜졌는지 알 수 없으므로 `check` 에 물려 기계 검증한다.
+ * (swap-domain 의 `checkNoExternalDependencies` 와 같은 취지다.)
+ */
+val forbiddenMainPatterns = mapOf(
+    "org.springframework" to "Spring 을 import 하지 않는다",
+    "io.netty" to "Netty 를 import 하지 않는다 (PLAN §6)",
+    "javax.servlet" to "서블릿 API 를 import 하지 않는다",
+    "jakarta.servlet" to "서블릿 API 를 import 하지 않는다",
+    "java.net.http" to "WebSocket/HTTP 클라이언트를 import 하지 않는다",
+    "javax.websocket" to "WebSocket API 를 import 하지 않는다",
+    "jakarta.websocket" to "WebSocket API 를 import 하지 않는다",
+    "Instant.now(" to "현재 시각을 직접 조회하지 않는다 — Clock 을 주입받아라",
+    "System.currentTimeMillis" to "현재 시각을 직접 조회하지 않는다 — Clock 을 주입받아라",
+    "System.nanoTime" to "현재 시각을 직접 조회하지 않는다 — Clock 을 주입받아라",
+)
+
+val checkNoFrameworkImports by tasks.registering {
+    val mainSources = layout.projectDirectory.dir("src/main/kotlin").asFileTree.matching { include("**/*.kt") }
+    val patterns = forbiddenMainPatterns
+
+    inputs.files(mainSources)
+
+    doLast {
+        val offenses = mainSources.files.sorted().flatMap { file ->
+            file.readLines().withIndex().flatMap { (index, line) ->
+                patterns.entries
+                    .filter { (needle, _) -> needle in line }
+                    .map { (_, reason) -> "${file.name}:${index + 1} — $reason" }
+            }
+        }
+
+        check(offenses.isEmpty()) {
+            "ocpp-core 는 프레임워크와 벽시계를 모른다 (PLAN §6):\n" + offenses.joinToString("\n")
+        }
+    }
+}
+
+tasks.named("check") {
+    dependsOn(checkNoFrameworkImports)
 }
 
 /**

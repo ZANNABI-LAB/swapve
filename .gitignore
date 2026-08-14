@@ -21,3 +21,6 @@ build/
 
 # Kotlin 2.x 빌드 세션
 .kotlin/
+
+# 중첩 실행이 만든 로컬 권한 설정
+.claude/settings.local.json
