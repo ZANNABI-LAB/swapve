@@ -8,7 +8,7 @@
 > Implements the Battery Swap functional block of OCPP 2.1 (IEC 63584-210),
 > verified against the OCA conformance test cases.
 
-[![status](https://img.shields.io/badge/status-design%20complete%20%C2%B7%20implementation%20not%20started-orange)]()
+[![status](https://img.shields.io/badge/status-M0%20skeleton-yellow)]()
 [![license](https://img.shields.io/badge/license-Apache--2.0-blue)]()
 [![OCPP](https://img.shields.io/badge/OCPP-2.1%20Edition%202-informational)]()
 
@@ -16,10 +16,21 @@
 
 ## 현재 상태
 
-**설계 완료 · 구현 착수 전.** 아직 동작하는 코드가 없습니다.
+**M0 — 뼈대.** 4개 모듈 빌드가 서고, 공식 스키마 181개가 클래스패스에 실립니다.
+프로토콜 코덱(M1)부터가 실제 구현입니다.
+
+```bash
+./gradlew test
+```
 
 - 📄 **[구현 계획서 (docs/PLAN.md)](docs/PLAN.md)** — 프로토콜 명세, 도메인 설계, 검증 전략
 - 📋 **[BACKLOG.md](BACKLOG.md)** — 범위 밖으로 밀어낸 것들과 그 트리거
+
+| M | 내용 | 상태 |
+|---|---|---|
+| M0 | 뼈대 + zannabi 연동 | ✅ |
+| M1 | `ocpp-core` 프레이밍 코덱 | |
+| M2~M10 | [PLAN §8](docs/PLAN.md) | |
 
 ---
 
