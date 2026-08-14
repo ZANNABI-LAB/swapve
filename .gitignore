@@ -1,0 +1,20 @@
+# OCPP 스펙 문서 — CC BY-ND 4.0, 재배포 조건이 걸려 있어 저장소에 포함하지 않는다.
+# https://openchargealliance.org/download-ocpp/ 에서 무료로 받을 수 있다.
+docs/spec/
+
+# Gradle / JVM
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+*.class
+
+# zannabi-code 실행 증거 (필요 시 선별 커밋)
+.zannabi/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# OS
+.DS_Store

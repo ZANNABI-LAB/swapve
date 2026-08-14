@@ -1,0 +1,31 @@
+SwapVe
+Copyright 2026 ZANNABI LAB
+
+This product includes software developed at ZANNABI LAB.
+Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+--------------------------------------------------------------------------------
+THIRD-PARTY MATERIAL
+--------------------------------------------------------------------------------
+
+OCPP 2.1 JSON Schemas  —  schemas/
+
+    OCPP 2.1 Edition 1 / Edition 2
+    Copyright (c) Open Charge Alliance (OCA)
+    Licensed under the Creative Commons
+    Attribution-NoDerivatives 4.0 International Public License (CC BY-ND 4.0)
+    https://creativecommons.org/licenses/by-nd/4.0/
+
+    The schema files under schemas/ are redistributed VERBATIM and are NOT
+    modified in any way, in accordance with the NoDerivatives condition.
+    They are NOT covered by the Apache License that applies to the rest of
+    this repository.
+
+    Obtained from: https://openchargealliance.org/download-ocpp/
+
+    The OCPP specification documents themselves (Parts 0-6, appendices) are
+    NOT redistributed in this repository. Download them free of charge from
+    the URL above.
+
+    "OCPP" and "Open Charge Point Protocol" are managed by the Open Charge
+    Alliance. This project is not affiliated with, nor endorsed by, the OCA.
