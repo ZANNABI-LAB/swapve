@@ -8,7 +8,7 @@
 > Implements the Battery Swap functional block of OCPP 2.1 (IEC 63584-210),
 > verified against the OCA conformance test cases.
 
-[![status](https://img.shields.io/badge/status-M0%20skeleton-yellow)]()
+[![status](https://img.shields.io/badge/status-M1%20framing%20codec-yellow)]()
 [![license](https://img.shields.io/badge/license-Apache--2.0-blue)]()
 [![OCPP](https://img.shields.io/badge/OCPP-2.1%20Edition%202-informational)]()
 
@@ -16,8 +16,8 @@
 
 ## 현재 상태
 
-**M0 — 뼈대.** 4개 모듈 빌드가 서고, 공식 스키마 181개가 클래스패스에 실립니다.
-프로토콜 코덱(M1)부터가 실제 구현입니다.
+**M1 — OCPP-J 프레이밍 코덱.** 5개 메시지 타입(CALL·CALLRESULT·CALLERROR·CALLRESULTERROR·SEND)의
+인코딩/디코딩과 손상 프레임 판정이 동작합니다. 페이로드 스키마 검증은 M2입니다.
 
 ```bash
 ./gradlew test
@@ -29,8 +29,9 @@
 | M | 내용 | 상태 |
 |---|---|---|
 | M0 | 뼈대 + zannabi 연동 | ✅ |
-| M1 | `ocpp-core` 프레이밍 코덱 | |
-| M2~M10 | [PLAN §8](docs/PLAN.md) | |
+| M1 | `ocpp-core` 프레이밍 코덱 | ✅ |
+| M2 | `ocpp-core` 스키마 검증 + CALLERROR 정책 | |
+| M3~M10 | [PLAN §8](docs/PLAN.md) | |
 
 ---
 

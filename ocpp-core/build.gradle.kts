@@ -1,5 +1,10 @@
 // OCPP-J 프레이밍 · 공식 JSON Schema 검증 · 세션 계층. 프레임워크를 모른다.
 
+dependencies {
+    api(libs.jackson.databind)
+    implementation(libs.tsid.creator)
+}
+
 /**
  * 공식 스키마 181개를 클래스패스 `ocpp/schemas/` 로 옮긴다.
  *
