@@ -18,3 +18,6 @@ build/
 
 # OS
 .DS_Store
+
+# Kotlin 2.x 빌드 세션
+.kotlin/

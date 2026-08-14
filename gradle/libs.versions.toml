@@ -3,9 +3,12 @@ kotlin = "2.1.0"
 junit = "5.11.4"
 jackson = "2.18.2"
 tsid = "5.2.6"
+networknt = "1.5.6"
 
 [libraries]
 jackson-databind = { module = "com.fasterxml.jackson.core:jackson-databind", version.ref = "jackson" }
+# 공식 스키마는 draft-06 이다 (PLAN §6 기술선택)
+json-schema-validator = { module = "com.networknt:json-schema-validator", version.ref = "networknt" }
 # 시간순 정렬 가능한 ID — 로컬 카운터 금지 (PLAN §11.5)
 tsid-creator = { module = "com.github.f4b6a3:tsid-creator", version.ref = "tsid" }
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }

@@ -2,6 +2,7 @@
 
 dependencies {
     api(libs.jackson.databind)
+    implementation(libs.json.schema.validator)
     implementation(libs.tsid.creator)
 }
 
