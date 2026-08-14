@@ -8,7 +8,7 @@
 > Implements the Battery Swap functional block of OCPP 2.1 (IEC 63584-210),
 > verified against the OCA conformance test cases.
 
-[![status](https://img.shields.io/badge/status-M2%20schema%20validation-yellow)]()
+[![status](https://img.shields.io/badge/status-M3%20swap%20state%20machine-yellow)]()
 [![license](https://img.shields.io/badge/license-Apache--2.0-blue)]()
 [![OCPP](https://img.shields.io/badge/OCPP-2.1%20Edition%202-informational)]()
 
@@ -16,8 +16,8 @@
 
 ## 현재 상태
 
-**M2 — 스키마 검증.** 프레이밍 위에서 공식 스키마 181개로 페이로드를 검증하고,
-위반 종류에 맞는 CALLERROR 코드를 결정합니다. 세션 계층은 M4입니다.
+**M3 — 교환 상태머신.** 프레이밍·스키마 검증 위에 배터리 교환 도메인이 올라갔습니다.
+입고 먼저·출고 먼저 양방향을 같은 상태머신으로 처리합니다. 세션 계층은 M4입니다.
 
 ```bash
 ./gradlew test
@@ -31,8 +31,9 @@
 | M0 | 뼈대 + zannabi 연동 | ✅ |
 | M1 | `ocpp-core` 프레이밍 코덱 | ✅ |
 | M2 | `ocpp-core` 스키마 검증 + CALLERROR 정책 | ✅ |
-| M3 | `swap-domain` 교환 상태머신 | |
-| M4~M10 | [PLAN §8](docs/PLAN.md) | |
+| M3 | `swap-domain` 교환 상태머신 | ✅ |
+| M4 | ★ `ocpp-core` 세션 계층 | |
+| M5~M10 | [PLAN §8](docs/PLAN.md) | |
 
 ---
 
