@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/assets/hero.png" alt="SwapVe — OCPP 2.1 battery swapping server" width="100%">
+</p>
+
 # SwapVe
 
 > **Open-source OCPP 2.1 battery swapping server (CSMS) for the JVM.**
