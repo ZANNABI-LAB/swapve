@@ -1,0 +1,54 @@
+# 세 게이트를 그대로 돈다 (PLAN §7.3 · §6 기술선택 CI).
+#
+#   L1 단위        ./gradlew build          — 단위 시험 + 모듈 경계 검증 3종
+#   L2 표준 적합성  ./gradlew conformanceTest — TC_S_102/103_CSMS + 실패 F1~F6
+#   L3 부하 + 감사  ./gradlew auditTest       — 스테이션 20대 동시 → 불변식 감사 (S4)
+#
+# 게이트를 한 줄로 합치지 않는다. 합치면 "단위는 통과했는데 적합성이 깨졌다"가 로그
+# 어딘가에 묻히고, 게이트를 나눠 둔 이유(PLAN §7.3)가 사라진다.
+#
+# ⚠️ 저장소 공개 여부는 사람이 정한다 (PLAN §10 결정 #1). 이 파일이 있다는 것은
+#    "공개하면 CI가 돈다"는 뜻이지 공개 결정이 내려졌다는 뜻이 아니다.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # JDK 17 — 빌드의 jvmToolchain(17) 과 같은 값이다 (PLAN §6 기술선택).
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      # 캐시는 이 액션이 알아서 한다. 손으로 키를 짜면 그때부터 관리 대상이 된다.
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: L1 단위 게이트 + 모듈 경계 검증
+        run: ./gradlew build
+
+      - name: L2 표준 적합성 게이트 (TC_S_102/103_CSMS · F1~F6)
+        run: ./gradlew conformanceTest
+
+      - name: L3 부하 + 불변식 감사 게이트 (스테이션 20대 동시)
+        run: ./gradlew auditTest
+
+      # 실패했을 때 무엇이 깨졌는지 보려면 리포트가 있어야 한다.
+      - name: 시험 리포트 보관
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: '**/build/reports/tests/'
+          retention-days: 7

@@ -27,7 +27,12 @@ object StationSimCli {
           --id-token-type <type>    토큰 종류. 기본 ISO14443
           --charging-id-token <v>   충전 트랜잭션용 대체 토큰(BatterySwapCtrlr.IdToken).
                                     생략하면 인가 없는 트랜잭션으로 보고한다
-          --request-id <n>          교환 상관 번호. 기본 1001
+          --request-id <n>          교환 상관 번호. 기본 1001.
+                                    --remote-start 면 CSMS 가 보낸 값으로 덮인다 (S02.FR.02)
+          --remote-start            ★ S02 — 스스로 시작하지 않고 CSMS 의
+                                    RequestBatterySwapRequest 를 기다린다.
+                                    앱이 교환을 거는 표준 유즈케이스다:
+                                      POST /api/swaps {"stationId": ..., "idToken": ...}
     """.trimIndent()
 
     @JvmStatic
@@ -37,19 +42,37 @@ object StationSimCli {
             return
         }
 
-        val options = parse(args)
+        val remoteStart = args.any { it == REMOTE_START_FLAG }
+        val options = parse(args.filterNot { it == REMOTE_START_FLAG }.toTypedArray())
         val config = buildConfig(options)
 
         println("station-sim → ${config.connectUrl} (순서 ${config.swapOrder.wireValue}, 배터리 ${config.insertSlots.size} 개)")
 
         StationSimulator(config).use { simulator ->
+            var requestId = config.requestId
             runBlocking {
                 simulator.connect()
-                simulator.bootAndSwap()
+                if (remoteStart) {
+                    // S02 — 개시 주체가 CSMS(앱)다. 인가도 CSMS 가 이미 했으므로 여기서
+                    // Authorize 를 보내지 않는다 (PLAN §4.4).
+                    simulator.boot()
+                    println("S02 대기 중 — CSMS 의 RequestBatterySwap 을 기다린다.")
+                    println("  curl -X POST localhost:8080/api/swaps -H 'Content-Type: application/json' \\")
+                    println("       -d '{\"stationId\":\"${config.stationId}\",\"idToken\":" +
+                        "{\"idToken\":\"${config.idToken.idToken}\",\"type\":\"${config.idToken.type}\"}}'")
+                    // 상관 번호는 CSMS 가 발번한 값을 승계한다 (S02.FR.02).
+                    requestId = simulator.awaitRemoteStart()
+                    simulator.runRemoteSwap()
+                } else {
+                    simulator.bootAndSwap()
+                }
             }
-            println("교환 완주: requestId=${config.requestId}, 오간 메시지 ${simulator.eventLog.size()} 건")
+            println("교환 완주: requestId=$requestId, 오간 메시지 ${simulator.eventLog.size()} 건")
         }
     }
+
+    /** S02 원격 개시 대기 모드. 값을 받지 않는 유일한 인자라 [parse] 에 넣지 않는다. */
+    private const val REMOTE_START_FLAG = "--remote-start"
 
     /**
      * 기본 시나리오 구성.

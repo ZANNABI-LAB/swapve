@@ -71,6 +71,39 @@ val conformanceTest by tasks.registering(Test::class) {
 }
 
 /**
+ * ★ **L3 부하 + 불변식 감사 게이트의 실체** (PLAN §7.3, 성공 기준 S4).
+ *
+ * 스테이션 20 대를 동시에 붙여 교환을 완주시킨 뒤, **이벤트 로그에서 재구성한 상태**로
+ * 불변식을 전수 검사한다 (PLAN §11.1). `conformanceTest` 와 마찬가지로 소스셋을 나누지 않고
+ * 태그로만 가른다 — 감사 시험도 `FixedClockConfig` 같은 기존 시험 지원 코드를 그대로 쓴다.
+ *
+ * `test` 와 `conformanceTest` 어디에도 섞이지 않는다. 세 게이트가 서로 다른 질문에 답하기
+ * 때문이다: 단위는 "부품이 맞는가", 적합성은 "표준대로 대화하는가", 감사는 "동시에 밀어넣어도
+ * 장부가 맞는가".
+ */
+val auditTest by tasks.registering(Test::class) {
+    group = "verification"
+    description = "스테이션 20대 동시 접속 후 불변식 감사 (PLAN §2 S4)"
+
+    val testSourceSet = sourceSets["test"]
+    testClassesDirs = testSourceSet.output.classesDirs
+    classpath = testSourceSet.runtimeClasspath
+
+    useJUnitPlatform {
+        includeTags("audit")
+    }
+
+    // 감사는 "지금 코드가 동시성 아래서도 불변식을 지키는가"를 묻는다. 앞선 실행이
+    // 통과했다는 이유로 건너뛰면 그 질문에 답하지 않은 것이다.
+    outputs.upToDateWhen { false }
+
+    // 감사 보고서는 시험의 산출물이다. 잡아먹지 않고 그대로 콘솔에 흘린다.
+    testLogging {
+        showStandardStreams = true
+    }
+}
+
+/**
  * **Spring 은 여기서 멈춘다** (PLAN §6 설계원칙 1).
  *
  * `ocpp-core` 와 `swap-domain` 은 프레임워크를 모르고, 그것을 각 모듈의
