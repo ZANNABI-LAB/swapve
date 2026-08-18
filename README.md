@@ -8,7 +8,7 @@
 > Implements the Battery Swap functional block of OCPP 2.1 (IEC 63584-210),
 > verified against the OCA conformance test cases.
 
-[![status](https://img.shields.io/badge/status-M5%20websocket%20endpoint-yellow)]()
+[![status](https://img.shields.io/badge/status-M6%20swap%20end--to--end-yellow)]()
 [![license](https://img.shields.io/badge/license-Apache--2.0-blue)]()
 [![OCPP](https://img.shields.io/badge/OCPP-2.1%20Edition%202-informational)]()
 
@@ -16,13 +16,15 @@
 
 ## 현재 상태
 
-**M5 — WebSocket 엔드포인트.** CSMS가 실제로 기동해 스테이션 연결을 받습니다.
-`ocpp2.1` 서브프로토콜을 협상하고, 부팅·하트비트·S01 인가에 응답합니다.
-프레이밍·스키마 검증·멱등은 `ocpp-core` 그대로입니다 — csms는 그것을 조립할 뿐입니다.
+**M6 — 교환 1건 완주 (성공 기준 S1).** 스테이션 시뮬레이터가 실제 WebSocket으로 붙어
+S03 교환을 **In-Out·Out-In 두 순서 모두** 완주합니다. 오가는 모든 메시지가 공식 스키마
+검증을 양방향으로 통과하고, 끝나면 CSMS 쪽 교환 트랜잭션이 `Completed`이며
+들어온 수 = 나간 수, 양쪽 배터리의 serialNumber·SoC·SoH가 남습니다.
 
 ```bash
-./gradlew test        # 전체 시험
+./gradlew test            # 전체 시험
 ./gradlew :csms:bootRun   # ws://localhost:8080/ocpp/{stationId}
+./gradlew :station-sim:run --args="--csms-url ws://localhost:8080/ocpp --station-id CS001 --swap-order Out-In"
 ```
 
 - 📄 **[구현 계획서 (docs/PLAN.md)](docs/PLAN.md)** — 프로토콜 명세, 도메인 설계, 검증 전략
@@ -36,7 +38,9 @@
 | M3 | `swap-domain` 교환 상태머신 | ✅ |
 | M4 | ★ `ocpp-core` 세션 계층 | ✅ |
 | M5 | `csms` WebSocket + S01 Authorize + Boot/Heartbeat | ✅ |
-| M6~M10 | [PLAN §8](docs/PLAN.md) | |
+| M6 | `station-sim` + S03 교환 1건 완주 | ✅ |
+| M7 | ★ `TC_S_102/103_CSMS` 적합성 + 실패 F1~F6 | |
+| M8~M10 | [PLAN §8](docs/PLAN.md) | |
 
 ---
 

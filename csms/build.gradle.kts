@@ -16,6 +16,10 @@ dependencies {
     annotationProcessor(libs.spring.boot.configuration.processor)
 
     testImplementation(libs.spring.boot.starter.test)
+    // 성공 기준 S1 — 시뮬레이터와 CSMS 를 한 테스트 안에서 **실제 소켓으로** 붙인다 (PLAN §2).
+    // 시험 전용 의존이다. main 의 의존 방향은 그대로 csms → (ocpp-core, swap-domain) 이고,
+    // station-sim 은 Spring 을 여전히 모른다.
+    testImplementation(project(":station-sim"))
 }
 
 /**
