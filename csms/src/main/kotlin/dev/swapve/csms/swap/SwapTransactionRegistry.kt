@@ -105,6 +105,16 @@ class SwapTransactionRegistry {
     fun of(stationId: StationId): Map<SwapKey, SwapTransaction> =
         transactions.filterKeys { it.stationId == stationId }
 
+    /**
+     * 스테이션을 가로지르는 교환 전부 — **지표(M8, PLAN §2 S5)가 읽는 자리다.**
+     *
+     * `SwapTransaction.Idle` 이 섞여 있을 수 있다. 인가 없이 도착한 사건(PLAN §5.4 F5)은
+     * 상태를 바꾸지 못하고 `Idle` 그대로 저장되기 때문이다 — **열린 적 없는 교환**이므로
+     * 세는 쪽에서 걸러야 한다. 여기서 미리 빼지 않는 이유는, 그러면 "왜 저장했는데 안
+     * 보이나"를 이 함수를 읽는 사람이 알 수 없기 때문이다.
+     */
+    fun all(): Map<SwapKey, SwapTransaction> = transactions.toMap()
+
     fun recordAnomaly(anomaly: SwapAnomaly) = synchronized(recordLock) { anomalies += anomaly; Unit }
 
     fun recordIgnored(event: SwapIgnored) = synchronized(recordLock) { ignored += event; Unit }

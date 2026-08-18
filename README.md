@@ -8,7 +8,7 @@
 > Implements the Battery Swap functional block of OCPP 2.1 (IEC 63584-210),
 > verified against the OCA conformance test cases.
 
-[![status](https://img.shields.io/badge/status-M6%20swap%20end--to--end-yellow)]()
+[![status](https://img.shields.io/badge/status-M8%20swap%20API%20%26%20metrics-yellow)]()
 [![license](https://img.shields.io/badge/license-Apache--2.0-blue)]()
 [![OCPP](https://img.shields.io/badge/OCPP-2.1%20Edition%202-informational)]()
 
@@ -16,18 +16,27 @@
 
 ## 현재 상태
 
-**M6 — 교환 1건 완주 (성공 기준 S1).** 스테이션 시뮬레이터가 실제 WebSocket으로 붙어
-S03 교환을 **In-Out·Out-In 두 순서 모두** 완주합니다. 오가는 모든 메시지가 공식 스키마
-검증을 양방향으로 통과하고, 끝나면 CSMS 쪽 교환 트랜잭션이 `Completed`이며
-들어온 수 = 나간 수, 양쪽 배터리의 serialNumber·SoC·SoH가 남습니다.
+**M8 — 교환 REST API + 지표 (성공 기준 S5).** 공식 적합성 케이스 `TC_S_102_CSMS`·
+`TC_S_103_CSMS`와 실패 시나리오 F1~F6이 통과하고(M7), 그 위에 **앱이 소비할 교환 API**가
+얹혔습니다. 표준이 정의한 S02(*"스마트폰 앱에서 QR을 찍어 교환을 개시"*)의 CSMS 측 계약입니다.
 
 ```bash
-./gradlew test            # 전체 시험
-./gradlew :csms:bootRun   # ws://localhost:8080/ocpp/{stationId}
+./gradlew build             # 전체 시험 + 모듈 경계 검증
+./gradlew conformanceTest   # ★ 공식 적합성 + 실패 시나리오 F1~F6
+./gradlew :csms:bootRun     # ws://localhost:8080/ocpp/{stationId}
 ./gradlew :station-sim:run --args="--csms-url ws://localhost:8080/ocpp --station-id CS001 --swap-order Out-In"
 ```
 
+```bash
+# 교환 시작 → RequestBatterySwap 발사 (S02)
+curl -X POST localhost:8080/api/swaps -H 'Content-Type: application/json' \
+     -d '{"stationId":"CS001","idToken":{"idToken":"RFID-0001","type":"ISO14443"}}'
+curl localhost:8080/api/swaps/CS001:1734829911   # 진행 상태 · 양쪽 배터리 SoC/SoH
+curl localhost:8080/api/metrics/swaps            # 성공률 · 소요시간 · 실패 사유
+```
+
 - 📄 **[구현 계획서 (docs/PLAN.md)](docs/PLAN.md)** — 프로토콜 명세, 도메인 설계, 검증 전략
+- 🔌 **[앱 계약 (docs/API.md)](docs/API.md)** — 교환 REST API. **인증이 없다는 사실 포함**
 - 📋 **[BACKLOG.md](BACKLOG.md)** — 범위 밖으로 밀어낸 것들과 그 트리거
 
 | M | 내용 | 상태 |
@@ -39,8 +48,9 @@ S03 교환을 **In-Out·Out-In 두 순서 모두** 완주합니다. 오가는 �
 | M4 | ★ `ocpp-core` 세션 계층 | ✅ |
 | M5 | `csms` WebSocket + S01 Authorize + Boot/Heartbeat | ✅ |
 | M6 | `station-sim` + S03 교환 1건 완주 | ✅ |
-| M7 | ★ `TC_S_102/103_CSMS` 적합성 + 실패 F1~F6 | |
-| M8~M10 | [PLAN §8](docs/PLAN.md) | |
+| M7 | ★ `TC_S_102/103_CSMS` 적합성 + 실패 F1~F6 + S02 발신 | ✅ |
+| M8 | 교환 REST API + 지표 ([docs/API.md](docs/API.md)) | ✅ |
+| M9~M10 | [PLAN §8](docs/PLAN.md) | |
 
 ---
 
@@ -74,6 +84,35 @@ swapve/
 
 `ocpp-core` 와 `swap-domain` 은 프레임워크를 모릅니다. `String` ↔ 도메인 객체 변환만 합니다.
 덕분에 전송 계층을 나중에 교체할 수 있고, 테스트가 I/O 없이 돕니다.
+
+---
+
+## 앱 계약 — 표준이 앱 시나리오를 이미 정의해 두었습니다
+
+> **S02 - Battery Swap Remote Start**: *"EV Driver requests CSMS to initiate a battery swap
+> **via a smartphone app, e.g. by scanning a QR code** or selecting the appropriate station in the app."*
+
+즉 `앱 → CSMS → RequestBatterySwap → 스테이션`이 **표준 유즈케이스**입니다.
+앱 구현은 범위 밖이지만 **그 계약은 설계했습니다**.
+
+| 메서드 | 경로 | 하는 일 |
+|---|---|---|
+| `POST` | `/api/swaps` | 교환 시작 — `RequestBatterySwapRequest` 발사 (S02) |
+| `GET` | `/api/swaps/{id}` | 진행 상태 · **양쪽 배터리의 SoC/SoH** · 장부 불균형 |
+| `GET` | `/api/metrics/swaps` | 성공률 · 소요시간 분포 · **F1~F6별 실패 사유** |
+
+읽어 볼 만한 설계 결정 세 가지 — 자세한 근거는 **[docs/API.md](docs/API.md)** 에 있습니다.
+
+- **배터리 부족(`NoBatteryAvailable`)은 오류가 아니라 200입니다.** 재고 판정은 스테이션이
+  하고(S02.FR.04), 그건 시스템 장애가 아니라 정상적인 운영 상태입니다. 5xx로 답하면 앱이
+  재시도 대상으로 오해합니다.
+- **지표에 Micrometer를 쓰지 않았습니다.** 필요한 값이 전부 기존 기록에서 파생 계산되기
+  때문입니다 — 미등록 배터리 거부(F3)와 재접속 재전송(F6)은 지표용 기록이 아예 없고
+  **이벤트 로그의 원문**에서 계산됩니다. 카운터를 심으면 진실의 원본이 둘이 됩니다.
+- ⚠️ **인증·인가가 없습니다.** 로그인도 API 키도 JWT도 없습니다. 범위 밖이며,
+  **그대로 인터넷에 노출하면 안 됩니다.** 숨기지 않고 문서 첫머리에 적어 두었습니다.
+
+지표 대시보드와 UI는 만들지 않습니다 ([PLAN §10 결정 #2](docs/PLAN.md) — REST 조회까지).
 
 ---
 
