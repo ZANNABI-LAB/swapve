@@ -17,6 +17,9 @@ import java.time.Duration
  * @param operatorId 스테이션 등록에 남길 소유 사업자 (PLAN §11.3). **값이 항상 하나여도 둔다** —
  *   단일 사업자를 전제로 박으면 나중에 로밍에서 전 데이터 마이그레이션이 필요해진다.
  * @param authorizedIdTokens 인가할 토큰 목록. MVP 의 인가 정책은 이 목록 조회가 전부다.
+ * @param knownBatterySerials 이 CPO 가 아는 배터리 일련번호 (PLAN §5.4 F3).
+ *   **비어 있으면 배터리를 식별하지 않는다** — 빈 목록을 "전부 미등록"으로 읽으면 등록
+ *   절차가 없는 지금 모든 교환이 거부된다. 자세한 근거는 `BatteryRegistry` KDoc.
  * @param maxTextMessageSize 텍스트 프레임 버퍼 상한. OCPP 페이로드는 작지만
  *   `GetCompositeSchedule` 류는 커질 수 있어 기본 64 KiB 로 둔다.
  * @param callTimeout CSMS 가 보낸 CALL 의 응답 대기 한도 (Part 4 §4.1.1).
@@ -27,6 +30,7 @@ data class CsmsProperties(
     val heartbeatInterval: Duration = Duration.ofSeconds(300),
     val operatorId: String = "swapve",
     val authorizedIdTokens: List<AuthorizedIdToken> = emptyList(),
+    val knownBatterySerials: List<String> = emptyList(),
     val maxTextMessageSize: Int = 64 * 1024,
     val callTimeout: Duration = Duration.ofSeconds(30),
 ) {

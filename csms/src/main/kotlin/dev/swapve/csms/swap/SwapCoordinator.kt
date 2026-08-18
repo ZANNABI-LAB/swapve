@@ -50,6 +50,7 @@ import java.time.Instant
 class SwapCoordinator(
     private val authorizations: AuthorizationRegistry,
     private val transactions: SwapTransactionRegistry,
+    private val outTimedOutLedger: OutTimedOutLedger,
     private val clock: Clock,
 ) {
 
@@ -83,6 +84,33 @@ class SwapCoordinator(
     }
 
     /**
+     * S02 — CSMS 가 개시한 교환을 연다 (PLAN §4.4).
+     *
+     * S01 과 달리 **여기서는 requestId 를 알고 있다.** CSMS 가 발번했기 때문이다. 그래서
+     * `AuthorizeRequest` 경로처럼 첫 `BatterySwap` 을 기다릴 필요 없이 지금 바로
+     * [SwapEvent.Authorized] 를 흘려 [SwapTransaction.Authorized] 로 만든다.
+     *
+     * 그 뒤 도착하는 `BatterySwap` 은 [ensureAuthorizationApplied] 를 그대로 지나간다 —
+     * 이미 `Idle` 이 아니므로 아무것도 하지 않고, 입고/출고가 바로 이어진다.
+     */
+    fun onRemoteStartAccepted(key: SwapKey, idToken: IdToken, at: Instant): SwapTransaction =
+        apply(key, SwapEvent.Authorized(key, idToken, at), at)
+
+    /**
+     * S02 개시를 스테이션이 거부했다 (PLAN §5.4 F1 = `TC_S_102_CSMS`).
+     *
+     * **교환을 열지 않는다.** 상태머신에 흘릴 사건 자체가 없다 — 인가가 나지 않았으므로
+     * 열렸다가 닫힌 것이 아니라 처음부터 없었다. 사실만 기록에 남는다.
+     */
+    fun onRemoteStartRejected(rejection: SwapRejection) {
+        transactions.recordRejection(rejection)
+        log.info(
+            "원격 개시가 거부됐다: key={} reasonCode={} {}",
+            rejection.key, rejection.reasonCode, rejection.additionalInfo.orEmpty(),
+        )
+    }
+
+    /**
      * 아직 교환이 열리지 않았다면 인가 사실을 찾아 [SwapEvent.Authorized] 를 먼저 흘린다.
      *
      * 인가가 없으면 **아무것도 하지 않는다.** 그러면 이어지는 입고/출고가 [SwapTransaction.Idle]
@@ -108,7 +136,10 @@ class SwapCoordinator(
         transactions.store(key, transition.state)
 
         when (transition) {
-            is SwapTransition.Advanced -> Unit
+            // 장부 불균형에 도달했다면 **영속시킨다** (PLAN §5.3, §5.4 F2). 이것만 DB 로
+            // 가는 이유는 [OutTimedOutLedger] KDoc 에 있다 — 파생 상태가 아니라 채무다.
+            is SwapTransition.Advanced ->
+                (transition.state as? SwapTransaction.OutTimedOut)?.let(outTimedOutLedger::save)
 
             is SwapTransition.Ignored -> {
                 transactions.recordIgnored(SwapIgnored(key, transition.reason, at))

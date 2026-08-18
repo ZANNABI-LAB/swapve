@@ -6,6 +6,20 @@ server:
     # 켤 때는 server.ssl.key-store 계열 설정을 함께 채운다.
     enabled: false
 
+spring:
+  datasource:
+    # OUT_TIMED_OUT 장부만 여기 산다 (PLAN §5.3 불변식, §6 기술선택).
+    # **파일 기반이어야 한다** — 인메모리면 장부 불균형이 재시작마다 사라지고, 그건
+    # "보상해야 할 채무를 기록으로 남긴다"는 요구를 만족하지 못한다.
+    url: jdbc:h2:file:./data/swapve;AUTO_SERVER=TRUE;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""
+  sql:
+    init:
+      # schema.sql 한 장. 마이그레이션 도구는 도입하지 않는다 (PLAN §11.0).
+      mode: always
+
 csms:
   # 실제 연결 URL 은 여기에 "/" + 스테이션 식별자가 붙는다 (Part 4 §3.1.1).
   # 예: ws://localhost:8080/ocpp/CS001
@@ -20,6 +34,21 @@ csms:
   authorized-id-tokens:
     - id-token: RFID-0001
       type: ISO14443
+  # 이 CPO 가 아는 배터리 (PLAN §5.4 F3). 목록에 없는 일련번호가 오면 응답에
+  # customData 로 Rejected/BatteryUnknown 을 실어 알린다 (PLAN §4.8).
+  # **비어 있으면 배터리를 식별하지 않는다** — 근거는 BatteryRegistry KDoc.
+  # 실제 배터리 등록 절차는 아직 없다 — 인가 토큰 목록과 같은 성격의 시드 목록이다.
+  known-battery-serials:
+    # 공식 적합성 케이스 TC_S_103_CSMS 가 지정한 일련번호 (Part 6 step 11/21)
+    - "1234"
+    - "5678"
+    - "4321"
+    - "8765"
+    # 로컬 실행·M6 종단 시험이 쓰는 시드 재고
+    - BAT-USED-1
+    - BAT-USED-2
+    - BAT-FULL-3
+    - BAT-FULL-4
 
 logging:
   level:

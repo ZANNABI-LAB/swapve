@@ -114,15 +114,30 @@ class AuthorizationRegistry(properties: CsmsProperties) {
      * 인가가 나면 [GrantedAuthorization] 도 함께 남는다. 그것이 requestId 를 실어 올 첫
      * `BatterySwap` 을 기다리는 자리다 (위 KDoc).
      */
-    fun authorize(principal: StationPrincipal, idToken: IdToken, at: Instant): AuthorizationAttempt {
-        val stationId = StationId(principal.stationId)
+    fun authorize(principal: StationPrincipal, idToken: IdToken, at: Instant): AuthorizationAttempt =
+        authorize(StationId(principal.stationId), idToken, principal.authMethod, at)
+
+    /**
+     * 신원 객체 없이 판정한다 — **S02 원격 개시가 쓴다.**
+     *
+     * S01 은 스테이션이 `AuthorizeRequest` 를 보내오므로 그 연결의 [StationPrincipal] 이
+     * 손에 있다. S02 는 **CSMS 쪽에서 시작**하므로 그런 것이 없다. 그렇다고 신원 확인 수준을
+     * 버리면 안 되므로 (PLAN §11.4), 호출자가 스테이션 등록에 남은 [authMethod] 를 찾아
+     * 넘긴다. 없는 값을 지어내지 않는 대신 **모른다는 사실도 값**으로 받는다.
+     */
+    fun authorize(
+        stationId: StationId,
+        idToken: IdToken,
+        authMethod: AuthMethod,
+        at: Instant,
+    ): AuthorizationAttempt {
         val status = if (idToken in allowed) AuthorizationStatus.ACCEPTED else AuthorizationStatus.UNKNOWN
 
         if (status == AuthorizationStatus.ACCEPTED) {
             grants[stationId to idToken] = GrantedAuthorization(stationId, idToken, at)
         }
 
-        val attempt = AuthorizationAttempt(stationId, idToken, status, principal.authMethod, at)
+        val attempt = AuthorizationAttempt(stationId, idToken, status, authMethod, at)
         record(attempt)
         return attempt
     }

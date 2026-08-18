@@ -79,12 +79,27 @@ object BatterySwapWire {
     /** `TriggerReasonEnumType` — 충전 상태가 바뀌었다. */
     const val TRIGGER_REASON_CHARGING_STATE_CHANGED = "ChargingStateChanged"
 
-    /** `TriggerReasonEnumType` — 배터리가 빠져 통신이 끊겼다. `TxStopPoint = EVConnected` (S04.FR.09). */
-    const val TRIGGER_REASON_EV_COMMUNICATION_LOST = "EVCommunicationLost"
+    /**
+     * `TriggerReasonEnumType` — 충전 한도에 도달했다.
+     *
+     * ### ★ 배터리 제거로 트랜잭션이 끝날 때의 triggerReason 이 이것이다
+     *
+     * Part 6 `TC_S_103_CSMS` step 13/17 원문이 그렇다. PLAN v3 는 이 자리를
+     * `EVCommunicationLost` 로 **추정**했고 v3.1 이 스펙 원문 대조로 정정했다 (PLAN §0).
+     * 그 추정값은 스펙 어디에도 근거가 없어 상수 자체를 지웠다 — 남겨 두면 다시 쓰인다.
+     *
+     * 종료 사건은 세 값을 **각각** 요구한다: 왜 끝났나(`triggerReason`) · 무엇이
+     * 끊겼나([STOPPED_REASON_EV_DISCONNECTED]) · 끝난 뒤의 상태([CHARGING_STATE_IDLE]).
+     * 셋 다 enum 으로는 유효한 값이라 **스키마 검증으로는 잡히지 않는다.**
+     */
+    const val TRIGGER_REASON_ENERGY_LIMIT_REACHED = "EnergyLimitReached"
 
     /** `ChargingStateEnumType` */
     const val CHARGING_STATE_EV_CONNECTED = "EVConnected"
     const val CHARGING_STATE_CHARGING = "Charging"
+
+    /** `ChargingStateEnumType` — 트랜잭션이 끝난 뒤의 상태 (Part 6 `TC_S_103_CSMS` step 13/17). */
+    const val CHARGING_STATE_IDLE = "Idle"
 
     /** `ReasonEnumType` — 배터리를 빼서 트랜잭션이 끝났다 (PLAN §4.10). */
     const val STOPPED_REASON_EV_DISCONNECTED = "EVDisconnected"
@@ -110,4 +125,69 @@ object BatterySwapWire {
 
     /** `AuthorizationStatusEnumType` */
     const val AUTHORIZATION_ACCEPTED = "Accepted"
+
+    /** `GenericStatusEnumType` — `RequestBatterySwapResponse.status` (S02). */
+    const val GENERIC_ACCEPTED = "Accepted"
+    const val GENERIC_REJECTED = "Rejected"
+
+    // ------------------------------------------------------------------ customData 거부 확장 (PLAN §4.8)
+
+    /**
+     * `BatterySwapResponse` 로 배터리를 거부할 때 쓰는 벤더 식별자 (Part 2 S03 Error handling).
+     *
+     * `BatterySwapResponse` 는 *"Empty response by CSMS to confirm receipt"* 이고 **거부할 수
+     * 없다** (PLAN §4.3). OCA 가 그 한계를 위한 공식 우회를 정해 두었다 — 응답에
+     * `customData` 를 실어 `status`/`statusInfo` 를 알린다. 그래도 **응답의 성격은 수신
+     * 확인 그대로**이므로 CALLERROR 로 답하지 않는다.
+     *
+     * 지원 여부는 디바이스 모델의
+     * `CustomizationCtrlr.CustomImplementationEnabled[이 vendorId] = true` 로 보고한다.
+     */
+    const val VENDOR_ID_BATTERY_SWAP_RESPONSE = "org.openchargealliance.batteryswapresponse"
+}
+
+/**
+ * 배터리 거부 사유 코드 — 부록 `reason_codes.csv` 가 정본이다 (PLAN §4.9.1).
+ *
+ * 이 여섯 개는 표준이 **사전 정의**한 값이라 우리가 짓는 것이 아니다. 문자열 리터럴로 흩어
+ * 놓으면 오타가 조용히 통과한다 — `statusInfo.reasonCode` 는 `maxLength` 만 검사받고 값의
+ * 목록은 스키마에 없기 때문이다.
+ *
+ * @param wireValue 전선 위의 값. 열거형 이름이 바뀌어도 이 값은 흔들리지 않는다.
+ * @param appliesToRequestBatterySwap `RequestBatterySwapResponse.statusInfo` 에도 쓸 수 있는가.
+ *   부록 표에서 그 자리에 나오는 것은 [NO_BATTERY_AVAILABLE] 하나뿐이다 (S02.FR.04).
+ */
+enum class BatteryRejectionReason(
+    val wireValue: String,
+    val appliesToRequestBatterySwap: Boolean = false,
+) {
+
+    /** SoH 가 너무 낮다. */
+    BATTERY_SOH_LOW("BatterySoHLow"),
+
+    /** SoC 값이 부적절하다. */
+    BATTERY_SOC("BatterySoC"),
+
+    /** 배터리가 손상됐다. */
+    BATTERY_DAMAGED("BatteryDamaged"),
+
+    /** 우리가 모르는 일련번호다 (PLAN §5.4 F3). */
+    BATTERY_UNKNOWN("BatteryUnknown"),
+
+    /** 허용되지 않는 배터리 타입이다. */
+    BATTERY_TYPE("BatteryType"),
+
+    /**
+     * 교환에 내줄 배터리가 없다 (S02.FR.04, PLAN §5.4 F1).
+     *
+     * **재고 판정은 스테이션이 한다** (PLAN §4.5). CSMS 는 이 코드를 만들지 않고 받아 기록만
+     * 한다 — Part 6 `TC_S_102_CSMS` 가 그 시나리오다.
+     */
+    NO_BATTERY_AVAILABLE("NoBatteryAvailable", appliesToRequestBatterySwap = true);
+
+    companion object {
+        /** 전선 위의 값으로 찾는다. 대소문자를 가리지 않는다 — *"The string is case-insensitive"* (스키마). */
+        fun ofWire(value: String?): BatteryRejectionReason? =
+            entries.firstOrNull { it.wireValue.equals(value, ignoreCase = true) }
+    }
 }

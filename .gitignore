@@ -11,6 +11,9 @@ build/
 # zannabi-code 실행 증거 (필요 시 선별 커밋)
 .zannabi/
 
+# H2 — OUT_TIMED_OUT 장부 (PLAN §5.3). 런타임 데이터라 저장소에 넣지 않는다.
+data/
+
 # IDE
 .idea/
 *.iml
@@ -24,3 +27,6 @@ build/
 
 # 중첩 실행이 만든 로컬 권한 설정
 .claude/settings.local.json
+
+# 테스트 JVM 부산물
+.attach_pid*

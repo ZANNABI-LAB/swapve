@@ -20,6 +20,9 @@ enum class SimStep {
     /** S01 `AuthorizeRequest` 발신 직전 */
     AUTHORIZE,
 
+    /** S02 `RequestBatterySwapRequest` 수신 직후, 응답을 정하기 직전 */
+    REQUEST_BATTERY_SWAP,
+
     /** 충전 트랜잭션 `TransactionEventRequest` 발신 직전 */
     TRANSACTION_EVENT,
 
@@ -28,25 +31,27 @@ enum class SimStep {
 
     /** `BatterySwapRequest(BatteryOut)` 발신 직전 */
     BATTERY_OUT,
+
+    /** `BatterySwapRequest(BatteryOutTimeout)` 발신 직전 (S03.FR.06) */
+    BATTERY_OUT_TIMEOUT,
 }
 
 /**
- * 장애 주입 훅 — **뼈대뿐이다.**
+ * 장애 주입 훅.
  *
- * ### 지금은 자리만 만든다
+ * M6 은 호출 지점만 뚫어 두고 [None] 하나로 끝냈다. **M7 이 그 자리를 채운다** — 실패
+ * 시나리오 F1~F6 (PLAN §5.4) 이 성공 기준 S3 이기 때문이다.
  *
- * 실패 시나리오 F1~F6 (PLAN §5.4) 은 **M7 의 일이다.** 여기에 미리 구현해 두면 M6 의 범위를
- * 넘고, 검증되지 않은 코드가 "있는 것처럼" 보인다. 그래서 지금 있는 것은 호출 지점과
- * [None] 하나뿐이다.
+ * ### 여섯 시나리오가 전부 이 훅을 쓰지는 않는다
  *
- * ### 왜 그럼에도 지금 두는가
+ * 그게 정상이다. F1(배터리 부족)·F3(미등록 배터리)은 **구성**으로 재현된다 — 스테이션에
+ * 내줄 배터리를 두지 않거나, CSMS 가 모르는 일련번호를 가진 배터리를 넣으면 그만이다.
+ * F5(순서 위반)는 인가를 건너뛰는 것으로 충분하고, F2·F4·F6 은 시뮬레이터의 시퀀스
+ * 진입점([StationSimulator.reportBatteryOutTimeout] 등)으로 재현된다.
  *
- * 호출 지점을 나중에 뚫으려면 시퀀스 함수 전부를 손대야 한다. 훅 하나를 미리 심어 두는
- * 비용은 함수 호출 한 줄이고, 그건 PLAN §11.0 이 경계한 "미래를 위한 추상 계층"이 아니라
- * **되돌리기 비싼 자리를 지금 열어 두는 것**에 해당한다.
- *
- * 구현체는 [before] 에서 지연·예외·상태 조작을 하거나, [rewrite] 로 나갈 페이로드를
- * 바꿔치기할 수 있다. 어느 쪽도 지금은 하지 않는다.
+ * 훅이 필요한 것은 **시퀀스 한가운데서 무언가 끊기는** 상황이다 — 그게 [failingAt] 이고,
+ * F6 의 "교환 도중 연결이 끊겼다"가 그 용도다. 없는 쓰임을 위해 훅을 더 만들지 않는다
+ * (PLAN §11.0).
  */
 fun interface FaultInjection {
 
@@ -58,11 +63,31 @@ fun interface FaultInjection {
      */
     suspend fun before(step: SimStep, context: FaultContext)
 
-    /** 아무것도 하지 않는다. M6 의 정상 경로가 쓰는 유일한 구현이다. */
     companion object {
+
+        /** 아무것도 하지 않는다. 정상 경로가 쓰는 구현이다. */
         val None: FaultInjection = FaultInjection { _, _ -> }
+
+        /**
+         * [step] 에 도달하면 [SimulatedFault] 를 던져 시퀀스를 끊는다.
+         *
+         * 교환이 **반쪽으로 남는다.** 그 뒤 재접속해 CALL 을 재전송하는 것이 F6 이고, 그때
+         * 장부가 두 번 늘지 않아야 한다 (PLAN §5.4 F6).
+         */
+        fun failingAt(step: SimStep, message: String): FaultInjection = FaultInjection { at, context ->
+            if (at == step) throw SimulatedFault("$message (step=$at, station=${context.stationId})")
+        }
     }
 }
+
+/**
+ * 주입된 장애.
+ *
+ * 전용 타입인 것이 요점이다. 시험이 `IllegalStateException` 을 잡으면 **시뮬레이터의 진짜
+ * 버그까지 함께 삼킨다** — 그러면 "장애를 주입했는데 통과했다"와 "코드가 깨졌는데 통과했다"를
+ * 구분할 수 없다.
+ */
+class SimulatedFault(message: String) : RuntimeException(message)
 
 /**
  * 훅에 함께 넘기는 상황 정보.

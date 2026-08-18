@@ -57,16 +57,36 @@ data class SimBattery(
  *
  * @param connectorId 슬롯 안의 커넥터 번호. `TransactionEvent.evse.connectorId` 가 있어야
  *   한다는 Part 6 Tool validation 때문에 값으로 들고 있는다.
+ * @param chargingTransactionId 이 슬롯의 충전 트랜잭션 식별자를 **고정한다.** `null` 이면
+ *   슬롯이 트랜잭션을 열 때 발번한다. 적합성 시험이 `TC_S_103_CSMS` 의
+ *   `111-222-333-444-1..-4` 를 스펙 원문 그대로 쓰기 위한 자리다.
+ * @param chargingAlreadyStarted **이 슬롯의 충전은 이 시나리오 이전에 시작됐다.**
+ *   `true` 면 부팅 시 `TransactionEvent(Started)` 를 보내지 않고 [chargingTransactionId] 만
+ *   이어받는다 → **CSMS 는 시작을 본 적 없는 트랜잭션의 종료를 받게 된다.**
+ *
+ *   이것이 `TC_S_103_CSMS` 의 실제 모습이다 (PLAN §7.1 읽을 것 5): 입고 배터리는 tx `…-3`/`…-4`
+ *   로 **시작**되지만, 반출 배터리의 tx `…-1`/`…-2` 는 그 이전에 시작됐고 여기서는 **종료만**
+ *   온다. CSMS 가 그때 폭발하면 안 되고, 그 사실은 이 플래그가 있어야 실제 연결 위에서
+ *   재현된다. 기본값 `false` 는 S04.FR.11 (재부팅 시 트랜잭션 재개시) 그대로다.
  */
 data class SlotConfig(
     val slotId: Int,
     val battery: SimBattery? = null,
     val connectorId: Int = 1,
+    val chargingTransactionId: String? = null,
+    val chargingAlreadyStarted: Boolean = false,
 ) {
     init {
         // EVSE id 0 은 "충전소 전체"를 가리키는 예약값이라 슬롯이 될 수 없다 (Part 2 §K).
         require(slotId >= 1) { "슬롯 번호는 1 이상이어야 한다: $slotId" }
         require(connectorId >= 1) { "커넥터 번호는 1 이상이어야 한다: $connectorId" }
+        // 배터리가 없는 슬롯에는 돌아가는 충전 트랜잭션도 없다.
+        require(!(chargingAlreadyStarted && battery == null)) {
+            "빈 슬롯 $slotId 에 이미 시작된 충전 트랜잭션이 있을 수 없다"
+        }
+        require(!(chargingAlreadyStarted && chargingTransactionId == null)) {
+            "슬롯 $slotId 의 충전이 이미 시작됐다면 그 트랜잭션 식별자를 알고 있어야 한다"
+        }
     }
 }
 

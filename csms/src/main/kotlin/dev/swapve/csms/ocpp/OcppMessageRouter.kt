@@ -8,6 +8,8 @@ import dev.swapve.csms.auth.AuthorizationStatus
 import dev.swapve.csms.config.CsmsProperties
 import dev.swapve.csms.station.StationRegistration
 import dev.swapve.csms.station.StationRegistry
+import dev.swapve.csms.swap.BatteryRegistry
+import dev.swapve.csms.swap.BatteryRejection
 import dev.swapve.csms.swap.ChargingEvent
 import dev.swapve.csms.swap.ChargingTransactionRegistry
 import dev.swapve.csms.swap.SlotStateRegistry
@@ -56,6 +58,7 @@ class OcppMessageRouter(
     private val stations: StationRegistry,
     private val authorizations: AuthorizationRegistry,
     private val swaps: SwapCoordinator,
+    private val batteries: BatteryRegistry,
     private val slotStates: SlotStateRegistry,
     private val chargingTransactions: ChargingTransactionRegistry,
     private val validator: OcppPayloadValidator,
@@ -254,9 +257,23 @@ class OcppMessageRouter(
      * 다른 저장소, 다른 키다. 들어온 배터리의 충전은 교환이 끝난 뒤에도 며칠 계속되므로,
      * 둘을 한 객체로 묶으면 그 배터리가 언제까지 어느 교환에 매여 있는지가 거짓이 된다.
      *
-     * 응답에 `idTokenInfo.status = Accepted` 를 싣는다. 요청에 `idToken` 이 실려 있을 때
-     * 적합성 시험이 그것을 확인하기 때문이다 (PLAN §7.1 `TC_S_103_CSMS` step 6/10/14/18).
-     * `NoAuthorization` 은 애초에 인가가 아니므로 대상이 아니다.
+     * ### ★ 무인가 요청에도 `idTokenInfo.status = Accepted` 를 싣는다 (M7 정정)
+     *
+     * M6 은 *"`NoAuthorization` 은 애초에 인가가 아니므로 대상이 아니다"* 라고 판단해
+     * `idToken` 이 있을 때만 실었다. **그 판단이 틀렸다.**
+     *
+     * `TC_S_103_CSMS` step 5/9/13/17 의 요청은 전부 `idToken.type = NoAuthorization` 에
+     * `idToken.idToken = ""` 이다. 인가 대상이 아니다. 그런데 같은 케이스의 Tool validation 은
+     * **step 6/10/14/18 응답의 `idTokenInfo.status` 가 `Accepted`** 이길 요구한다
+     * (Part 6 p.1366–1369, PLAN §7.1 함정 4). "토큰이 없으니 생략한다"가 자연스러운 구현이고,
+     * 그러면 적합성에 떨어진다.
+     *
+     * `TransactionEventResponse` 스키마에는 top-level `required` 가 없어 `idTokenInfo` 는
+     * **선택 필드**다. 즉 **스키마 검증만으로는 절대 잡히지 않는다** — 적합성 시험이 유일한
+     * 검출 수단이라 `TcS103CsmsTest` 가 이 필드를 명시적으로 단언한다.
+     *
+     * 응답에 싣는 것과 **기록하는 것은 다르다.** [ChargingEvent.idToken] 에는 여전히 `null` 을
+     * 남긴다 — 없는 인가를 있는 것처럼 적으면 그게 조용히 훼손된 장부다.
      */
     private fun transactionEvent(principal: StationPrincipal, payload: ObjectNode): InboundResponse {
         val stationId = StationId(principal.stationId)
@@ -297,10 +314,10 @@ class OcppMessageRouter(
             ),
         )
 
+        // 요청에 토큰이 있든 없든 싣는다. 이유는 위 KDoc — Tool validation 이 요구하고,
+        // 스키마는 선택 필드라 잡아 주지 않는다.
         val response = objectNode().apply {
-            if (idToken != null) {
-                putObject("idTokenInfo").put("status", BatterySwapWire.AUTHORIZATION_ACCEPTED)
-            }
+            putObject("idTokenInfo").put("status", BatterySwapWire.AUTHORIZATION_ACCEPTED)
         }
         return respond(BatterySwapWire.TRANSACTION_EVENT, response)
     }
@@ -314,7 +331,12 @@ class OcppMessageRouter(
      * 인가가 없어도(F5), 중복이어도(F4) 응답은 정상 회신이고 사실만 기록에 남는다
      * (PLAN §5.4 — *"모든 위반은 CALLRESULT 로 정상 응답한다"*).
      *
-     * `customData` 로 배터리를 거부하는 확장(PLAN §4.8)은 **M7** 이다. 지금 만들지 않는다.
+     * ### F3 — 미등록 배터리는 `customData` 로 거부한다 (M7, PLAN §4.8)
+     *
+     * 거부하더라도 **응답의 성격은 수신 확인 그대로**다. `CALLERROR` 로 답하지 않고,
+     * 상태 진행도 멈추지 않는다 — 그 배터리는 실제로 스테이션 안에 들어와 있고, 그 사실을
+     * 기록하지 않으면 장부가 현실과 어긋난다. 우리가 알리는 것은 *"받았지만 우리 것이
+     * 아니다"* 이지 *"없던 일로 하자"* 가 아니다.
      *
      * 상태 진행은 [SwapCoordinator] 가 M3 상태머신에 위임한다 — 여기서 다시 구현하지 않는다.
      */
@@ -338,7 +360,46 @@ class OcppMessageRouter(
             state::class.simpleName,
         )
 
-        return respond(BatterySwapWire.BATTERY_SWAP, objectNode())
+        val serials = payload.path("batteryData").mapNotNull { it.text("serialNumber") }
+        val rejection = batteries.rejectionFor(serials)
+        if (rejection != null) {
+            log.warn(
+                "미등록 배터리: station={} serials={}",
+                principal.stationId, rejection.unknownSerials,
+            )
+        }
+
+        return respond(BatterySwapWire.BATTERY_SWAP, batterySwapResponse(rejection))
+    }
+
+    /**
+     * `BatterySwapResponse` — 빈 응답, 또는 거부를 실은 `customData` (PLAN §4.8).
+     *
+     * OCA 가 정한 공식 우회다 (Part 2 S03 Error handling):
+     *
+     * ```jsonc
+     * "customData": {
+     *   "vendorId": "org.openchargealliance.batteryswapresponse",
+     *   "status": "Rejected",
+     *   "statusInfo": { "reasonCode": "BatteryUnknown", "additionalInfo": "…" }
+     * }
+     * ```
+     *
+     * 공식 스키마의 `CustomDataType` 에는 `additionalProperties: false` 가 **없다** — OCA 가
+     * *"so it can be extended with arbitrary JSON properties"* 라고 명시했다. 그래서 이
+     * customData 를 붙여도 응답이 공식 스키마를 통과한다. [respond] 가 그 사실을 매번
+     * 실행되는 검사로 확인한다.
+     */
+    private fun batterySwapResponse(rejection: BatteryRejection?): ObjectNode = objectNode().apply {
+        if (rejection == null) return@apply
+        putObject("customData").apply {
+            put("vendorId", BatterySwapWire.VENDOR_ID_BATTERY_SWAP_RESPONSE)
+            put("status", BatterySwapWire.GENERIC_REJECTED)
+            putObject("statusInfo").apply {
+                put("reasonCode", rejection.reason.wireValue)
+                put("additionalInfo", rejection.additionalInfo)
+            }
+        }
     }
 
     // ------------------------------------------------------------------ 공통

@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.node.JsonNodeFactory
 import com.fasterxml.jackson.databind.node.ObjectNode
 import dev.swapve.ocpp.json.OcppDateTime
 import dev.swapve.ocpp.swap.AvailabilityState
+import dev.swapve.ocpp.swap.BatteryRejectionReason
 import dev.swapve.ocpp.swap.BatterySwapWire
 import java.time.Instant
 
@@ -158,6 +159,36 @@ internal object SimPayloads {
                 put("serialNumber", battery.serialNumber)
                 put("soC", battery.soC)
                 put("soH", battery.soH)
+            }
+        }
+    }
+
+    /**
+     * S02 원격 개시에 대한 스테이션의 답 (`RequestBatterySwapResponse`).
+     *
+     * ### 재고 판정은 스테이션이 한다 (PLAN §4.5)
+     *
+     * **S02.FR.04**: 배터리가 부족하면 **Charging Station 이** `Rejected` +
+     * `statusInfo.reasonCode = "NoBatteryAvailable"` 로 답한다. CSMS 는 재고를 몰라도 된다 —
+     * 그게 `TC_S_102_CSMS` 가 시험하는 것이고, v2 의 "CSMS 가 재고를 알아야 한다"는 잘못된
+     * 전제였다.
+     *
+     * @param reason 거부 사유. `Accepted` 면 `null` 이다 — `statusInfo` 는 선택 필드이고,
+     *   받아들이면서 사유를 다는 것은 의미가 없다.
+     */
+    fun requestBatterySwapResponse(
+        accepted: Boolean,
+        reason: BatteryRejectionReason? = null,
+        additionalInfo: String? = null,
+    ): ObjectNode = node().apply {
+        put(
+            "status",
+            if (accepted) BatterySwapWire.GENERIC_ACCEPTED else BatterySwapWire.GENERIC_REJECTED,
+        )
+        reason?.let {
+            putObject("statusInfo").apply {
+                put("reasonCode", it.wireValue)
+                additionalInfo?.let { text -> put("additionalInfo", text) }
             }
         }
     }

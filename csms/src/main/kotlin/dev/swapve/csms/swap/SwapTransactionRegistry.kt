@@ -1,5 +1,6 @@
 package dev.swapve.csms.swap
 
+import dev.swapve.ocpp.swap.BatteryRejectionReason
 import dev.swapve.swap.AnomalyReason
 import dev.swapve.swap.IgnoreReason
 import dev.swapve.swap.StationId
@@ -36,6 +37,29 @@ data class SwapIgnored(
 )
 
 /**
+ * S02 원격 개시가 스테이션에게 거부당한 기록 (PLAN §5.4 F1).
+ *
+ * 교환 트랜잭션이 **열리지 않았다.** 그래서 [SwapTransaction] 이 아니라 별도 기록이다 —
+ * 상태 없는 것을 상태로 만들면 "인가됐다가 취소된 교환"처럼 보인다.
+ *
+ * **재고 판정은 스테이션이 한다** (PLAN §4.5, S02.FR.04). CSMS 는 사유를 만들지 않고 받아
+ * 적을 뿐이며, 그게 `TC_S_102_CSMS` 다.
+ *
+ * @param reasonCode 스테이션이 보낸 `statusInfo.reasonCode` **원문**. 부록
+ *   `reason_codes.csv` 밖의 값이 와도 버리지 않는다 (PLAN §11.0) — 해석은 [reason] 이 한다.
+ */
+data class SwapRejection(
+    val key: SwapKey,
+    val idToken: dev.swapve.swap.IdToken,
+    val reasonCode: String?,
+    val additionalInfo: String?,
+    val at: Instant,
+) {
+    /** 사전 정의된 사유면 그 값, 아니면 `null`. 원문은 [reasonCode] 에 남아 있다. */
+    val reason: BatteryRejectionReason? get() = BatteryRejectionReason.ofWire(reasonCode)
+}
+
+/**
  * 교환 트랜잭션 보관소 — `(stationId, requestId)` 로 조회한다 (PLAN §5.3).
  *
  * ### 왜 복합키인가
@@ -63,6 +87,7 @@ class SwapTransactionRegistry {
     private val recordLock = Any()
     private val anomalies = ArrayList<SwapAnomaly>()
     private val ignored = ArrayList<SwapIgnored>()
+    private val rejections = ArrayList<SwapRejection>()
 
     /** 이 교환의 현재 상태. 처음 보는 키면 [SwapTransaction.Idle] 이다. */
     fun stateOf(key: SwapKey): SwapTransaction = transactions[key] ?: SwapTransaction.Idle
@@ -84,7 +109,12 @@ class SwapTransactionRegistry {
 
     fun recordIgnored(event: SwapIgnored) = synchronized(recordLock) { ignored += event; Unit }
 
+    fun recordRejection(rejection: SwapRejection) = synchronized(recordLock) { rejections += rejection; Unit }
+
     fun anomalies(): List<SwapAnomaly> = synchronized(recordLock) { anomalies.toList() }
 
     fun ignoredEvents(): List<SwapIgnored> = synchronized(recordLock) { ignored.toList() }
+
+    /** 스테이션이 거부한 원격 개시들 (PLAN §5.4 F1). */
+    fun rejections(): List<SwapRejection> = synchronized(recordLock) { rejections.toList() }
 }
