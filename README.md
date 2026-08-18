@@ -8,7 +8,7 @@
 > Implements the Battery Swap functional block of OCPP 2.1 (IEC 63584-210),
 > verified against the OCA conformance test cases.
 
-[![status](https://img.shields.io/badge/status-M4%20session%20layer-yellow)]()
+[![status](https://img.shields.io/badge/status-M5%20websocket%20endpoint-yellow)]()
 [![license](https://img.shields.io/badge/license-Apache--2.0-blue)]()
 [![OCPP](https://img.shields.io/badge/OCPP-2.1%20Edition%202-informational)]()
 
@@ -16,11 +16,13 @@
 
 ## 현재 상태
 
-**M4 — OCPP-J 세션 계층.** pending CALL·타임아웃·재접속 멱등·per-station 직렬화가 붙었습니다.
-전송은 주입받은 함수 뒤에 있어 WebSocket도 Spring도 모릅니다. WebSocket 연결은 M5입니다.
+**M5 — WebSocket 엔드포인트.** CSMS가 실제로 기동해 스테이션 연결을 받습니다.
+`ocpp2.1` 서브프로토콜을 협상하고, 부팅·하트비트·S01 인가에 응답합니다.
+프레이밍·스키마 검증·멱등은 `ocpp-core` 그대로입니다 — csms는 그것을 조립할 뿐입니다.
 
 ```bash
-./gradlew test
+./gradlew test        # 전체 시험
+./gradlew :csms:bootRun   # ws://localhost:8080/ocpp/{stationId}
 ```
 
 - 📄 **[구현 계획서 (docs/PLAN.md)](docs/PLAN.md)** — 프로토콜 명세, 도메인 설계, 검증 전략
@@ -33,7 +35,8 @@
 | M2 | `ocpp-core` 스키마 검증 + CALLERROR 정책 | ✅ |
 | M3 | `swap-domain` 교환 상태머신 | ✅ |
 | M4 | ★ `ocpp-core` 세션 계층 | ✅ |
-| M5~M10 | [PLAN §8](docs/PLAN.md) | |
+| M5 | `csms` WebSocket + S01 Authorize + Boot/Heartbeat | ✅ |
+| M6~M10 | [PLAN §8](docs/PLAN.md) | |
 
 ---
 
@@ -81,6 +84,30 @@ OCPP 2.1 Part 6는 **시험 대상이 CSMS인** Battery Swap 테스트 케이스
 | `TC_S_103_CSMS` | Remote Start — 전체 교환 시퀀스 (배터리 2개 세트) |
 
 > "표준을 준수한다"를 주장이 아니라 **통과 여부로 판정 가능한 형태**로 만드는 것이 목표입니다.
+
+### OCPP-J 전송 계층 (Part 4 Edition 2 §3)
+
+| 항목 | 요구 | 상태 |
+|---|---|---|
+| §3.1.1 연결 URL — 식별자 48자 이하, 콜론 불가, 퍼센트 디코딩 | SHALL | ✅ 핸드셰이크에서 거절 |
+| §3.1.1 신원을 URL에만 의존하지 않기 | RECOMMENDED | ⚠️ `StationPrincipal(authMethod=NONE)` — 자리만 마련 |
+| §3.1.2 `Sec-WebSocket-Protocol`로 버전 협상 | SHALL | ✅ `ocpp2.1` 미제시 시 연결 거절 |
+| §3.3 101 응답에 선택한 하나를 실어 회신 | SHALL | ✅ |
+| §3.4 RFC 7692 압축 (`permessage-deflate`) | **SHALL** | ✅ 협상됨 |
+
+**§3.4 압축에 대한 기록.** 적합성 항목이라 추측하지 않고 관측했습니다.
+`WebSocketHandshakeTest`가 101 응답의 `Sec-WebSocket-Extensions` 헤더를 직접 읽으며,
+실제로 `permessage-deflate;client_max_window_bits=15`가 돌아옵니다.
+확장 협상의 주체는 서블릿 컨테이너(내장 Tomcat)이고 Spring이 클라이언트 요청을 그대로
+통과시키므로, **애플리케이션 코드로 켜거나 끄는 자리는 없습니다.** 만약 언젠가 꺼진 것이
+관측된다면 손댈 곳은 내장 컨테이너 선택 또는 앞단 리버스 프록시이며, 그때 이 시험이 먼저
+실패합니다.
+
+**§3.1.1 이중 확인에 대한 기록.** 스펙은 연결 URL만으로 스테이션을 식별하지 말라고 권고합니다.
+현재 구현은 경로에서 식별자를 얻지만, 그 사실이 `StationPrincipal.authMethod = NONE`으로
+남습니다. 보안 프로파일 2/3을 붙일 때 바뀌는 것은 이 값 하나이고, 핸들러는 이미 문자열이
+아니라 `StationPrincipal`을 받고 있습니다 ([PLAN §11.4](docs/PLAN.md)).
+인증서 발급·CSR·키 저장소는 범위 밖입니다.
 
 ---
 

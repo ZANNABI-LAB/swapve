@@ -1,0 +1,44 @@
+package dev.swapve.csms.config
+
+import org.springframework.boot.context.properties.ConfigurationProperties
+import java.time.Duration
+
+/**
+ * CSMS 설정.
+ *
+ * 포트와 TLS 는 여기 없다 — `server.port` / `server.ssl.*` 로 Spring 이 이미 갖고 있고,
+ * 같은 것을 두 곳에 두면 어느 쪽이 이기는지가 새로운 질문이 된다 (PLAN §11.0).
+ * **wss 종료는 `server.ssl.enabled` 로 켜고 끈다** — 리버스 프록시가 앞단에서 종료해도 무방하다
+ * (PLAN §11.4).
+ *
+ * @param endpointPath WebSocket 엔드포인트 경로. 실제 연결 URL 은 여기에 `/` + 스테이션
+ *   식별자가 붙는다 (Part 4 §3.1.1).
+ * @param heartbeatInterval `BootNotificationResponse.interval` 로 회신할 하트비트 간격.
+ * @param operatorId 스테이션 등록에 남길 소유 사업자 (PLAN §11.3). **값이 항상 하나여도 둔다** —
+ *   단일 사업자를 전제로 박으면 나중에 로밍에서 전 데이터 마이그레이션이 필요해진다.
+ * @param authorizedIdTokens 인가할 토큰 목록. MVP 의 인가 정책은 이 목록 조회가 전부다.
+ * @param maxTextMessageSize 텍스트 프레임 버퍼 상한. OCPP 페이로드는 작지만
+ *   `GetCompositeSchedule` 류는 커질 수 있어 기본 64 KiB 로 둔다.
+ * @param callTimeout CSMS 가 보낸 CALL 의 응답 대기 한도 (Part 4 §4.1.1).
+ */
+@ConfigurationProperties(prefix = "csms")
+data class CsmsProperties(
+    val endpointPath: String = "/ocpp",
+    val heartbeatInterval: Duration = Duration.ofSeconds(300),
+    val operatorId: String = "swapve",
+    val authorizedIdTokens: List<AuthorizedIdToken> = emptyList(),
+    val maxTextMessageSize: Int = 64 * 1024,
+    val callTimeout: Duration = Duration.ofSeconds(30),
+) {
+
+    /**
+     * 인가 목록의 한 줄 — `(idToken, type)`.
+     *
+     * **사용자 테이블의 FK 가 아니다** (PLAN §11.3). 로밍 토큰은 애초에 우리 DB 에 없다.
+     * 표준이 `IdTokenType` 에 `type` 을 필수로 두고 있으므로 설정도 그대로 둘을 함께 받는다.
+     */
+    data class AuthorizedIdToken(
+        val idToken: String,
+        val type: String,
+    )
+}

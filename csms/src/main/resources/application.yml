@@ -1,0 +1,26 @@
+server:
+  port: 8080
+  ssl:
+    # wss/TLS 종료는 설정으로 켜고 끈다 (PLAN §11.4).
+    # 리버스 프록시가 앞단에서 종료해도 무방하다 — 그때는 여기를 false 로 둔다.
+    # 켤 때는 server.ssl.key-store 계열 설정을 함께 채운다.
+    enabled: false
+
+csms:
+  # 실제 연결 URL 은 여기에 "/" + 스테이션 식별자가 붙는다 (Part 4 §3.1.1).
+  # 예: ws://localhost:8080/ocpp/CS001
+  endpoint-path: /ocpp
+  heartbeat-interval: 300s
+  # 값이 항상 하나여도 둔다 (PLAN §11.3 로밍).
+  operator-id: swapve
+  max-text-message-size: 65536
+  call-timeout: 30s
+  # MVP 인가 정책 — 이 목록 조회가 전부다. 사용자 테이블이 아니라 (idToken, type) 값 객체의
+  # 집합이다 (PLAN §11.3). 목록에 없는 토큰은 거부되지만 시도는 기록된다.
+  authorized-id-tokens:
+    - id-token: RFID-0001
+      type: ISO14443
+
+logging:
+  level:
+    dev.swapve: INFO

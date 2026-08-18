@@ -5,6 +5,9 @@ jackson = "2.18.2"
 tsid = "5.2.6"
 networknt = "1.5.6"
 coroutines = "1.10.1"
+# csms 전용. ocpp-core / swap-domain 은 Spring 을 모른다 (PLAN §6 설계원칙 1)
+spring-boot = "3.4.1"
+spring-dependency-management = "1.1.7"
 
 [libraries]
 jackson-databind = { module = "com.fasterxml.jackson.core:jackson-databind", version.ref = "jackson" }
@@ -16,9 +19,19 @@ tsid-creator = { module = "com.github.f4b6a3:tsid-creator", version.ref = "tsid"
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
 # 가상 시간. 타임아웃 테스트가 실제로 기다리지 않게 한다
 kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "coroutines" }
+# WebSocket 서버. 버전은 spring-dependency-management 가 BOM 으로 정한다
+spring-boot-starter-websocket = { module = "org.springframework.boot:spring-boot-starter-websocket" }
+spring-boot-starter-test = { module = "org.springframework.boot:spring-boot-starter-test" }
+spring-boot-configuration-processor = { module = "org.springframework.boot:spring-boot-configuration-processor" }
+# @ConfigurationProperties 의 생성자 바인딩이 Kotlin 주 생성자를 읽으려면 리플렉션이 필요하다
+kotlin-reflect = { module = "org.jetbrains.kotlin:kotlin-reflect", version.ref = "kotlin" }
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
 junit-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "junit" }
 junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher" }
 
 [plugins]
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+# @Configuration / @Component 클래스를 open 으로 만든다. Spring 의 CGLIB 프록시가 요구한다
+kotlin-spring = { id = "org.jetbrains.kotlin.plugin.spring", version.ref = "kotlin" }
+spring-boot = { id = "org.springframework.boot", version.ref = "spring-boot" }
+spring-dependency-management = { id = "io.spring.dependency-management", version.ref = "spring-dependency-management" }
