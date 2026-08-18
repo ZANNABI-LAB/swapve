@@ -30,6 +30,10 @@ object BatterySwapWire {
     const val BATTERY_SWAP = "BatterySwap"
     const val REQUEST_BATTERY_SWAP = "RequestBatterySwap"
 
+    /** 디바이스 모델 조회·설정 (M9, PLAN §4.9). 식별자는 [DeviceModelVariables] 를 보라. */
+    const val GET_VARIABLES = "GetVariables"
+    const val SET_VARIABLES = "SetVariables"
+
     // ------------------------------------------------------------------ BatterySwapEventEnumType
 
     /** 헌 배터리가 **들어왔다.** */
@@ -66,6 +70,13 @@ object BatterySwapWire {
     /** 재시작/리부트. Part 6 는 [SECURITY_EVENT_STARTUP] 과 이 값 둘 중 하나를 허용한다. */
     const val SECURITY_EVENT_RESET_OR_REBOOT = "ResetOrReboot"
 
+    // ------------------------------------------------------------------ BootReasonEnumType
+
+    const val BOOT_REASON_POWER_UP = "PowerUp"
+
+    /** 스테이션이 스스로 재시작했다. **S04.FR.11** 의 재부팅 경로가 이 사유로 온다. */
+    const val BOOT_REASON_LOCAL_RESET = "LocalReset"
+
     // ------------------------------------------------------------------ TransactionEvent (S04)
 
     /** `TransactionEventEnumType` */
@@ -94,9 +105,49 @@ object BatterySwapWire {
      */
     const val TRIGGER_REASON_ENERGY_LIMIT_REACHED = "EnergyLimitReached"
 
+    /**
+     * `TriggerReasonEnumType` — 주기 계량 보고 (S04.FR.04).
+     *
+     * 충전 중 SoC 를 알리는 `TransactionEvent(Updated)` 의 계기다. 상태가 바뀌어서 보내는
+     * 것이 아니므로 [TRIGGER_REASON_CHARGING_STATE_CHANGED] 를 쓰면 거짓이 된다 —
+     * `chargingState` 는 그대로 `Charging` 이다.
+     */
+    const val TRIGGER_REASON_METER_VALUE_PERIODIC = "MeterValuePeriodic"
+
     /** `ChargingStateEnumType` */
     const val CHARGING_STATE_EV_CONNECTED = "EVConnected"
     const val CHARGING_STATE_CHARGING = "Charging"
+
+    /**
+     * `ChargingStateEnumType` — **충전 상한(`MaxSoc`)에 닿아 스테이션이 급전을 멈췄다** (S04.FR.06).
+     *
+     * ### 트랜잭션은 끝나지 않는다
+     *
+     * 멈춘 것은 **에너지 흐름**이지 트랜잭션이 아니다. 배터리는 여전히 슬롯에 꽂혀 있고
+     * (`TxStopPoint = EVConnected`, S04.FR.09), 트랜잭션은 그 배터리를 누군가 꺼내갈 때
+     * 비로소 `Ended` 로 닫힌다. 여기서 닫으면 나중에 반출될 때 종료할 트랜잭션이 없어
+     * 장부가 허공에서 끝난다.
+     *
+     * `EVSE` 가 멈춘 것이라 `SuspendedEV` 가 아니라 이 값이다 — 배터리가 거부한 것이 아니다.
+     */
+    const val CHARGING_STATE_SUSPENDED_EVSE = "SuspendedEVSE"
+
+    // ------------------------------------------------------------------ 계량값 (S04.FR.04)
+
+    /** `MeasurandEnumType` — 배터리 충전 상태. 주기 보고가 싣는 값이다. */
+    const val MEASURAND_SOC = "SoC"
+
+    /**
+     * `SampledValue.unitOfMeasure.unit` — 퍼센트.
+     *
+     * 스키마는 이 필드를 열거형이 아니라 문자열로 두고 *"SHALL use a value from the list
+     * Standardized Units of Measurements in Part 2 Appendices"* 라고만 적는다. 즉 오타가
+     * 스키마 검증을 그대로 통과한다 — 상수로 모으는 이유가 그것이다.
+     */
+    const val UNIT_PERCENT = "Percent"
+
+    /** `ReadingContextEnumType` — 주기 표본. 스키마 기본값과 같지만 명시해 둔다. */
+    const val READING_CONTEXT_SAMPLE_PERIODIC = "Sample.Periodic"
 
     /** `ChargingStateEnumType` — 트랜잭션이 끝난 뒤의 상태 (Part 6 `TC_S_103_CSMS` step 13/17). */
     const val CHARGING_STATE_IDLE = "Idle"

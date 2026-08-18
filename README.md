@@ -8,7 +8,7 @@
 > Implements the Battery Swap functional block of OCPP 2.1 (IEC 63584-210),
 > verified against the OCA conformance test cases.
 
-[![status](https://img.shields.io/badge/status-M8%20swap%20API%20%26%20metrics-yellow)]()
+[![status](https://img.shields.io/badge/status-M9%20charging%20%26%20device%20model-yellow)]()
 [![license](https://img.shields.io/badge/license-Apache--2.0-blue)]()
 [![OCPP](https://img.shields.io/badge/OCPP-2.1%20Edition%202-informational)]()
 
@@ -16,9 +16,12 @@
 
 ## 현재 상태
 
-**M8 — 교환 REST API + 지표 (성공 기준 S5).** 공식 적합성 케이스 `TC_S_102_CSMS`·
-`TC_S_103_CSMS`와 실패 시나리오 F1~F6이 통과하고(M7), 그 위에 **앱이 소비할 교환 API**가
-얹혔습니다. 표준이 정의한 S02(*"스마트폰 앱에서 QR을 찍어 교환을 개시"*)의 CSMS 측 계약입니다.
+**M9 — S04 충전 트랜잭션 + 디바이스 모델 변수.** 공식 적합성 케이스 `TC_S_102_CSMS`·
+`TC_S_103_CSMS`와 실패 시나리오 F1~F6이 통과하고(M7), 앱이 소비할 교환 API가 얹혔으며(M8),
+이제 **들어온 배터리의 충전**이 생명주기 전체로 기록됩니다 — 삽입 → 충전 시작 → SoC 주기
+보고 → `MaxSoc` 도달(멈추되 **트랜잭션은 유지**) → 제거. 스테이션 재부팅 시 트랜잭션 재개시
+(S04.FR.11)와 `GetVariables`/`SetVariables`(`TargetSoC`·`MaxSoc`·`BatteryCartridge.SoC`)도
+동작합니다. **스마트차징·요금은 범위 밖입니다** ([PLAN §10 결정 #8](docs/PLAN.md)).
 
 ```bash
 ./gradlew build             # 전체 시험 + 모듈 경계 검증
@@ -33,6 +36,9 @@ curl -X POST localhost:8080/api/swaps -H 'Content-Type: application/json' \
      -d '{"stationId":"CS001","idToken":{"idToken":"RFID-0001","type":"ISO14443"}}'
 curl localhost:8080/api/swaps/CS001:1734829911   # 진행 상태 · 양쪽 배터리 SoC/SoH
 curl localhost:8080/api/metrics/swaps            # 성공률 · 소요시간 · 실패 사유
+
+# 충전 트랜잭션 — 어느 슬롯의 어느 배터리가 얼마나 찼나 (S04)
+curl localhost:8080/api/stations/CS001/charging-transactions
 ```
 
 - 📄 **[구현 계획서 (docs/PLAN.md)](docs/PLAN.md)** — 프로토콜 명세, 도메인 설계, 검증 전략
@@ -50,7 +56,8 @@ curl localhost:8080/api/metrics/swaps            # 성공률 · 소요시간 · 
 | M6 | `station-sim` + S03 교환 1건 완주 | ✅ |
 | M7 | ★ `TC_S_102/103_CSMS` 적합성 + 실패 F1~F6 + S02 발신 | ✅ |
 | M8 | 교환 REST API + 지표 ([docs/API.md](docs/API.md)) | ✅ |
-| M9~M10 | [PLAN §8](docs/PLAN.md) | |
+| M9 | S04 충전 트랜잭션 수신·기록 + 디바이스 모델 변수 | ✅ |
+| M10 | [PLAN §8](docs/PLAN.md) | |
 
 ---
 

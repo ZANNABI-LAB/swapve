@@ -274,6 +274,18 @@ class OcppMessageRouter(
      *
      * 응답에 싣는 것과 **기록하는 것은 다르다.** [ChargingEvent.idToken] 에는 여전히 `null` 을
      * 남긴다 — 없는 인가를 있는 것처럼 적으면 그게 조용히 훼손된 장부다.
+     *
+     * ### SoC 주기 보고도 여기로 온다 (M9, S04.FR.04)
+     *
+     * 충전 중에는 `eventType = Updated` 에 `meterValue` 가 실려 온다. 그 값이
+     * [ChargingEvent.socPercent] 로 남아 트랜잭션의 SoC 자취가 된다 ([socPercent] 참조).
+     *
+     * ### 시작을 본 적 없는 트랜잭션, 끝나지 않은 트랜잭션 둘 다 정상이다
+     *
+     * 앞의 것은 `TC_S_103_CSMS` 의 함정 4 이고, 뒤의 것은 **S04.FR.11** 이다 — 스테이션이
+     * 재부팅하면 진행 중이던 트랜잭션은 종료 통보 없이 사라지고 `Started` 가 무더기로 온다.
+     * 이 함수는 어느 쪽도 특별 취급하지 않는다. 처음 보는 `transactionId` 면 그냥 새로
+     * 생기고, 옛 것은 끝나지 않은 채 남는다 — 그 자체가 재부팅의 기록이다.
      */
     private fun transactionEvent(principal: StationPrincipal, payload: ObjectNode): InboundResponse {
         val stationId = StationId(principal.stationId)
@@ -311,6 +323,7 @@ class OcppMessageRouter(
                 stoppedReason = transactionInfo.text("stoppedReason"),
                 idToken = idToken,
                 at = payload.instant("timestamp"),
+                socPercent = payload.socPercent(),
             ),
         )
 
@@ -360,6 +373,8 @@ class OcppMessageRouter(
             state::class.simpleName,
         )
 
+        linkBatteriesToCharging(StationId(principal.stationId), payload)
+
         val serials = payload.path("batteryData").mapNotNull { it.text("serialNumber") }
         val rejection = batteries.rejectionFor(serials)
         if (rejection != null) {
@@ -370,6 +385,36 @@ class OcppMessageRouter(
         }
 
         return respond(BatterySwapWire.BATTERY_SWAP, batterySwapResponse(rejection))
+    }
+
+    /**
+     * 들어온 배터리의 **신원**을 그 슬롯의 충전 트랜잭션에 붙인다 (S04, PLAN §5.1).
+     *
+     * ### 두 생명주기를 합치는 것이 아니다
+     *
+     * 붙이는 것은 `(슬롯, 일련번호)` 라는 사실 하나뿐이고, 충전 트랜잭션은 교환을 참조하지
+     * 않는다. 그래서 교환이 `Completed` 가 된 뒤에도 — 며칠 뒤까지도 — 그 슬롯의 충전은
+     * 그대로 살아 있다. **여기가 §5.1 이 요구하는 분리가 실제로 성립하는 자리다.**
+     *
+     * ### 입고(`BatteryIn`)에서만 붙인다
+     *
+     * 반출되는 배터리는 이미 트랜잭션이 `Ended` 로 닫힌 뒤에 `BatteryOut` 이 온다
+     * (`TC_S_103_CSMS` step 13 → 21). 닫힌 트랜잭션에 뒤늦게 신원을 붙이는 것은
+     * 기록을 고치는 일이라 하지 않는다 — 그 배터리가 무엇이었는지는 **교환 기록**에
+     * `serialNumber`·`soC`·`soH` 로 온전히 남아 있다 (PLAN §11.2).
+     *
+     * 부팅 시점부터 꽂혀 있던 배터리는 붙일 근거가 없다. `TransactionEvent` 도 `NotifyEvent` 도
+     * 일련번호를 싣지 않기 때문이다. 그때 CSMS 가 아는 것은 슬롯뿐이고, 알고 싶으면
+     * `GetVariables` 로 물어야 한다 (PLAN §4.5).
+     */
+    private fun linkBatteriesToCharging(stationId: StationId, payload: ObjectNode) {
+        if (payload.text("eventType") != BatterySwapWire.BATTERY_IN) return
+
+        payload.path("batteryData").forEach { entry ->
+            val slotId = entry.path("evseId").takeIf { it.isInt }?.asInt() ?: return@forEach
+            val serialNumber = entry.text("serialNumber") ?: return@forEach
+            chargingTransactions.linkBattery(stationId, SlotId(slotId), serialNumber)
+        }
     }
 
     /**
@@ -432,4 +477,20 @@ class OcppMessageRouter(
      */
     private fun JsonNode.instant(field: String): Instant =
         text(field)?.let(OcppDateTime::parse) ?: clock.instant()
+
+    /**
+     * `meterValue` 에서 배터리 SoC 를 꺼낸다 (S04.FR.04).
+     *
+     * **`measurand` 가 명시적으로 `SoC` 인 표본만** 읽는다. 그 필드는 선택이고 생략하면
+     * 기본값이 에너지(Wh)이므로 (공식 스키마), 아무 표본이나 SoC 로 읽으면 전력량을
+     * 충전율로 기록하게 된다. 여러 개면 마지막 값이다 — 같은 시각의 표본 묶음에서 나중에
+     * 적힌 것이 더 최신이다.
+     */
+    private fun ObjectNode.socPercent(): Double? =
+        path("meterValue")
+            .flatMap { it.path("sampledValue") }
+            .lastOrNull { it.text("measurand") == BatterySwapWire.MEASURAND_SOC }
+            ?.path("value")
+            ?.takeIf { it.isNumber }
+            ?.asDouble()
 }

@@ -1,6 +1,7 @@
 package dev.swapve.station
 
 import dev.swapve.swap.IdToken
+import java.time.Duration
 
 /**
  * 교환 순서 (PLAN §4.6, Part 2 S03 Remark).
@@ -112,6 +113,18 @@ data class SlotConfig(
  *   `type = NoAuthorization`, `idToken = ""` (Part 6 Tool validation).
  * @param insertSlots 이용자가 헌 배터리를 넣을 빈 슬롯. [incomingBatteries] 와 순서대로 짝짓는다.
  * @param dispenseSlots 새 배터리를 내줄, 배터리가 들어 있는 슬롯.
+ * @param targetSoC 디바이스 모델 `BatterySwapCtrlr.TargetSoC` — **교환에 내줘도 되는 기준
+ *   SoC** (S04.FR.05). 철자의 끝이 대문자 `C` 인 것은 정본이 그렇기 때문이다 (PLAN §4.9 주의 2).
+ * @param maxSoc 디바이스 모델 `BatterySwapCtrlr.MaxSoc` — **충전 상한** (S04.FR.06/10).
+ *   [targetSoC] 이상이어야 한다. 철자의 끝이 소문자 `c` 인 것도 정본 그대로다.
+ * @param batteryInTimeout `BatterySwapCtrlr.Timeout` instance `In` — 인가 후 배터리 삽입 대기.
+ *   만료돼도 **CSMS 는 통보받지 못한다** (PLAN §4.7).
+ * @param batteryOutTimeout `BatterySwapCtrlr.Timeout` instance `Out` — 제공된 배터리 수령 대기.
+ *   만료되면 `BatterySwapRequest(BatteryOutTimeout)` 를 보낸다 (S03.FR.06).
+ *   ⚠️ **두 값이 변수 두 개가 아니다.** 같은 `Timeout` 변수의 인스턴스 둘이고, 그 사실은
+ *   `SimDeviceModel` 이 지킨다 (PLAN §4.9 주의 1).
+ * @param swapAvailable `BatterySwapCtrlr.Available` — 이 스테이션이 스왑을 지원하는가.
+ *   모든 적합성 케이스의 전제조건이라 기본값이 `true` 다.
  */
 data class StationSimConfig(
     val csmsUrl: String,
@@ -124,6 +137,11 @@ data class StationSimConfig(
     val incomingBatteries: List<SimBattery>,
     val swapOrder: SwapOrder = SwapOrder.IN_OUT,
     val chargingIdToken: String? = null,
+    val targetSoC: Int = 80,
+    val maxSoc: Int = 100,
+    val batteryInTimeout: Duration = Duration.ofSeconds(120),
+    val batteryOutTimeout: Duration = Duration.ofSeconds(120),
+    val swapAvailable: Boolean = true,
     val vendorName: String = "SwapVe",
     val model: String = "SwapVe-Sim",
     val serialNumber: String? = null,
@@ -152,6 +170,14 @@ data class StationSimConfig(
         require(insertSlots.size == dispenseSlots.size) {
             "장부가 맞지 않는 시나리오: 투입 ${insertSlots.size} 개, 반출 ${dispenseSlots.size} 개"
         }
+
+        require(targetSoC in 0..100) { "TargetSoC 는 0..100 이어야 한다: $targetSoC" }
+        require(maxSoc in 0..100) { "MaxSoc 는 0..100 이어야 한다: $maxSoc" }
+        // S04.FR.06/10 — 애초에 어긋난 스테이션을 만들어 놓고 "거부가 되더라"를 확인하는 것은
+        // 시험이 아니라 자기 오류다. 거부는 `SetVariables` 로 들어오는 변경에서 판정된다.
+        require(maxSoc >= targetSoC) { "S04.FR.06/10 — MaxSoc($maxSoc) 는 TargetSoC($targetSoC) 이상이어야 한다" }
+        require(!batteryInTimeout.isNegative) { "Timeout(In) 이 음수다: $batteryInTimeout" }
+        require(!batteryOutTimeout.isNegative) { "Timeout(Out) 이 음수다: $batteryOutTimeout" }
     }
 
     /** 연결 URL — `{csmsUrl}/{stationId}` (Part 4 §3.1.1). */

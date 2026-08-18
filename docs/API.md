@@ -38,6 +38,11 @@
 | `POST` | `/api/swaps` | 교환 시작 — `RequestBatterySwapRequest` 발사 (S02) |
 | `GET` | `/api/swaps/{id}` | 교환 1건의 진행 상태 |
 | `GET` | `/api/metrics/swaps` | 성공률 · 소요시간 · 실패 사유 (성공 기준 S5) |
+| `GET` | `/api/stations/{stationId}/charging-transactions` | 그 스테이션의 충전 트랜잭션 (S04) |
+| `GET` | `/api/stations/{stationId}/charging-transactions/{transactionId}` | 충전 1건 |
+
+> **충전은 교환의 하위 자원이 아니다.** 들어온 배터리의 충전은 교환이 끝난 뒤에도 며칠
+> 계속되기 때문이다 ([PLAN §5.1](PLAN.md)). 아래 해당 절 참조.
 
 ### 교환 식별자 `{id}` 는 `{stationId}:{requestId}` 다
 
@@ -359,6 +364,72 @@ F6 은 **세션의 멱등 원장**이 상위 계층을 부르지도 않고 저�
 
 ---
 
+## `GET /api/stations/{stationId}/charging-transactions` — 충전 트랜잭션 조회 (S04)
+
+> [PLAN §4.10](PLAN.md) · [§10 결정 #8](PLAN.md): **수신·기록만.** 스마트차징·요금은 없다.
+
+```jsonc
+// 200 OK — 이 스테이션의 충전 트랜잭션 전부
+[
+  {
+    "self": "/api/stations/CS001/charging-transactions/0KA9L2M3N4P5",
+    "stationId": "CS001",
+    "transactionId": "0KA9L2M3N4P5",
+    "slotId": 1,                          // 어느 슬롯(EVSE)인가
+    "batterySerialNumber": "BAT-USED-1",  // 어느 배터리인가 (모르면 null — 아래)
+    "status": "SUSPENDED",                // CONNECTED | CHARGING | SUSPENDED | ENDED | UNKNOWN
+    "socPercent": 50.0,                   // 마지막으로 보고된 SoC (S04.FR.04). 없으면 null
+    "startedAt": "2026-08-18T09:30:00Z",
+    "updatedAt": "2026-08-18T10:00:00Z",
+    "eventCount": 6
+  }
+]
+```
+
+`GET /api/stations/{stationId}/charging-transactions/{transactionId}` 는 같은 객체 1건이고,
+없으면 **404** 다. 목록은 없는 스테이션이어도 **빈 배열에 200** 이다 — *"그 스테이션에 도는
+충전이 없다"* 는 정상적인 답이고, 스테이션 자원은 아직 없다.
+
+### ★ 교환의 하위 자원이 아니다 ([PLAN §5.1](PLAN.md))
+
+`/api/swaps/{id}/charging` 같은 경로를 뚫지 **않았다.** 들어온 배터리의 충전은 **교환이 끝난
+뒤에도 며칠 계속되기 때문**이다 — 교환 아래에 매달면 교환이 `COMPLETED` 가 되는 순간 그
+배터리의 충전을 가리킬 이름이 사라진다. 충전은 스테이션의 슬롯에 매인 것이라 경로도 거기 있다.
+
+같은 이유로 이 응답에는 **교환을 가리키는 필드가 없다.** 이 배터리는 어느 교환에도 매여 있지
+않다. (`ChargingApiTest` 가 *"교환이 완료돼도 들어온 배터리의 충전은 조회된다"* 로 고정한다.)
+
+### `status` 는 원문 `chargingState` 가 아니다
+
+`chargingState` 의 값 목록은 표준이 늘릴 수 있고(`SuspendedEV` 등), 소비자가 알아야 하는 것은
+**"충전 중인가 · 멈췄나 · 끝났나"** 셋이다. 경계에서 한 번 옮긴다 — `SwapView.status` 와 같다.
+
+**`SUSPENDED` 는 끝난 것이 아니다.** `MaxSoc` 에 닿아 급전이 멈춘 상태이고(S04.FR.06),
+배터리는 여전히 슬롯에 있으며 트랜잭션은 살아 있다. 끝은 배터리를 꺼내갈 때다
+(`TxStopPoint = EVConnected`, S04.FR.09).
+
+### `batterySerialNumber` 가 `null` 인 것은 버그가 아니다
+
+CSMS 가 슬롯과 배터리를 잇는 지점은 `BatterySwapRequest(BatteryIn)` 가 `(evseId,
+serialNumber)` 를 실어 오는 **그 순간 하나뿐**이다. `TransactionEvent` 도 `NotifyEvent` 도
+일련번호를 싣지 않는다. 그래서 **부팅 시점부터 이미 꽂혀 있던 배터리는 CSMS 가 정말로
+모른다** — 모르는 것을 지어내지 않는다. 알고 싶으면 `GetVariables` 로 물어야 한다
+([PLAN §4.5](PLAN.md)).
+
+### 쓰기가 없다
+
+충전 트랜잭션은 스테이션이 만드는 사실이지 CSMS 가 지시하는 것이 아니다. 스마트차징도 요금도
+범위 밖이다([§10 결정 #8](PLAN.md)). 그래서 `POST` 도 `PATCH` 도 없다.
+
+### 디바이스 모델은 REST 에 없다
+
+`GetVariables`/`SetVariables`(`TargetSoC`·`MaxSoc`·`BatteryCartridge.SoC` …)는 CSMS 안의
+`DeviceModelClient` 로만 부를 수 있고 **HTTP 로 노출하지 않았다.** 소비자가 없기 때문이다
+([PLAN §11.0](PLAN.md)) — 앱은 스테이션의 설정 변수를 만지지 않고, 운영 도구는 아직 없다.
+필요해지면 그 클래스를 부르는 얇은 컨트롤러 하나가 생길 자리다.
+
+---
+
 ## 설계 기록
 
 ### 지표에 Micrometer / Actuator 를 쓰지 않았다
@@ -405,6 +476,7 @@ S02 발신(`RequestBatterySwapRequest`)은 **M7 에서 이미 끝났다** —
 | `SwapMetricsApiTest` | 성공·실패·멱등이 섞인 시나리오를 한 번 돌린 뒤 성공률·소요시간·사유별 집계 |
 | `DurationSummaryTest` | 백분위·평균·빈 표본의 순수 계산 |
 | `SwapIdsTest` | 복합키 ↔ URL 토큰 |
+| `ChargingApiTest` | 충전 조회 — 슬롯·배터리·SoC 가 읽히고, **교환이 완료돼도 충전은 살아 있다** |
 
 ```bash
 ./gradlew :csms:test --tests 'dev.swapve.csms.api.*'

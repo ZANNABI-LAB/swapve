@@ -6,6 +6,9 @@ import dev.swapve.ocpp.json.OcppDateTime
 import dev.swapve.ocpp.swap.AvailabilityState
 import dev.swapve.ocpp.swap.BatteryRejectionReason
 import dev.swapve.ocpp.swap.BatterySwapWire
+import dev.swapve.ocpp.swap.VariableReading
+import dev.swapve.ocpp.swap.VariableRef
+import dev.swapve.ocpp.swap.VariableWrite
 import java.time.Instant
 
 /**
@@ -23,8 +26,12 @@ import java.time.Instant
  */
 internal object SimPayloads {
 
-    fun bootNotification(config: StationSimConfig): ObjectNode = node().apply {
-        put("reason", config.bootReason)
+    /**
+     * @param reason 부팅 사유. 재부팅 경로(S04.FR.11)는 `PowerUp` 이 아니라 `LocalReset` 으로
+     *   온다 — 무엇이 일어났는지를 CSMS 가 구분할 수 있어야 한다.
+     */
+    fun bootNotification(config: StationSimConfig, reason: String = config.bootReason): ObjectNode = node().apply {
+        put("reason", reason)
         putObject("chargingStation").apply {
             put("vendorName", config.vendorName)
             put("model", config.model)
@@ -91,6 +98,9 @@ internal object SimPayloads {
      *   [stoppedReason] 을 싣는다.
      * @param idToken `null` 이면 인가 없는 트랜잭션으로 보고한다 — `type = NoAuthorization`,
      *   `idToken = ""` (Part 6 Tool validation).
+     * @param socPercent 실려 나갈 배터리 충전 상태 (**S04.FR.04** 주기 보고). `null` 이면
+     *   `meterValue` 를 아예 싣지 않는다 — 값이 없는데 배열만 붙이면 스키마의 `minItems: 1`
+     *   에 걸리고, 애초에 측정하지 않은 것을 측정한 척하는 셈이다.
      */
     fun transactionEvent(
         eventType: String,
@@ -103,6 +113,7 @@ internal object SimPayloads {
         chargingState: String? = null,
         stoppedReason: String? = null,
         idToken: String? = null,
+        socPercent: Double? = null,
     ): ObjectNode = node().apply {
         put("eventType", eventType)
         put("timestamp", OcppDateTime.format(at))
@@ -128,6 +139,66 @@ internal object SimPayloads {
                     BatterySwapWire.ID_TOKEN_TYPE_CENTRAL
                 },
             )
+        }
+        socPercent?.let { soc ->
+            // 계량값의 시각은 사건의 시각과 같다 — 같은 순간에 표본을 떴다.
+            putArray("meterValue").addObject().apply {
+                put("timestamp", OcppDateTime.format(at))
+                putArray("sampledValue").addObject().apply {
+                    put("value", soc)
+                    put("measurand", BatterySwapWire.MEASURAND_SOC)
+                    put("context", BatterySwapWire.READING_CONTEXT_SAMPLE_PERIODIC)
+                    putObject("unitOfMeasure").put("unit", BatterySwapWire.UNIT_PERCENT)
+                }
+            }
+        }
+    }
+
+    /**
+     * `GetVariablesResponse` (S04.FR.12, PLAN §4.5).
+     *
+     * 항목 하나하나가 **어느 변수에 대한 답인지를 다시 싣는다** — 스키마가
+     * `component`/`variable` 을 필수로 두기 때문이다. 그 인코딩은 [VariableRef.writeTo] 한
+     * 곳에만 있다: 요청을 읽을 때와 응답을 쓸 때가 같은 코드를 지나야 인스턴스를 빠뜨린
+     * 쪽이 조용히 다른 변수를 가리키는 일이 없다.
+     */
+    fun getVariablesResponse(readings: List<VariableReading>): ObjectNode = node().apply {
+        val array = putArray("getVariableResult")
+        readings.forEach { reading ->
+            array.addObject().apply {
+                put("attributeStatus", reading.status.wireValue)
+                // 스키마: *"This field can only be empty when the given status is NOT accepted."*
+                reading.value?.let { put("attributeValue", it) }
+                statusInfo(reading.reasonCode, reading.additionalInfo)
+                reading.ref.writeTo(this)
+            }
+        }
+    }
+
+    /**
+     * `SetVariablesResponse` (S04.FR.06/10).
+     *
+     * **거부는 여기서 나간다.** `MaxSoc ≥ TargetSoC` 판정의 주체가 스테이션인 근거는
+     * `ocpp-core` 의 `DeviceModelVariables` KDoc 에 있다 — 표준이 판정의 자리를
+     * `SetVariableResultType.attributeStatus` 하나로 정해 두었기 때문이다.
+     */
+    fun setVariablesResponse(writes: List<VariableWrite>): ObjectNode = node().apply {
+        val array = putArray("setVariableResult")
+        writes.forEach { write ->
+            array.addObject().apply {
+                put("attributeStatus", write.status.wireValue)
+                statusInfo(write.reasonCode, write.additionalInfo)
+                write.ref.writeTo(this)
+            }
+        }
+    }
+
+    /** `StatusInfoType` 은 `reasonCode` 가 있어야 성립한다. 사유가 없으면 아예 싣지 않는다. */
+    private fun ObjectNode.statusInfo(reasonCode: String?, additionalInfo: String?) {
+        if (reasonCode == null) return
+        putObject("attributeStatusInfo").apply {
+            put("reasonCode", reasonCode)
+            additionalInfo?.let { put("additionalInfo", it) }
         }
     }
 

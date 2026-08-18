@@ -17,6 +17,11 @@ import dev.swapve.ocpp.session.OcppSession
 import dev.swapve.ocpp.session.StationSerializer
 import dev.swapve.ocpp.swap.BatteryRejectionReason
 import dev.swapve.ocpp.swap.BatterySwapWire
+import dev.swapve.ocpp.swap.DeviceModelVariables
+import dev.swapve.ocpp.swap.VariableReading
+import dev.swapve.ocpp.swap.VariableRef
+import dev.swapve.ocpp.swap.VariableStatus
+import dev.swapve.ocpp.swap.VariableWrite
 import dev.swapve.swap.SlotState
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.delay
@@ -40,6 +45,14 @@ import kotlin.time.Duration.Companion.seconds
  * | `EVConnectedPreSessionBatterySwapping` | [insertBatteries] |
  * | `EnergyTransferStartedBatterySwapping` | [reportChargingStarted] |
  * | `EVDisconnectedBatterySwapping` | [removeBatteries] |
+ *
+ * M9 가 S04 를 완성하며 셋이 더 붙었다 (PLAN §4.10):
+ *
+ * | 요구 | 함수 |
+ * |---|---|
+ * | **S04.FR.04** SoC 주기 보고 · `MaxSoc` 도달 시 `SuspendedEVSE` | [advanceCharging] · [chargeUntilMaxSoc] |
+ * | **S04.FR.11** 재부팅 시 배터리 있는 EVSE 마다 트랜잭션 재개시 | [reboot] |
+ * | **S04.FR.05/06/10/12** 디바이스 모델 조회·설정 | [SimDeviceModel] (`GetVariables`/`SetVariables` 응답) |
  *
  * [runSwap] 이 이들을 `SwapOrder` 에 따라 엮는다. **두 순서 모두 같은 상태 집합을 지나되
  * 진입 순서만 다르다** — Part 6 의 진입 조건을 그대로 옮기면 PLAN §4.6 의 양방향이 저절로
@@ -78,11 +91,31 @@ class StationSimulator(
         /** `TransactionEvent.seqNo` — 트랜잭션 안에서 0 부터 증가한다. */
         var txSeqNo: Int = 0
 
+        /**
+         * 충전 상한에 닿아 급전이 멈췄다 (`SuspendedEVSE`, S04.FR.06).
+         *
+         * **트랜잭션은 살아 있다.** 멈춘 것은 에너지 흐름이지 트랜잭션이 아니다 —
+         * 배터리를 꺼내갈 때 비로소 `Ended` 가 나간다 (`TxStopPoint = EVConnected`).
+         */
+        var chargingSuspended: Boolean = false
+
         val state: SlotState get() = if (battery == null) SlotState.EMPTY else SlotState.HOLDS_BATTERY
     }
 
     private val slots: Map<Int, SimSlot> =
         config.slots.associate { it.slotId to SimSlot(it, it.battery) }
+
+    /**
+     * 이 스테이션의 디바이스 모델 (PLAN §4.9).
+     *
+     * `BatteryCartridge.SoC`/`SoH` 를 여기 저장하지 않고 [slots] 에서 파생하도록 넘긴다 —
+     * 배터리가 바뀌면 답도 따라 바뀌어야 하기 때문이다 (S04.FR.12).
+     */
+    private val deviceModel: SimDeviceModel = SimDeviceModel.of(config) { evseId -> slots[evseId]?.battery }
+
+    /** 충전 상한 `BatterySwapCtrlr.MaxSoc` 의 현재 값. `SetVariables` 로 바뀌면 즉시 반영된다. */
+    private val maxSoc: Double
+        get() = (deviceModel.intOf(DeviceModelVariables.maxSoc()) ?: SimDeviceModel.DEFAULT_MAX_SOC).toDouble()
 
     private var transport: WebSocketTransport? = null
 
@@ -155,9 +188,56 @@ class StationSimulator(
      * 는 보내지 않으므로, CSMS 는 나중에 **시작을 본 적 없는 트랜잭션의 종료**를 받게 된다.
      * `TC_S_103_CSMS` 의 tx `…-1`/`…-2` 가 정확히 그것이다 (PLAN §7.1 읽을 것 5).
      */
-    suspend fun boot() {
+    suspend fun boot() = bootSequence(afterReboot = false)
+
+    /**
+     * ★ **S04.FR.11 — 재부팅** (PLAN §4.10).
+     *
+     * > *"스테이션 재부팅 시, 배터리가 들어 있는 모든 EVSE 에 대해 트랜잭션을 새로 시작한다."*
+     *
+     * ### 진행 중이던 트랜잭션은 **종료 통보 없이 사라진다**
+     *
+     * 그게 요점이다. 전원이 나간 스테이션은 `TransactionEvent(Ended)` 를 보낼 기회가 없다.
+     * 다시 올라온 뒤에는 **자기가 아는 사실만** 말한다 — "이 슬롯에 배터리가 있고, 지금부터
+     * 충전을 시작한다". CSMS 는 `Started` 가 무더기로 오는 것을 정상으로 받아야 하고,
+     * 끝나지 않은 옛 트랜잭션을 오류로 취급하면 안 된다.
+     *
+     * 그래서 여기서 [SimSlot.transactionId] 를 **비운 뒤** 다시 연다. 옛 식별자를 이어 쓰면
+     * 같은 트랜잭션이 두 번 시작한 것이 되어 장부가 거짓이 된다.
+     *
+     * 연결을 끊고 다시 붙는 데는 F6 이 만든 [disconnect]/[reconnect] 를 그대로 쓴다.
+     * 부팅 사유는 `LocalReset`, 보안 이벤트는 `ResetOrReboot` 다 — 전원 인가와 재시작은
+     * 다른 사건이고, 표준이 그 둘을 구분할 값을 준다.
+     */
+    suspend fun reboot() {
+        disconnect()
+
+        // 재부팅으로 잃어버리는 것들. 슬롯의 배터리는 물리적으로 그대로 남는다.
+        slots.values.forEach { slot ->
+            slot.transactionId = null
+            slot.txSeqNo = 0
+            slot.chargingSuspended = false
+        }
+
+        reconnect()
+        bootSequence(afterReboot = true)
+    }
+
+    /**
+     * 부팅 시퀀스 본체.
+     *
+     * @param afterReboot 재부팅으로 올라오는 길인가 (S04.FR.11). `true` 면 [SlotConfig.chargingAlreadyStarted]
+     *   를 **무시한다** — 그 플래그는 *"이 시나리오 이전에 시작됐다"* 는 초기 조건일 뿐이고,
+     *   재부팅을 지난 뒤에는 어떤 트랜잭션도 이어지지 않기 때문이다. 식별자도 새로 발번한다.
+     */
+    private suspend fun bootSequence(afterReboot: Boolean) {
         faults.before(SimStep.BOOT, context())
-        val response = call(BatterySwapWire.BOOT_NOTIFICATION, SimPayloads.bootNotification(config))
+        val bootReason =
+            if (afterReboot) BatterySwapWire.BOOT_REASON_LOCAL_RESET else config.bootReason
+        val response = call(
+            BatterySwapWire.BOOT_NOTIFICATION,
+            SimPayloads.bootNotification(config, bootReason),
+        )
         val status = response.path("status").asText()
         check(status == BatterySwapWire.REGISTRATION_ACCEPTED) {
             "부팅이 거부됐다: status=$status"
@@ -166,18 +246,24 @@ class StationSimulator(
         orderedSlots().forEach { reportSlotStatus(it) }
 
         faults.before(SimStep.SECURITY_EVENT, context())
+        val securityEvent = if (afterReboot) {
+            BatterySwapWire.SECURITY_EVENT_RESET_OR_REBOOT
+        } else {
+            BatterySwapWire.SECURITY_EVENT_STARTUP
+        }
         call(
             BatterySwapWire.SECURITY_EVENT_NOTIFICATION,
-            SimPayloads.securityEvent(BatterySwapWire.SECURITY_EVENT_STARTUP, clock.instant()),
+            SimPayloads.securityEvent(securityEvent, clock.instant()),
         )
 
         orderedSlots().filter { it.battery != null }.forEach { slot ->
-            if (slot.config.chargingAlreadyStarted) {
+            if (!afterReboot && slot.config.chargingAlreadyStarted) {
                 // 이 트랜잭션의 시작은 CSMS 가 본 적이 없다. 식별자만 이어받는다.
                 slot.transactionId = slot.config.chargingTransactionId
                 slot.txSeqNo = 0
             } else {
-                startChargingTransaction(slot)
+                // 재부팅이면 **새 트랜잭션**이다. 고정 식별자를 이어 쓰지 않는다.
+                startChargingTransaction(slot, transactionId = if (afterReboot) MessageIds.next() else null)
             }
         }
     }
@@ -268,6 +354,120 @@ class StationSimulator(
                 ),
             )
         }
+    }
+
+    // ------------------------------------------------------------------ 충전 진행 (S04.FR.04)
+
+    /**
+     * ★ **SoC 주기 보고 한 번** (S04.FR.04, PLAN §4.10).
+     *
+     * 슬롯의 배터리 SoC 를 [byPercent] 만큼 올리고 `TransactionEvent(Updated)` 에 measurand
+     * `SoC` 를 실어 보낸다. 상한은 `BatterySwapCtrlr.MaxSoc` 이다 (S04.FR.06).
+     *
+     * ### `chargingState` 를 싣지 않는다
+     *
+     * 스키마가 그 필드를 두고 *"is required when state **has changed**"* 라고 적는다. 주기
+     * 보고는 상태가 바뀌어서 보내는 것이 아니다 — 여전히 `Charging` 이다. 매번 실어 보내면
+     * "상태가 바뀌었다"는 신호를 매번 거짓으로 내는 셈이다. 그래서 `triggerReason` 도
+     * `ChargingStateChanged` 가 아니라 `MeterValuePeriodic` 이다.
+     *
+     * ### 상한에 닿으면 `SuspendedEVSE` 로 가되 **트랜잭션은 살아 있다**
+     *
+     * 그때만 상태가 실제로 바뀌므로 `chargingState = SuspendedEVSE` 를 실은 사건이 한 번 더
+     * 나간다 (`triggerReason = EnergyLimitReached`). **여기서 트랜잭션을 닫지 않는다** —
+     * 배터리는 아직 슬롯에 꽂혀 있고, 종료는 누군가 꺼내갈 때다 (`TxStopPoint = EVConnected`,
+     * S04.FR.09). 이미 멈춘 슬롯을 다시 부르면 아무것도 보내지 않는다.
+     *
+     * ### 시각은 주입된 시계에서 온다
+     *
+     * `sleep` 도 벽시계 조회도 없다. 시험은 [clock] 을 밀어서 "10분 뒤"를 만든다 (M4 방식).
+     *
+     * @return 보고한 SoC. 상한에 닿았으면 상한값이다.
+     */
+    suspend fun advanceCharging(slotId: Int, byPercent: Double): Double {
+        require(byPercent > 0) { "충전은 앞으로만 간다: $byPercent" }
+        val slot = slotOf(slotId)
+        val battery = checkNotNull(slot.battery) { "빈 슬롯은 충전되지 않는다: $slotId" }
+        if (slot.chargingSuspended) return battery.soC
+
+        val limit = maxSoc
+        // 이미 상한을 넘겨 꽂힌 배터리도 있다 (다 충전된 배터리를 다시 넣은 경우). 그때
+        // 상한으로 **끌어내리지 않는다** — 충전은 SoC 를 낮추지 않고, 관측값을 고치는 것은
+        // 거짓이다. 급전할 것이 없으니 곧바로 멈춘다.
+        if (battery.soC >= limit) {
+            suspendCharging(slot)
+            return battery.soC
+        }
+
+        val next = minOf(battery.soC + byPercent, limit)
+        // 배터리 자체의 SoC 를 올린다. `BatteryCartridge.SoC` 조회도, 나중에 이 배터리가
+        // 반출될 때의 `batteryData.soC` 도 같은 값을 봐야 한다 — 사실이 두 벌이면 하나는 거짓이다.
+        slot.battery = battery.copy(soC = next)
+
+        faults.before(SimStep.TRANSACTION_EVENT, context(slotId = slotId))
+        call(
+            BatterySwapWire.TRANSACTION_EVENT,
+            SimPayloads.transactionEvent(
+                eventType = BatterySwapWire.TX_UPDATED,
+                triggerReason = BatterySwapWire.TRIGGER_REASON_METER_VALUE_PERIODIC,
+                seqNo = nextTxSeqNo(slot),
+                transactionId = requireTransaction(slot),
+                slotId = slotId,
+                connectorId = slot.config.connectorId,
+                at = clock.instant(),
+                idToken = config.chargingIdToken,
+                socPercent = next,
+            ),
+        )
+
+        if (next >= limit) suspendCharging(slot)
+        return next
+    }
+
+    /**
+     * 상한에 닿을 때까지 [stepPercent] 씩 충전한다.
+     *
+     * 걸음마다 [advanceCharging] 이 사건 하나를 보내므로, CSMS 쪽에는 SoC 가 **올라간 자취**가
+     * 남는다. 마지막에 `SuspendedEVSE` 가 한 번 나가고 트랜잭션은 열린 채로 남는다.
+     *
+     * @return 보고한 SoC 들, 순서대로.
+     */
+    suspend fun chargeUntilMaxSoc(slotId: Int, stepPercent: Double): List<Double> {
+        val readings = mutableListOf<Double>()
+        while (!slotOf(slotId).chargingSuspended) {
+            readings += advanceCharging(slotId, stepPercent)
+        }
+        return readings
+    }
+
+    /** 이 슬롯의 충전이 상한에 닿아 멈췄는가 (`SuspendedEVSE`). 트랜잭션과는 무관하다. */
+    fun isChargingSuspended(slotId: Int): Boolean = slotOf(slotId).chargingSuspended
+
+    /**
+     * 상한 도달 — `Updated(EnergyLimitReached, SuspendedEVSE)`.
+     *
+     * **트랜잭션은 유지된다** (PLAN §4.10 표의 4행). 닫으면 나중에 반출될 때 종료할 대상이
+     * 없어 장부가 허공에서 끝난다.
+     */
+    private suspend fun suspendCharging(slot: SimSlot) {
+        slot.chargingSuspended = true
+
+        faults.before(SimStep.TRANSACTION_EVENT, context(slotId = slot.config.slotId))
+        call(
+            BatterySwapWire.TRANSACTION_EVENT,
+            SimPayloads.transactionEvent(
+                eventType = BatterySwapWire.TX_UPDATED,
+                triggerReason = BatterySwapWire.TRIGGER_REASON_ENERGY_LIMIT_REACHED,
+                seqNo = nextTxSeqNo(slot),
+                transactionId = requireTransaction(slot),
+                slotId = slot.config.slotId,
+                connectorId = slot.config.connectorId,
+                at = clock.instant(),
+                chargingState = BatterySwapWire.CHARGING_STATE_SUSPENDED_EVSE,
+                idToken = config.chargingIdToken,
+                socPercent = slot.battery?.soC,
+            ),
+        )
     }
 
     // ------------------------------------------------------------------ EVDisconnected
@@ -528,12 +728,13 @@ class StationSimulator(
      * `triggerReason = CablePluggedIn`, `evse` 와 `evse.connectorId` 를 싣는다 — Part 6 의
      * Tool validation 이 그 셋을 확인한다.
      */
-    private suspend fun startChargingTransaction(slot: SimSlot) {
+    private suspend fun startChargingTransaction(slot: SimSlot, transactionId: String? = null) {
         // 식별자가 고정된 슬롯이면 그 값을 쓴다 — 적합성 시험이 스펙 원문의 tx 를 그대로
         // 쓰기 위한 자리다. 아니면 발번한다 (로컬 카운터 금지, PLAN §11.5).
-        val transactionId = slot.config.chargingTransactionId ?: MessageIds.next()
-        slot.transactionId = transactionId
+        val newTransactionId = transactionId ?: slot.config.chargingTransactionId ?: MessageIds.next()
+        slot.transactionId = newTransactionId
         slot.txSeqNo = 0
+        slot.chargingSuspended = false
 
         faults.before(SimStep.TRANSACTION_EVENT, context(slotId = slot.config.slotId))
         call(
@@ -542,7 +743,7 @@ class StationSimulator(
                 eventType = BatterySwapWire.TX_STARTED,
                 triggerReason = BatterySwapWire.TRIGGER_REASON_CABLE_PLUGGED_IN,
                 seqNo = nextTxSeqNo(slot),
-                transactionId = transactionId,
+                transactionId = newTransactionId,
                 slotId = slot.config.slotId,
                 connectorId = slot.config.connectorId,
                 at = clock.instant(),
@@ -620,10 +821,57 @@ class StationSimulator(
      */
     private suspend fun handleInboundCall(call: OcppCall): InboundResponse = when (call.action) {
         BatterySwapWire.REQUEST_BATTERY_SWAP -> requestBatterySwap(call.payload)
+        BatterySwapWire.GET_VARIABLES -> getVariables(call.payload)
+        BatterySwapWire.SET_VARIABLES -> setVariables(call.payload)
         else -> InboundResponse.Fail(
             RpcErrorCode.NotImplemented,
             "station-sim 이 구현하지 않은 action: ${call.action}",
         )
+    }
+
+    /**
+     * `GetVariables` — 디바이스 모델을 읽어 답한다 (S04.FR.12, PLAN §4.5).
+     *
+     * 항목마다 **독립적으로** 판정한다. 하나가 `UnknownVariable` 이어도 나머지는 정상
+     * 응답한다 — 스키마의 `getVariableResult` 가 요청 항목과 1:1 인 배열이고, 전체를 실패로
+     * 만들 자리가 없다.
+     */
+    private fun getVariables(payload: ObjectNode): InboundResponse {
+        val readings = payload.path("getVariableData").map { item ->
+            val ref = VariableRef.read(item)
+                // 스키마가 component.name / variable.name 을 필수로 두므로 여기 올 수 없다.
+                // 그래도 터뜨리지 않고 "모르는 컴포넌트"로 답한다 — 응답 배열의 길이는 맞아야 한다.
+                ?: return@map VariableReading(
+                    UNREADABLE_REF,
+                    VariableStatus.UNKNOWN_COMPONENT,
+                    reasonCode = SimDeviceModel.REASON_UNKNOWN_COMPONENT,
+                )
+            deviceModel.read(ref)
+        }
+        return InboundResponse.Respond(SimPayloads.getVariablesResponse(readings))
+    }
+
+    /**
+     * `SetVariables` — 값을 바꾸고 그 결과를 답한다 (S04.FR.06/10).
+     *
+     * ### ★ 거부는 여기서 난다
+     *
+     * `MaxSoc ≥ TargetSoC` 를 어기는 설정은 `attributeStatus = Rejected` 로 돌아간다.
+     * **판정 주체가 스테이션인 근거**는 `ocpp-core` 의 `DeviceModelVariables` KDoc 에
+     * 적어 두었다 — 표준이 판정의 자리를 `SetVariableResultType.attributeStatus` 하나로
+     * 정했고, 디바이스 모델의 소유자가 스테이션이기 때문이다.
+     */
+    private fun setVariables(payload: ObjectNode): InboundResponse {
+        val results = payload.path("setVariableData").map { item ->
+            val ref = VariableRef.read(item)
+                ?: return@map VariableWrite(
+                    UNREADABLE_REF,
+                    VariableStatus.UNKNOWN_COMPONENT,
+                    reasonCode = SimDeviceModel.REASON_UNKNOWN_COMPONENT,
+                )
+            deviceModel.write(ref, item.path("attributeValue").asText())
+        }
+        return InboundResponse.Respond(SimPayloads.setVariablesResponse(results))
     }
 
     /**
@@ -683,6 +931,14 @@ class StationSimulator(
         FaultContext(config.stationId, slotId, requestId)
 
     private companion object {
+        /**
+         * 스키마를 통과했는데도 `component`/`variable` 을 읽지 못했을 때 답에 실을 자리 표시.
+         *
+         * 실제로는 발생하지 않는다 — 두 필드 다 스키마 필수다. 응답 배열의 항목 수가 요청과
+         * 어긋나지 않게 하려고만 존재한다.
+         */
+        val UNREADABLE_REF = VariableRef(component = "Unknown", variable = "Unknown")
+
         /** 재전송할 프레임에서 페이로드를 꺼낼 때만 쓴다. `[2,"id","Action",{payload}]`. */
         val MAPPER = ObjectMapper()
         const val PAYLOAD_INDEX = 3
