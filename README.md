@@ -133,9 +133,16 @@ curl -X POST localhost:8080/api/swaps -H 'Content-Type: application/json' \
 Out-In 순서(`--swap-order Out-In`)와 S02 대기 모드(`--remote-start`)도 같은 방식으로
 실행을 확인했습니다.
 
-⚠️ **`curl` 세 줄만은 이 실측에서 직접 실행하지 못했습니다** (측정을 돌린 환경에서 셸의
-HTTP 호출이 막혀 있었습니다). 경로와 응답은 같은 엔드포인트를 실제 Spring 컨텍스트에서
-호출하는 `SwapApiTest` · `SwapMetricsApiTest` · `ChargingApiTest` 가 매 빌드마다 확인합니다.
+`curl` 세 줄도 별도 환경에서 실행해 확인했습니다. 위 절차를 그대로 밟은 뒤:
+
+- `/api/swaps/CS001:1001` → `status: COMPLETED`, `batteriesIn` 2개(`BAT-USED-1/2`, SoC 12·13%)와
+  `batteriesOut` 2개(`BAT-FULL-3/4`, SoC 95%)가 **양쪽 다** 실립니다 ([PLAN §11.2](docs/PLAN.md))
+- `/api/metrics/swaps` → `successRate: 1.0`, 소요시간 백분위, `failures.byScenario`가
+  F1·F2·F3·F5로 구분 (F4·F6은 멱등이라 실패로 세지 않습니다)
+- `/api/stations/CS001/charging-transactions` → 슬롯별 충전 트랜잭션
+
+같은 엔드포인트를 실제 Spring 컨텍스트에서 호출하는 `SwapApiTest` · `SwapMetricsApiTest` ·
+`ChargingApiTest` 가 매 빌드마다 이를 다시 확인합니다.
 </details>
 
 ---
