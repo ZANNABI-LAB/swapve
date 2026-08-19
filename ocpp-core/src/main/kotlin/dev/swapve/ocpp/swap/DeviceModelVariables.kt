@@ -234,12 +234,17 @@ data class VariableWrite(
  *
  * → CSMS 쪽 구현은 `DeviceModelClient`, 스테이션 쪽 판정은 `SimDeviceModel` 에 있다.
  *
- * ### `SwapOrder` 는 여기 없다
+ * ### ★ `SwapOrder` 는 **정본 목록에 없는데도** 여기 있다
  *
- * `BatterySwapCtrlr.SwapOrder` 는 **부록 CSV 에 없고 Part 2 본문(S03 Remark, S03.FR.07)에만
- * 있다** (PLAN §4.9 주의 3). 본문을 따르되 그 불일치를 기록으로 남긴다 — 같은 주석이
- * `station-sim` 의 `SwapOrder` 열거형에도 있다. 아직 실제로 보고하지 않으므로 여기에
- * 상수를 두지 않는다.
+ * `BatterySwapCtrlr.SwapOrder` 는 **부록 CSV(`dm_components_vars.csv`)에 없고 Part 2
+ * 본문(S03 Remark, S03.FR.07)에만 있다** (PLAN §4.9 주의 3). 위 표의 다른 변수들과 근거의
+ * 층이 다르다는 뜻이다.
+ *
+ * 그래도 본문을 따라 [swapOrder] 를 두고 `GetBaseReport(FullInventory)` 보고에 싣는다.
+ * 본문이 *"this **must** be reported as `BatterySwapCtrlr.SwapOrder = "Out-In"`"* 라고
+ * 못박았고, 부록은 릴리스와 별개로 갱신될 수 있기 때문이다. **불일치를 지우지 않고
+ * 여기 남긴다** — 나중에 부록이 이 변수를 담게 되면 이 절이 지워질 자리다. 같은 주석이
+ * `station-sim` 의 `SwapOrder` 열거형에도 있다.
  */
 object DeviceModelVariables {
 
@@ -263,6 +268,9 @@ object DeviceModelVariables {
     const val VARIABLE_SOC = "SoC"
     const val VARIABLE_SOH = "SoH"
 
+    /** ⚠️ 부록 CSV 에 없는 변수다. 근거와 그 불일치는 이 객체의 KDoc 을 보라 (§4.9 주의 3). */
+    const val VARIABLE_SWAP_ORDER = "SwapOrder"
+
     /** 인가 후 배터리 삽입 대기. 만료돼도 **CSMS 는 통보받지 못한다** (PLAN §4.7). */
     const val INSTANCE_IN = "In"
 
@@ -283,6 +291,14 @@ object DeviceModelVariables {
     fun timeoutOut() = VariableRef(COMPONENT_BATTERY_SWAP_CTRLR, VARIABLE_TIMEOUT, variableInstance = INSTANCE_OUT)
 
     fun available() = VariableRef(COMPONENT_BATTERY_SWAP_CTRLR, VARIABLE_AVAILABLE)
+
+    /**
+     * 교환 순서 (S03.FR.07). 역순으로 도는 스테이션은 `"Out-In"` 으로 **보고해야 한다**.
+     *
+     * 값의 집합은 `station-sim` 의 `SwapOrder` 열거형이 들고 있다 — 어느 순서로 움직일지는
+     * 스테이션의 성질이지 프로토콜 어휘가 아니다.
+     */
+    fun swapOrder() = VariableRef(COMPONENT_BATTERY_SWAP_CTRLR, VARIABLE_SWAP_ORDER)
 
     /** [evseId] 슬롯에 꽂힌 배터리의 SoC (S04.FR.12, PLAN §4.5 재고 조회 수단). */
     fun batterySoC(evseId: Int) = VariableRef(COMPONENT_BATTERY_CARTRIDGE, VARIABLE_SOC, evseId = evseId)

@@ -14,12 +14,12 @@ import java.time.Duration
  * (`EVConnectedPreSessionBatterySwapping` / `EVDisconnectedBatterySwapping`), 시뮬레이터가
  * 이 분기를 그대로 구현하면 §4.6 양방향이 자동으로 검증된다 (PLAN §7.2).
  *
- * @param wireValue 디바이스 모델 변수 `BatterySwapCtrlr.SwapOrder` 로 보고할 값.
- *   [IN_OUT] 은 기본값이라 보고하지 않아도 된다 (S03.FR.07).
- *   ⚠️ **아직 실제로 보고하지는 않는다.** 변수 보고는 `GetVariables`/`GetBaseReport` 를
- *   요구하는데 디바이스 모델 자체가 아직 없다 (BACKLOG B03, `TC_S_104_CS`). 지금 이 값은
- *   시뮬레이터가 어느 순서로 움직일지를 정할 뿐이고, 그 순서는 오가는 메시지의 순서로
- *   드러난다 — CSMS 의 상태머신은 어차피 순서를 몰라야 한다 (PLAN §4.6).
+ * @param wireValue 디바이스 모델 변수 `BatterySwapCtrlr.SwapOrder` 로 보고하는 값.
+ *   [IN_OUT] 은 기본값이라 보고하지 않아도 되지만 (S03.FR.07) 함께 싣는다 — 받는 쪽이
+ *   "보고하지 않음"과 "In-Out 이다"를 구분할 수 없으면 순서를 아는 수단이 추측뿐이 된다.
+ *   실제로 보고하는 자리는 `GetVariables` 와 `GetBaseReport(FullInventory)` 둘이고
+ *   (`SimDeviceModel`), 그 목록이 `TC_S_104_CS` 에서 확인된다.
+ *   그래도 **CSMS 의 상태머신은 이 값을 몰라야 한다** — 순서 불가지론 (PLAN §4.6).
  *   ⚠️ 이 변수는 **부록 CSV(`dm_components_vars.csv`)에 없고 Part 2 본문에만 있다.**
  *   부록은 릴리스와 별개로 갱신될 수 있으므로 본문을 따른다 (PLAN §4.9 주의 3).
  */

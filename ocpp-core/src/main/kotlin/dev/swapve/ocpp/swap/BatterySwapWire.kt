@@ -34,6 +34,16 @@ object BatterySwapWire {
     const val GET_VARIABLES = "GetVariables"
     const val SET_VARIABLES = "SetVariables"
 
+    /**
+     * 디바이스 모델 **전체 재고** 보고 (B03, `TC_S_104_CS`).
+     *
+     * `GetVariables` 는 CSMS 가 **무엇을 물을지 이미 알 때** 쓴다. 전체 목록은 그렇게 얻을 수
+     * 없다 — 모르는 변수를 물을 수는 없기 때문이다. 그래서 방향이 뒤집힌다: CSMS 가
+     * [GET_BASE_REPORT] 로 청하면 스테이션이 [NOTIFY_REPORT] 를 **여러 건으로 나눠** 보낸다.
+     */
+    const val GET_BASE_REPORT = "GetBaseReport"
+    const val NOTIFY_REPORT = "NotifyReport"
+
     // ------------------------------------------------------------------ BatterySwapEventEnumType
 
     /** 헌 배터리가 **들어왔다.** */
@@ -180,6 +190,44 @@ object BatterySwapWire {
     /** `GenericStatusEnumType` — `RequestBatterySwapResponse.status` (S02). */
     const val GENERIC_ACCEPTED = "Accepted"
     const val GENERIC_REJECTED = "Rejected"
+
+    // ------------------------------------------------------------------ 디바이스 모델 보고 (B03)
+
+    /** `ReportBaseEnumType` — 디바이스 모델 **전부**. `TC_S_104_CS` 가 요구하는 값이다. */
+    const val REPORT_BASE_FULL_INVENTORY = "FullInventory"
+
+    /** `GenericDeviceModelStatusEnumType` — `GetBaseReportResponse.status`. */
+    const val DEVICE_MODEL_ACCEPTED = "Accepted"
+
+    /** 우리가 만들 수 없는 종류의 보고를 청받았다. `Rejected`("못 하겠다")와 다르다. */
+    const val DEVICE_MODEL_NOT_SUPPORTED = "NotSupported"
+
+    /**
+     * `AttributeEnumType` — **지금 실제로 갖고 있는 값**.
+     *
+     * 한 변수에 `Target`/`MinSet`/`MaxSet` 까지 최대 4개의 속성이 딸릴 수 있다. 받는 쪽이
+     * 아무 속성이나 값으로 읽으면 목표치를 현재치로 오해하므로, 보고할 때도 골라 읽을 때도
+     * 이 상수를 지난다.
+     */
+    const val ATTRIBUTE_ACTUAL = "Actual"
+
+    /** `MutabilityEnumType` — 관측될 뿐 설정할 수 없다 (`BatteryCartridge`, `SwapOrder`). */
+    const val MUTABILITY_READ_ONLY = "ReadOnly"
+
+    /** `MutabilityEnumType` — `SetVariables` 로 바꿀 수 있다. */
+    const val MUTABILITY_READ_WRITE = "ReadWrite"
+
+    /** `DataEnumType` — `VariableCharacteristics.dataType` (필수 필드). */
+    const val DATA_TYPE_INTEGER = "integer"
+    const val DATA_TYPE_DECIMAL = "decimal"
+    const val DATA_TYPE_STRING = "string"
+    const val DATA_TYPE_BOOLEAN = "boolean"
+
+    /** 값이 정해진 목록 중 하나다. 이때 `valuesList` 가 **필수**다 (공식 스키마). */
+    const val DATA_TYPE_OPTION_LIST = "OptionList"
+
+    /** `VariableCharacteristics.unit` — 초. [UNIT_PERCENT] 과 같은 자리다. */
+    const val UNIT_SECONDS = "seconds"
 
     // ------------------------------------------------------------------ customData 거부 확장 (PLAN §4.8)
 

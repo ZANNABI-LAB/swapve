@@ -41,8 +41,6 @@ OCPP 2.1이 2025년 1월 **Battery Swap 기능 블록(Block S)** 을 정식 편�
 - **스마트차징·요금·로밍·수평 확장은 범위 밖입니다** ([PLAN §3](docs/PLAN.md)).
   구현하지 않았을 뿐 **봉쇄하지도 않았습니다** ([PLAN §11](docs/PLAN.md)).
 - **대시보드·UI가 없습니다.** 조회는 REST까지입니다 ([PLAN §10 결정 #2](docs/PLAN.md)).
-- 아직 미구현인 적합성 경로가 있습니다 — `GetBaseReport(FullInventory)` / `TC_S_104_CS`
-  ([BACKLOG B03](BACKLOG.md)).
 
 ---
 
@@ -154,7 +152,7 @@ Out-In 순서(`--swap-order Out-In`)와 S02 대기 모드(`--remote-start`)도 �
 | 게이트 | 명령 | 무엇을 보장하나 |
 |---|---|---|
 | **L1 단위** | `./gradlew build` | 프레임 왕복 · **공식 스키마 181개 검증** · 상태머신 전이와 불변식 · REST 계약. **모듈 경계 검증 3종**(`ocpp-core`/`swap-domain` 에 프레임워크·외부 의존이 새어 들지 않았는가)이 함께 돕니다 |
-| **L2 표준 적합성** | `./gradlew conformanceTest` | 공식 케이스 **`TC_S_102_CSMS` · `TC_S_103_CSMS`** 와 실패 시나리오 **F1~F6**. 시험 대상은 CSMS이고 시뮬레이터가 시험계 역할을 합니다 |
+| **L2 표준 적합성** | `./gradlew conformanceTest` | 공식 케이스 **`TC_S_102_CSMS` · `TC_S_103_CSMS` · `TC_S_104_CS`** 와 실패 시나리오 **F1~F6**. 앞의 둘은 시험 대상이 CSMS이고 시뮬레이터가 시험계이며, **`TC_S_104_CS`는 그 반대**입니다 |
 | **L3 부하 + 감사** | `./gradlew auditTest` | **스테이션 20대 동시 접속** 후 불변식 감사. 감사는 **이벤트 로그에서 상태를 재구성해** 인메모리 레지스트리와 대조합니다 |
 
 `auditTest` 는 통과/실패만 찍지 않고 **항목마다 몇 건을 검사했는지** 출력합니다.
@@ -189,7 +187,7 @@ Out-In 순서(`--swap-order Out-In`)와 S02 대기 모드(`--remote-start`)도 �
 | # | 기준 | 검증 명령 | 시험 |
 |---|---|---|---|
 | **S1** | 공식 스키마를 통과하는 메시지로 S03 교환 1건 완주 | `./gradlew build` | `SwapEndToEndTest` · `SchemaCrossCheckTest` · `ProtocolContractTest` |
-| **S2** | ★ 공식 적합성 `TC_S_102_CSMS` · `TC_S_103_CSMS` | `./gradlew conformanceTest` | `TcS102CsmsTest` · `TcS103CsmsTest` |
+| **S2** | ★ 공식 적합성 `TC_S_102_CSMS` · `TC_S_103_CSMS` · `TC_S_104_CS` | `./gradlew conformanceTest` | `TcS102CsmsTest` · `TcS103CsmsTest` · `TcS104CsTest` |
 | **S3** | 실패 시나리오 F1~F6 | `./gradlew conformanceTest` | `FailureScenarioTest` |
 | **S4** | 스테이션 20대 동시 → 불변식 감사 전항목 | `./gradlew auditTest` | `LoadAuditTest` (+ 감사 자체의 시험 `InvariantAuditTest`) |
 | **S5** | 성공률·소요시간·실패 사유가 REST로 조회 | `./gradlew build` | `SwapMetricsApiTest` · `SwapApiTest` · `ChargingApiTest` |
@@ -209,8 +207,12 @@ OCPP 2.1 Part 6는 **시험 대상이 CSMS인** Battery Swap 테스트 케이스
 |---|---|---|
 | `TC_S_102_CSMS` | Remote Start — 배터리 부족 (`Rejected` / `NoBatteryAvailable`) | ✅ `TcS102CsmsTest` |
 | `TC_S_103_CSMS` | Remote Start — 전체 교환 시퀀스 (배터리 2개 세트) | ✅ `TcS103CsmsTest` |
-| `TC_S_104_CS` | 디바이스 모델 전체 재고 보고 (`GetBaseReport(FullInventory)`) | ❌ 미구현 ([B03](BACKLOG.md)) |
+| `TC_S_104_CS` | 디바이스 모델 전체 재고 보고 (`GetBaseReport(FullInventory)`) | ✅ `TcS104CsTest` |
 
+> `TC_S_104_CS`는 앞의 둘과 **시험 대상이 반대**입니다 — 시뮬레이터가 CS 역할로 시험받고,
+> CSMS가 시험계(Test System)로서 `GetBaseReport(FullInventory)`를 청한 뒤 나뉘어 오는
+> `NotifyReport`를 `requestId`별로 재조립합니다 ([PLAN §7.2](docs/PLAN.md)).
+>
 > 시험 대상(System under test)이 CS인 케이스(p.948–954)는 **시뮬레이터의 명세**로 씁니다
 > ([PLAN §7.2](docs/PLAN.md)) — `BootedBatterySwapping` · `AuthorizedBatterySwapping` ·
 > `EVConnectedPreSessionBatterySwapping` · `EnergyTransferStartedBatterySwapping` ·

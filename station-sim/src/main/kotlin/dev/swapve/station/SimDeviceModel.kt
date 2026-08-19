@@ -34,6 +34,14 @@ import dev.swapve.ocpp.swap.VariableWrite
  */
 class SimDeviceModel(
     settings: Map<VariableRef, String>,
+    /**
+     * 이 스테이션이 가진 슬롯 번호 전부.
+     *
+     * [batteryAt] 만으로는 **무엇을 물어야 할지** 알 수 없다 — 그건 "이 번호의 배터리를
+     * 다오"에 답할 뿐이다. [fullInventory] 는 묻지 않은 것까지 열거해야 하므로 슬롯의
+     * 집합 자체가 필요하다.
+     */
+    private val slotIds: List<Int> = emptyList(),
     private val batteryAt: (Int) -> SimBattery?,
 ) {
 
@@ -68,6 +76,40 @@ class SimDeviceModel(
 
     /** 정수로 읽는다. 값이 없거나 정수가 아니면 `null`. */
     fun intOf(ref: VariableRef): Int? = valueOf(ref)?.toIntOrNull()
+
+    /**
+     * ★ **전체 재고** — `GetBaseReport(FullInventory)` 가 보고할 목록 (B03, `TC_S_104_CS`).
+     *
+     * ### 저장된 것 + 파생되는 것을 여기서 합친다
+     *
+     * [read] 는 "이 변수를 아는가"에 답하고, 이 함수는 "무엇을 아는가"에 답한다. 둘의
+     * 대상이 어긋나면 보고에 실린 변수를 조회했을 때 `UnknownVariable` 이 나오는
+     * 모순이 생기므로, `BatteryCartridge` 는 여기서도 [cartridgeReading] 을 지난다 —
+     * 답을 만드는 코드가 한 곳이어야 두 경로가 같은 말을 한다.
+     *
+     * ### 빈 슬롯은 싣지 않는다
+     *
+     * 카트리지가 없는 슬롯은 보고할 카트리지 변수도 없다. 상태를 `UnknownComponent` 로
+     * 실어 보내면 "이 변수가 이런 값이다"라는 보고에 "이 변수는 없다"를 섞는 셈이다 —
+     * 없는 값을 지어내지 않는 [cartridgeReading] 의 태도와 같은 이유로 아예 뺀다.
+     *
+     * 순서는 설정 순서 → 슬롯 번호 순이다. 보고가 여러 건으로 쪼개져도 재조립한 쪽이
+     * 같은 목록을 보게 하려면 열거 순서가 정해져 있어야 한다.
+     */
+    fun fullInventory(): List<VariableReading> = synchronized(lock) {
+        val stored = entries.values.map { VariableReading(it.ref, VariableStatus.ACCEPTED, value = it.value) }
+        val cartridges = slotIds.sorted()
+            .filter { batteryAt(it) != null }
+            .flatMap { evseId ->
+                listOf(
+                    DeviceModelVariables.batterySoC(evseId),
+                    DeviceModelVariables.batterySoH(evseId),
+                ).map { cartridgeReading(it) }
+            }
+            .filter { it.isAccepted }
+
+        stored + cartridges
+    }
 
     // ------------------------------------------------------------------ 설정
 
@@ -134,6 +176,16 @@ class SimDeviceModel(
                 else -> null
             }
         }
+
+        // 교환 순서는 **기계의 성질**이지 설정이 아니다. CSMS 가 정해 줄 수 있는 것이었다면
+        // S03.FR.07 이 "보고해야 한다"가 아니라 "설정한다"라고 적혔을 것이다.
+        ref.variable.equals(DeviceModelVariables.VARIABLE_SWAP_ORDER, ignoreCase = true) ->
+            VariableWrite(
+                ref,
+                VariableStatus.REJECTED,
+                reasonCode = REASON_READ_ONLY,
+                additionalInfo = "교환 순서는 스테이션의 성질이라 설정할 수 없다 (S03.FR.07)",
+            )
 
         // 이름 비교는 언제나 대소문자를 무시한다 — 스키마가 그렇게 규정한다.
         ref.variable.equals(DeviceModelVariables.VARIABLE_TIMEOUT, ignoreCase = true) ->
@@ -282,7 +334,12 @@ class SimDeviceModel(
                 DeviceModelVariables.idToken() to config.chargingIdToken.orEmpty(),
                 DeviceModelVariables.timeoutIn() to config.batteryInTimeout.seconds.toString(),
                 DeviceModelVariables.timeoutOut() to config.batteryOutTimeout.seconds.toString(),
+                // S03.FR.07 — 역순으로 도는 스테이션은 이 값을 **보고해야 한다**. 기본값인
+                // In-Out 도 함께 싣는다: "보고하지 않음"과 "In-Out 이다"를 받는 쪽이
+                // 구분할 수 없으면, 순서를 아는 유일한 수단이 메시지 순서 추측이 된다.
+                DeviceModelVariables.swapOrder() to config.swapOrder.wireValue,
             ),
+            slotIds = config.slots.map { it.slotId },
             batteryAt = batteryAt,
         )
     }

@@ -6,6 +6,8 @@ import com.fasterxml.jackson.databind.node.ObjectNode
 import dev.swapve.csms.auth.AuthorizationRegistry
 import dev.swapve.csms.auth.AuthorizationStatus
 import dev.swapve.csms.config.CsmsProperties
+import dev.swapve.csms.devicemodel.DeviceModelReportRegistry
+import dev.swapve.csms.devicemodel.ReportedVariable
 import dev.swapve.csms.station.StationRegistration
 import dev.swapve.csms.station.StationRegistry
 import dev.swapve.csms.swap.BatteryRegistry
@@ -23,6 +25,7 @@ import dev.swapve.ocpp.session.InboundResponse
 import dev.swapve.ocpp.session.OcppCall
 import dev.swapve.ocpp.swap.AvailabilityState
 import dev.swapve.ocpp.swap.BatterySwapWire
+import dev.swapve.ocpp.swap.VariableRef
 import dev.swapve.swap.IdToken
 import dev.swapve.swap.OperatorId
 import dev.swapve.swap.SlotId
@@ -61,6 +64,7 @@ class OcppMessageRouter(
     private val batteries: BatteryRegistry,
     private val slotStates: SlotStateRegistry,
     private val chargingTransactions: ChargingTransactionRegistry,
+    private val reports: DeviceModelReportRegistry,
     private val validator: OcppPayloadValidator,
     private val properties: CsmsProperties,
     private val clock: Clock,
@@ -82,6 +86,7 @@ class OcppMessageRouter(
         BatterySwapWire.SECURITY_EVENT_NOTIFICATION -> securityEventNotification(principal, call.payload)
         BatterySwapWire.TRANSACTION_EVENT -> transactionEvent(principal, call.payload)
         BatterySwapWire.BATTERY_SWAP -> batterySwap(principal, call.payload)
+        BatterySwapWire.NOTIFY_REPORT -> notifyReport(principal, call.payload)
 
         else -> {
             log.info("미구현 action: station={} action={}", principal.stationId, call.action)
@@ -445,6 +450,60 @@ class OcppMessageRouter(
                 put("additionalInfo", rejection.additionalInfo)
             }
         }
+    }
+
+    // ------------------------------------------------------------------ NotifyReport (B03)
+
+    /**
+     * 디바이스 모델 보고 한 조각 (`TC_S_104_CS`).
+     *
+     * ### 여기서 하는 일은 **읽어서 넘기는 것**뿐이다
+     *
+     * 조각을 잇는 규칙(`seqNo` 연속·`tbc` 종결·유실 표시)은 전부
+     * [DeviceModelReportRegistry] 에 있다. 이 함수가 그것을 조금이라도 흉내 내면 규칙이
+     * 두 곳에 생기고, 그중 하나만 고치는 날이 온다.
+     *
+     * ### `Actual` 속성만 값으로 읽는다
+     *
+     * 한 변수에 `Target`/`MinSet`/`MaxSet` 이 함께 실릴 수 있다 (스키마 `maxItems: 4`).
+     * 배열의 첫 항목을 값으로 삼으면 **목표치를 현재치로 기록**하게 되므로, 종류를 보고
+     * 고른다. 속성이 하나뿐이고 `type` 이 생략됐으면 그것이 `Actual` 이다 — 스키마의
+     * 기본값이 그렇다.
+     *
+     * ### 응답은 빈 객체다
+     *
+     * `NotifyReportResponse` 에는 실을 필드가 없다. 보고를 거부할 자리도 없다 —
+     * 스테이션이 이미 보내 버린 사실이기 때문이다.
+     */
+    private fun notifyReport(principal: StationPrincipal, payload: ObjectNode): InboundResponse {
+        val variables = payload.path("reportData").mapNotNull { entry ->
+            val ref = VariableRef.read(entry) ?: return@mapNotNull null
+            val attribute = entry.path("variableAttribute").firstOrNull { attr ->
+                val type = attr.text("type")
+                type == null || type == BatterySwapWire.ATTRIBUTE_ACTUAL
+            }
+            val characteristics = entry.path("variableCharacteristics")
+
+            ReportedVariable(
+                ref = ref,
+                value = attribute?.text("value"),
+                mutability = attribute?.text("mutability"),
+                dataType = characteristics.text("dataType"),
+                unit = characteristics.text("unit"),
+            )
+        }
+
+        reports.record(
+            stationId = StationId(principal.stationId),
+            requestId = payload.path("requestId").asInt(),
+            seqNo = payload.path("seqNo").asInt(),
+            // 생략되면 거짓이다 — "여기서 끝"이라는 뜻 (공식 스키마 기본값).
+            tbc = payload.path("tbc").asBoolean(false),
+            generatedAt = payload.instant("generatedAt"),
+            variables = variables,
+        )
+
+        return respond(BatterySwapWire.NOTIFY_REPORT, objectNode())
     }
 
     // ------------------------------------------------------------------ 공통

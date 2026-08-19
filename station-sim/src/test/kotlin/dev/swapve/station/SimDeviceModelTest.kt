@@ -229,22 +229,86 @@ class SimDeviceModelTest {
     }
 
     @Test
-    fun `설정된 변수는 정확히 이 여섯 개다`() {
+    fun `설정된 변수는 정확히 이 일곱 개다`() {
         // 목록이 늘어나면 이 시험이 먼저 그 사실을 알린다 (PLAN §4.9 표).
         val model = model()
-        listOf(
-            DeviceModelVariables.available(),
-            DeviceModelVariables.targetSoC(),
-            DeviceModelVariables.maxSoc(),
-            DeviceModelVariables.idToken(),
-            DeviceModelVariables.timeoutIn(),
-            DeviceModelVariables.timeoutOut(),
-        ).forEach { ref ->
+        assertEquals(SETTINGS.size, model.fullInventory().count { it.ref.evseId == null })
+        SETTINGS.forEach { ref ->
             assertNotNull(model.valueOf(ref), "$ref 가 없다")
         }
     }
 
+    /**
+     * `SwapOrder` 는 **설정이 아니라 기계의 성질**이다 (S03.FR.07).
+     *
+     * 부록 CSV 에 없고 Part 2 본문에만 있는 변수라, 보고에 실리는지와 설정을 거부하는지를
+     * 함께 못박아 둔다 (PLAN §4.9 주의 3).
+     */
+    @Test
+    fun `SwapOrder 는 보고되지만 설정할 수 없다`() {
+        val model = model()
+
+        assertEquals(SwapOrder.IN_OUT.wireValue, model.valueOf(DeviceModelVariables.swapOrder()))
+        assertEquals(
+            VariableStatus.REJECTED,
+            model.write(DeviceModelVariables.swapOrder(), SwapOrder.OUT_IN.wireValue).status,
+        )
+        // 거부됐으니 값도 그대로다 — 거부해 놓고 바꾸면 그게 조용한 훼손이다.
+        assertEquals(SwapOrder.IN_OUT.wireValue, model.valueOf(DeviceModelVariables.swapOrder()))
+    }
+
+    // ------------------------------------------------------------------ 전체 재고 (B03)
+
+    /**
+     * ★ **`GetBaseReport(FullInventory)` 가 보고할 목록** (`TC_S_104_CS`).
+     *
+     * 설정된 변수 + **배터리가 든 슬롯의** 카트리지다. 빈 슬롯이 끼면 보고에 "이 변수는
+     * 없다"가 섞이므로, 그 경계가 여기서 지켜진다.
+     */
+    @Test
+    fun `전체 재고는 설정된 변수와 꽂혀 있는 카트리지를 합친 것이다`() {
+        val inventory = model().fullInventory()
+
+        assertTrue(inventory.all { it.isAccepted }, "받아들여지지 않은 항목이 보고에 섞였다")
+        SETTINGS.forEach { ref ->
+            assertTrue(inventory.any { it.ref.identity == ref.identity }, "$ref 가 재고에 없다")
+        }
+
+        // 슬롯 1·2 에만 배터리가 있다 (slotIds 는 config 의 슬롯 둘). 슬롯마다 SoC·SoH 둘.
+        assertEquals(
+            listOf(
+                DeviceModelVariables.batterySoC(1),
+                DeviceModelVariables.batterySoH(1),
+                DeviceModelVariables.batterySoC(2),
+                DeviceModelVariables.batterySoH(2),
+            ).map { it.identity },
+            inventory.filter { it.ref.evseId != null }.map { it.ref.identity },
+        )
+        assertEquals("40", inventory.first { it.ref.identity == DeviceModelVariables.batterySoC(1).identity }.value)
+    }
+
+    @Test
+    fun `배터리가 없는 슬롯은 재고에 실리지 않는다`() {
+        val model = SimDeviceModel.of(config()) { null }
+
+        assertTrue(
+            model.fullInventory().none { it.ref.evseId != null },
+            "빈 슬롯의 카트리지를 지어냈다: ${model.fullInventory().map { it.ref }}",
+        )
+    }
+
     // ------------------------------------------------------------------ 공통
+
+    /** 이 스테이션이 **설정으로** 들고 있는 변수들. 카트리지는 슬롯에서 파생하므로 빠진다. */
+    private val SETTINGS = listOf(
+        DeviceModelVariables.available(),
+        DeviceModelVariables.targetSoC(),
+        DeviceModelVariables.maxSoc(),
+        DeviceModelVariables.idToken(),
+        DeviceModelVariables.timeoutIn(),
+        DeviceModelVariables.timeoutOut(),
+        DeviceModelVariables.swapOrder(),
+    )
 
     private fun model() = SimDeviceModel.of(config()) { evseId ->
         when (evseId) {

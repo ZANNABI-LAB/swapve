@@ -59,12 +59,13 @@ object AuditTag {
  * --gate "conformance:./gradlew conformanceTest"
  * ```
  *
- * `TC_S_102_CSMS` · `TC_S_103_CSMS` 와 실패 시나리오 F1~F6 이 여기서 돈다. 실제 시험은
- * `:csms` 에 있고 (시험 대상이 CSMS 이므로), 이 태스크는 루트에서 부를 수 있게 모아 준다.
+ * `TC_S_102_CSMS` · `TC_S_103_CSMS` · `TC_S_104_CS` 와 실패 시나리오 F1~F6 이 여기서 돈다.
+ * 실제 시험은 전부 `:csms` 에 있다 — 앞의 둘은 시험 대상이 CSMS 라서이고,
+ * `TC_S_104_CS` 는 반대로 **CSMS 가 시험계**라서 그렇다 (PLAN §7.2).
  */
 tasks.register("conformanceTest") {
     group = "verification"
-    description = "공식 적합성 케이스(TC_S_102/103_CSMS)와 실패 시나리오 F1~F6 (PLAN §7.3 L2)"
+    description = "공식 적합성 케이스(TC_S_102/103_CSMS · TC_S_104_CS)와 실패 시나리오 F1~F6 (PLAN §7.3 L2)"
     dependsOn(":csms:conformanceTest")
 }
 

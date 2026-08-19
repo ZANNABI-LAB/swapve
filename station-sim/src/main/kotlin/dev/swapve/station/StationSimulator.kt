@@ -135,6 +135,14 @@ class StationSimulator(
     private var remoteStart = CompletableDeferred<Int>()
 
     /**
+     * `GetBaseReport` 를 기다리는 [reportFullInventory] 가 깨어날 자리 (B03).
+     *
+     * [remoteStart] 와 같은 장치다 — 인바운드 CALL 을 처리하는 자리에서 새 CALL 을 보낼 수
+     * 없기 때문이다 (Part 4 §4.1.1).
+     */
+    private val baseReport = CompletableDeferred<Int>()
+
+    /**
      * 세션. 멱등 원장과 직렬화기는 이 스테이션 전용이라 새로 만든다 — CSMS 쪽처럼 여러
      * 스테이션이 공유하는 자리가 아니다.
      */
@@ -823,6 +831,7 @@ class StationSimulator(
         BatterySwapWire.REQUEST_BATTERY_SWAP -> requestBatterySwap(call.payload)
         BatterySwapWire.GET_VARIABLES -> getVariables(call.payload)
         BatterySwapWire.SET_VARIABLES -> setVariables(call.payload)
+        BatterySwapWire.GET_BASE_REPORT -> getBaseReport(call.payload)
         else -> InboundResponse.Fail(
             RpcErrorCode.NotImplemented,
             "station-sim 이 구현하지 않은 action: ${call.action}",
@@ -872,6 +881,67 @@ class StationSimulator(
             deviceModel.write(ref, item.path("attributeValue").asText())
         }
         return InboundResponse.Respond(SimPayloads.setVariablesResponse(results))
+    }
+
+    /**
+     * ★ **`GetBaseReport`** — 청을 받아들이고, 보고 자체는 [reportFullInventory] 가 나른다
+     * (B03, `TC_S_104_CS`).
+     *
+     * ### 여기서 `NotifyReport` 를 보내지 않는다
+     *
+     * [requestBatterySwap] 과 **정확히 같은 이유**다: 아직 응답을 내지 않은 채 새 CALL 을
+     * 보내면 연결당 in-flight CALL 하나 규칙(Part 4 §4.1.1)과 어긋난다. 그래서 상관 번호만
+     * [baseReport] 에 담아 두고, 그것을 기다리던 쪽이 이어받는다.
+     *
+     * ### `FullInventory` 만 받아들인다
+     *
+     * `ConfigurationInventory` / `SummaryInventory` 는 "설정 가능한 것만" · "요약만" 이라는
+     * **다른 목록**이다. 같은 전체 목록을 세 이름으로 답하면 그건 세 종류를 지원하는 것이
+     * 아니라 두 개를 잘못 답하는 것이라, 지원하지 않는다고 말한다 (PLAN §11.0).
+     */
+    private fun getBaseReport(payload: ObjectNode): InboundResponse {
+        val reportBase = payload.path("reportBase").asText()
+        if (!reportBase.equals(BatterySwapWire.REPORT_BASE_FULL_INVENTORY, ignoreCase = true)) {
+            return InboundResponse.Respond(
+                SimPayloads.getBaseReportResponse(
+                    accepted = false,
+                    reasonCode = REASON_UNSUPPORTED_REPORT_BASE,
+                    additionalInfo = "이 스테이션이 만들 수 있는 보고는 FullInventory 뿐이다: $reportBase",
+                ),
+            )
+        }
+
+        if (!baseReport.isCompleted) baseReport.complete(payload.path("requestId").asInt())
+        return InboundResponse.Respond(SimPayloads.getBaseReportResponse(accepted = true))
+    }
+
+    /**
+     * ★ **디바이스 모델 전체를 `NotifyReport` 여러 건으로 나눠 보고한다** (B03, `TC_S_104_CS`).
+     *
+     * [getBaseReport] 가 청을 받아들일 때까지 기다렸다가, 그 `requestId` 를 **그대로 되돌리며**
+     * 목록을 [REPORT_PAGE_SIZE] 씩 잘라 보낸다. `seqNo` 는 0 부터 오르고 마지막 조각만
+     * `tbc` 가 없다.
+     *
+     * @return 보고에 실은 상관 번호. 청한 쪽의 것이다.
+     */
+    suspend fun reportFullInventory(): Int {
+        val requestId = baseReport.await()
+        val pages = deviceModel.fullInventory().chunked(REPORT_PAGE_SIZE)
+        check(pages.isNotEmpty()) { "보고할 변수가 하나도 없다 — 디바이스 모델이 비어 있을 수 없다" }
+
+        pages.forEachIndexed { index, page ->
+            call(
+                BatterySwapWire.NOTIFY_REPORT,
+                SimPayloads.notifyReport(
+                    requestId = requestId,
+                    seqNo = index,
+                    tbc = index != pages.lastIndex,
+                    at = clock.instant(),
+                    readings = page,
+                ),
+            )
+        }
+        return requestId
     }
 
     /**
@@ -938,6 +1008,19 @@ class StationSimulator(
          * 어긋나지 않게 하려고만 존재한다.
          */
         val UNREADABLE_REF = VariableRef(component = "Unknown", variable = "Unknown")
+
+        /**
+         * ★ **`NotifyReport` 한 건에 싣는 변수의 최대 개수** (B03).
+         *
+         * 실제 스테이션이 나누는 이유는 프레임 크기 한계지만, 여기서 작은 값을 쓰는 이유는
+         * 다르다: **분할이 언제나 실제로 일어나게 하려는 것**이다. 목록이 다 들어가는 크기를
+         * 쓰면 `tbc`·`seqNo` 경로가 시험에서 한 번도 실행되지 않고, 그러면 "구현했다"가
+         * 확인되지 않은 주장으로 남는다 (`TC_S_104_CS`).
+         */
+        const val REPORT_PAGE_SIZE = 3
+
+        /** `statusInfo.reasonCode` 는 20자 제한이다 (공식 스키마). */
+        const val REASON_UNSUPPORTED_REPORT_BASE = "UnsupportedBase"
 
         /** 재전송할 프레임에서 페이로드를 꺼낼 때만 쓴다. `[2,"id","Action",{payload}]`. */
         val MAPPER = ObjectMapper()

@@ -49,13 +49,17 @@ tasks.withType<Test>().configureEach {
  * 역할은 `station-sim` 이 맡는다 — 시뮬레이터가 스펙 시퀀스를 그대로 연기하고, 우리가
  * 만든 CSMS 가 시험받는다.
  *
+ * **`TC_S_104_CS` 는 그 반대다** — 시험 대상이 CS 라 시뮬레이터가 시험받고 CSMS 가
+ * 시험계다. 그래도 같은 게이트에 둔다: 두 방향 다 "표준대로 대화하는가"를 묻는 시험이고,
+ * 한쪽을 다른 태스크로 빼면 적합성이 어디까지 확인됐는지가 두 곳에 흩어진다.
+ *
  * `test` 태스크와 **같은 소스셋을 공유하되 태그로만 갈린다.** 소스셋을 나누면 시험 지원
  * 코드(`SwapScenario`, `FixedClockConfig` …)를 복제하거나 또 다른 공유 소스셋을 만들어야
  * 하는데, 그건 게이트를 나누려다 구조를 늘리는 일이다.
  */
 val conformanceTest by tasks.registering(Test::class) {
     group = "verification"
-    description = "TC_S_102_CSMS · TC_S_103_CSMS 와 실패 시나리오 F1~F6 (PLAN §2 S2·S3)"
+    description = "TC_S_102_CSMS · TC_S_103_CSMS · TC_S_104_CS 와 실패 시나리오 F1~F6 (PLAN §2 S2·S3)"
 
     val testSourceSet = sourceSets["test"]
     testClassesDirs = testSourceSet.output.classesDirs

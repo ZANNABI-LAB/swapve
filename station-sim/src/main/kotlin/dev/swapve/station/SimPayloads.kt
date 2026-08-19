@@ -6,6 +6,7 @@ import dev.swapve.ocpp.json.OcppDateTime
 import dev.swapve.ocpp.swap.AvailabilityState
 import dev.swapve.ocpp.swap.BatteryRejectionReason
 import dev.swapve.ocpp.swap.BatterySwapWire
+import dev.swapve.ocpp.swap.DeviceModelVariables
 import dev.swapve.ocpp.swap.VariableReading
 import dev.swapve.ocpp.swap.VariableRef
 import dev.swapve.ocpp.swap.VariableWrite
@@ -190,6 +191,134 @@ internal object SimPayloads {
                 statusInfo(write.reasonCode, write.additionalInfo)
                 write.ref.writeTo(this)
             }
+        }
+    }
+
+    /**
+     * `GetBaseReportResponse` (B03, `TC_S_104_CS`).
+     *
+     * **보고 자체는 여기서 나가지 않는다.** 이 응답은 "그 청을 받아들였다"까지이고, 실제
+     * 목록은 이어지는 [notifyReport] 들이 나른다. 그 둘을 한 메시지로 합칠 수 없는 것이
+     * 이 경로의 성격이다 — 목록이 한 프레임에 담긴다는 보장이 없다.
+     */
+    fun getBaseReportResponse(accepted: Boolean, reasonCode: String? = null, additionalInfo: String? = null): ObjectNode =
+        node().apply {
+            put(
+                "status",
+                if (accepted) {
+                    BatterySwapWire.DEVICE_MODEL_ACCEPTED
+                } else {
+                    BatterySwapWire.DEVICE_MODEL_NOT_SUPPORTED
+                },
+            )
+            if (reasonCode != null) {
+                putObject("statusInfo").apply {
+                    put("reasonCode", reasonCode)
+                    additionalInfo?.let { put("additionalInfo", it) }
+                }
+            }
+        }
+
+    /**
+     * ★ **`NotifyReport` 한 조각** (B03, `TC_S_104_CS`).
+     *
+     * ### 조각이라는 것이 이 메시지의 본질이다
+     *
+     * [seqNo] 는 0 부터 1 씩 오르고, 뒤에 더 올 것이 있으면 [tbc] 가 참이다. 마지막 조각은
+     * `tbc` 를 싣지 않는다 — 스키마의 기본값이 거짓이라 **없는 것이 곧 "여기서 끝"** 이다.
+     * 굳이 `false` 를 적어 보내지 않는 이유는, 받는 쪽이 "없음"과 "거짓"을 다르게 다루면
+     * 그 자리가 곧 버그이기 때문이다. 기본값대로 두면 그 구분이 생길 수 없다.
+     *
+     * ### 속성과 특성을 매번 함께 싣는다
+     *
+     * `variableAttribute` 는 **필수**이고 (`minItems: 1`), 이 스테이션이 보고하는 것은
+     * 언제나 `Actual` 하나다. `variableCharacteristics` 는 선택이지만 [characteristics] 로
+     * 함께 싣는다 — 받는 쪽이 `"80"` 이라는 문자열만 보고 그것이 퍼센트인지 초인지
+     * 짐작하게 두면, 짐작이 곧 계약이 된다.
+     */
+    fun notifyReport(
+        requestId: Int,
+        seqNo: Int,
+        tbc: Boolean,
+        at: Instant,
+        readings: List<VariableReading>,
+    ): ObjectNode = node().apply {
+        put("requestId", requestId)
+        put("generatedAt", OcppDateTime.format(at))
+        put("seqNo", seqNo)
+        // 마지막 조각에는 아예 싣지 않는다 (스키마 기본값 = false).
+        if (tbc) put("tbc", true)
+
+        val array = putArray("reportData")
+        readings.forEach { reading ->
+            array.addObject().apply {
+                // 식별자 인코딩은 언제나 이 한 곳을 지난다 — 조회와 보고가 같은 철자를 써야
+                // 재조립한 쪽이 두 경로의 답을 같은 변수로 볼 수 있다.
+                reading.ref.writeTo(this)
+                putArray("variableAttribute").addObject().apply {
+                    put("type", BatterySwapWire.ATTRIBUTE_ACTUAL)
+                    reading.value?.let { put("value", it) }
+                    put("mutability", mutabilityOf(reading.ref))
+                }
+                characteristics(reading.ref)
+            }
+        }
+    }
+
+    /**
+     * `BatteryCartridge` 와 `SwapOrder` 는 **관측되는 값**이라 읽기 전용이다.
+     *
+     * 같은 판정이 `SimDeviceModel.write` 에도 있다. 거기서는 거부의 근거이고 여기서는 그
+     * 사실의 보고다 — 둘이 어긋나면 "설정할 수 있다고 보고해 놓고 거부하는" 스테이션이 된다.
+     */
+    private fun mutabilityOf(ref: VariableRef): String = when {
+        ref.component.equals(DeviceModelVariables.COMPONENT_BATTERY_CARTRIDGE, ignoreCase = true) ->
+            BatterySwapWire.MUTABILITY_READ_ONLY
+
+        ref.variable.equals(DeviceModelVariables.VARIABLE_SWAP_ORDER, ignoreCase = true) ->
+            BatterySwapWire.MUTABILITY_READ_ONLY
+
+        else -> BatterySwapWire.MUTABILITY_READ_WRITE
+    }
+
+    /**
+     * `VariableCharacteristicsType` — `dataType` 과 `supportsMonitoring` 이 **필수**다.
+     *
+     * `supportsMonitoring = false` 로 고정한다. 변수 감시(`SetVariableMonitoring`)를 하나도
+     * 구현하지 않았으므로, 지원한다고 보고하면 CSMS 가 걸 수 있다고 믿는 감시를 우리가
+     * 받지 못한다 (PLAN §11.0 — 없는 기능을 있는 척하지 않는다).
+     */
+    private fun ObjectNode.characteristics(ref: VariableRef) {
+        putObject("variableCharacteristics").apply {
+            when {
+                ref.variable.equals(DeviceModelVariables.VARIABLE_AVAILABLE, ignoreCase = true) ->
+                    put("dataType", BatterySwapWire.DATA_TYPE_BOOLEAN)
+
+                ref.variable.equals(DeviceModelVariables.VARIABLE_ID_TOKEN, ignoreCase = true) ->
+                    put("dataType", BatterySwapWire.DATA_TYPE_STRING)
+
+                ref.variable.equals(DeviceModelVariables.VARIABLE_TIMEOUT, ignoreCase = true) -> {
+                    put("dataType", BatterySwapWire.DATA_TYPE_INTEGER)
+                    put("unit", BatterySwapWire.UNIT_SECONDS)
+                    put("minLimit", 0)
+                }
+
+                ref.variable.equals(DeviceModelVariables.VARIABLE_SWAP_ORDER, ignoreCase = true) -> {
+                    // OptionList 는 valuesList 가 필수다 (공식 스키마). 값의 집합을 아는 것은
+                    // 이 열거형 하나뿐이라 리터럴로 적지 않는다.
+                    put("dataType", BatterySwapWire.DATA_TYPE_OPTION_LIST)
+                    put("valuesList", SwapOrder.entries.joinToString(",") { it.wireValue })
+                }
+
+                // 남은 것은 전부 퍼센트다 — TargetSoC · MaxSoc · 카트리지의 SoC/SoH.
+                else -> {
+                    put("dataType", BatterySwapWire.DATA_TYPE_DECIMAL)
+                    put("unit", BatterySwapWire.UNIT_PERCENT)
+                    put("minLimit", 0)
+                    put("maxLimit", 100)
+                }
+            }
+            put("supportsMonitoring", false)
         }
     }
 
