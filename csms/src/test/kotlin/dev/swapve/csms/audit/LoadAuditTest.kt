@@ -12,6 +12,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
@@ -133,7 +134,7 @@ class LoadAuditTest {
                 try {
                     connectAll(simulators)
 
-                    val connected = sessions.connectedStationIds.count { it in LoadScenario.stationIds }
+                    val connected = awaitConnected(LoadScenario.STATION_COUNT)
                     assertEquals(
                         LoadScenario.STATION_COUNT,
                         connected,
@@ -156,5 +157,38 @@ class LoadAuditTest {
 
     private suspend fun connectAll(simulators: List<StationSimulator>) = coroutineScope {
         simulators.map { simulator -> async(Dispatchers.IO) { simulator.connect() } }.awaitAll()
+    }
+
+    /**
+     * 20 대의 접속이 [SessionRegistry] 에 **나타날 때까지** 기다린 뒤, 관측한 수를 돌려준다.
+     *
+     * 기다리는 이유는 하나다. 시뮬레이터의 `connect()` 는 **101 응답을 받은 시점**에 반환되는데,
+     * 서버 쪽 `afterConnectionEstablished` 의 등록은 그보다 뒤에 다른 스레드에서 일어난다.
+     * 그 틈 때문에 20 대가 정말로 붙어 있는데도 18 대로 세이는 일이 있었다 — 기다리지 않으면
+     * 시험이 **기계의 코어 수에 따라 흔들린다**(2 코어 CI 러너에서 특히).
+     *
+     * 대기가 보장을 약화시키지는 않는다. 여기서 기다리는 것은 **관측의 지연**이지 접속 자체가
+     * 아니고, 교환은 여전히 20 대가 모두 붙은 것을 확인한 다음에 시작한다. 초과분(20 대보다
+     * 많이 잡히는 경우)은 대기 대상이 아니라 그대로 호출부의 단언에 걸린다.
+     */
+    private suspend fun awaitConnected(expected: Int): Int {
+        val deadlineNanos = System.nanoTime() + OBSERVE_TIMEOUT_MILLIS * 1_000_000
+        var connected = countConnected()
+        while (connected < expected && System.nanoTime() < deadlineNanos) {
+            delay(OBSERVE_POLL_MILLIS)
+            connected = countConnected()
+        }
+        return connected
+    }
+
+    private fun countConnected(): Int =
+        sessions.connectedStationIds.count { it in LoadScenario.stationIds }
+
+    private companion object {
+        /** 접속 관측을 기다리는 상한. 넘기면 그냥 관측한 수로 단언에 들어가 실패로 남는다. */
+        const val OBSERVE_TIMEOUT_MILLIS = 5_000L
+
+        /** 관측 간격. 붙는 즉시 진행하려는 값이지 대기 시간을 늘리려는 값이 아니다. */
+        const val OBSERVE_POLL_MILLIS = 10L
     }
 }
