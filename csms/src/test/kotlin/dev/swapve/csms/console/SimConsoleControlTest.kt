@@ -1,0 +1,298 @@
+package dev.swapve.csms.console
+
+import com.fasterxml.jackson.databind.JsonNode
+import com.fasterxml.jackson.databind.ObjectMapper
+import dev.swapve.console.ControlledStations
+import dev.swapve.console.SimConsoleServer
+import dev.swapve.csms.support.FixedClockConfig
+import dev.swapve.csms.swap.RemoteSwapStart
+import dev.swapve.csms.swap.RemoteSwapStarter
+import dev.swapve.csms.swap.SwapTransactionRegistry
+import dev.swapve.ocpp.swap.BatteryRejectionReason
+import dev.swapve.swap.IdToken
+import dev.swapve.swap.StationId
+import dev.swapve.swap.SwapTransaction
+import kotlinx.coroutines.runBlocking
+import org.junit.jupiter.api.AfterEach
+import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Test
+import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.boot.test.web.server.LocalServerPort
+import org.springframework.context.annotation.Import
+import java.net.URI
+import java.net.http.HttpClient
+import java.net.http.HttpRequest
+import java.net.http.HttpResponse
+import kotlin.test.assertContains
+import kotlin.test.assertEquals
+import kotlin.test.assertIs
+import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
+
+/**
+ * ★ **제어 콘솔의 제어 경로가 실제로 돈다** (B24).
+ *
+ * ### 화면은 눈으로 보지만 제어 경로는 기계가 확인한다
+ *
+ * 콘솔이 하는 일은 "HTTP 요청 하나가 실제 WebSocket 위의 교환 1건이 되는 것"이다. 그건
+ * 눈으로 보는 것이 아니라 시험할 수 있는 것이고, 시험하지 않으면 데모 당일에 처음 알게 된다.
+ * 그래서 **실제 CSMS 를 상대로** 콘솔의 API 를 두드린다 — 붙이고, 교환을 걸고, 완주를
+ * 확인하고, 장애를 주입하고, 잘못된 요청에 무엇으로 답하는지 본다.
+ *
+ * ### 여기 있는 이유
+ *
+ * 콘솔 자체는 CSMS 를 모른다 (의존 방향은 sim-console → station-sim 한 방향이다). 둘을 한
+ * 자리에서 붙일 수 있는 곳은 **CSMS 의 시험 소스셋**뿐이고, 그건 `station-sim` 이 이미
+ * 그렇게 쓰이고 있는 것과 같은 사정이다 (`csms/build.gradle.kts`).
+ *
+ * ### 태그가 없다
+ *
+ * 적합성도 감사도 아니다. `./gradlew build` 의 L1 게이트에서 돌고, `conformanceTest` 와
+ * `auditTest` 의 질문에는 손대지 않는다 (PLAN §7.3).
+ */
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@Import(FixedClockConfig::class)
+class SimConsoleControlTest {
+
+    @LocalServerPort
+    private var port: Int = 0
+
+    @Autowired
+    private lateinit var swaps: SwapTransactionRegistry
+
+    @Autowired
+    private lateinit var remoteSwapStarter: RemoteSwapStarter
+
+    private lateinit var console: SimConsoleServer
+
+    private val http: HttpClient = HttpClient.newHttpClient()
+
+    @BeforeEach
+    fun startConsole() {
+        // 포트 0 — 시험이 고정 포트를 잡으면 병렬 실행이나 사람의 로컬 데모와 부딪힌다.
+        console = SimConsoleServer(ControlledStations("ws://localhost:$port/ocpp"), port = 0).start()
+    }
+
+    @AfterEach
+    fun stopConsole() {
+        // 붙어 있는 시뮬레이터까지 함께 닫힌다. 남겨 두면 다음 시험의 CSMS 에 죽은 연결이 남는다.
+        console.close()
+    }
+
+    // ------------------------------------------------------------------ 정상 경로
+
+    /**
+     * ★ 제어 API 로 **스테이션을 띄우고 → 교환을 시작해 → 완주한다.**
+     *
+     * 완주 판정을 콘솔의 말만 듣고 하지 않는다. CSMS 의 장부에서 같은 교환이
+     * [SwapTransaction.Completed] 인지 교차 확인한다 — 콘솔이 "끝났다"고 말하는 것과
+     * 관제 서버의 장부가 맞는 것은 다른 일이다.
+     */
+    @Test
+    fun `제어 API 로 붙인 스테이션이 교환 1건을 완주한다`() {
+        val stationId = "CS-CONSOLE-SWAP"
+        val attached = attach(stationId)
+
+        // 붙자마자 보이는 것 — 투입 슬롯은 비어 있고 반출 슬롯에는 내줄 배터리가 있다.
+        assertEquals(4, attached.path("slots").size())
+        assertTrue(slot(attached, 1).path("battery").isNull, "투입 슬롯에 배터리가 있다")
+        assertEquals("BAT-FULL-3", slot(attached, 3).path("battery").path("serialNumber").asText())
+
+        val (status, _) = post("/api/stations/$stationId/swap", "{}")
+        assertEquals(202, status, "교환 시작이 접수되지 않았다")
+
+        val completed = awaitProgress(stationId, "COMPLETED")
+        val requestId = completed.path("requestId").asInt()
+
+        // ★ CSMS 의 장부에서 같은 교환이 완주로 남았다.
+        val transaction = assertNotNull(swaps.find(StationId(stationId), requestId), "교환이 열리지 않았다")
+        val ledger = assertIs<SwapTransaction.Completed>(transaction, "교환이 완료되지 않았다: $transaction")
+        assertEquals(2, ledger.batteriesIn.size)
+        assertEquals(ledger.batteriesIn.size, ledger.batteriesOut.size)
+
+        // 슬롯이 뒤바뀐 것이 화면에도 그대로 보인다 — 헌 배터리가 들어오고 새 배터리가 나갔다.
+        assertEquals("BAT-USED-1", slot(completed, 1).path("battery").path("serialNumber").asText())
+        assertTrue(slot(completed, 3).path("battery").isNull, "내준 배터리가 슬롯에 남아 있다")
+        assertTrue(completed.path("messageCount").asInt() > 0, "오간 메시지가 없다")
+    }
+
+    // ------------------------------------------------------------------ 장애 주입
+
+    /**
+     * ★ **F1 — 배터리 부족.** 버튼 하나로 걸었을 때 **실제로 그 실패가 난다.**
+     *
+     * 개시 주체가 CSMS 인 시나리오라 (S02.FR.04) 콘솔은 붙여 놓고 기다린다. 여기서는
+     * 사람이 칠 curl 대신 시험이 직접 개시를 건다 — 어느 쪽이든 CSMS 를 지나는 길은 같다.
+     */
+    @Test
+    fun `F1 을 걸면 스테이션이 개시를 거부하고 그 사유가 콘솔에 남는다`() {
+        val stationId = "CS-CONSOLE-F1"
+        attach(stationId)
+
+        val (status, _) = post("/api/stations/$stationId/swap", """{"fault":"F1"}""")
+        assertEquals(202, status)
+
+        // 붙고 부팅까지 끝나야 CSMS 가 이 스테이션을 안다. 그 시점이 이 상태다.
+        val waiting = awaitProgress(stationId, "AWAITING_REMOTE_START")
+        assertTrue(waiting.path("connected").asBoolean(), "기다린다면서 붙어 있지 않다")
+        // 내줄 배터리가 없는 구성으로 다시 붙었다 — 반출 슬롯이 하나도 없다.
+        assertTrue(
+            waiting.path("slots").none { it.path("role").asText() == "DISPENSE" },
+            "F1 인데 반출 슬롯이 있다",
+        )
+        // 상관 번호는 CSMS 가 발번한다 (S02.FR.02). 개시 전에는 모르는 것이 맞다.
+        assertTrue(waiting.path("requestId").isNull, "개시 전인데 상관 번호를 알고 있다")
+
+        val outcome = runBlocking {
+            remoteSwapStarter.start(StationId(stationId), IdToken("RFID-0001", "ISO14443"))
+        }
+
+        val rejected = assertIs<RemoteSwapStart.Rejected>(outcome, "거부되지 않았다: $outcome")
+        assertEquals(BatteryRejectionReason.NO_BATTERY_AVAILABLE, rejected.rejection.reason)
+
+        val snapshot = awaitProgress(stationId, "REJECTED")
+        assertContains(snapshot.path("note").asText(), BatteryRejectionReason.NO_BATTERY_AVAILABLE.wireValue)
+        assertTrue(
+            swaps.rejections().any { it.key.stationId.value == stationId },
+            "거부가 CSMS 에 기록되지 않았다",
+        )
+    }
+
+    /**
+     * **F3 — 미등록 배터리.** 구성으로 재현되는 쪽도 도는지 본다.
+     *
+     * F1 과 갈리는 지점이 여기다: F3 은 교환이 **정상으로 완주하되** 응답에 customData 거부가
+     * 붙는다 (PLAN §4.8, §4.3 — `BatterySwapResponse` 는 거부할 수 없다).
+     */
+    @Test
+    fun `F3 을 걸면 등록되지 않은 배터리가 customData 로 거부된다`() {
+        val stationId = "CS-CONSOLE-F3"
+        attach(stationId)
+
+        post("/api/stations/$stationId/swap", """{"fault":"F3"}""")
+        val completed = awaitProgress(stationId, "COMPLETED")
+
+        assertContains(completed.path("note").asText(), BatteryRejectionReason.BATTERY_UNKNOWN.wireValue)
+        // 그럼에도 교환 자체는 완주했다 — 거부는 회신에 실린 사실이지 흐름의 중단이 아니다.
+        assertIs<SwapTransaction.Completed>(
+            swaps.find(StationId(stationId), completed.path("requestId").asInt()),
+        )
+    }
+
+    // ------------------------------------------------------------------ 오류 처리
+
+    @Test
+    fun `없는 스테이션을 조종하려 하면 404 로 답한다`() {
+        val (swapStatus, swapBody) = post("/api/stations/CS-NOT-THERE/swap", "{}")
+        assertEquals(404, swapStatus)
+        assertContains(swapBody.path("error").asText(), "CS-NOT-THERE")
+
+        val detach = http.send(
+            HttpRequest.newBuilder(uri("/api/stations/CS-NOT-THERE")).DELETE().build(),
+            HttpResponse.BodyHandlers.ofString(),
+        )
+        assertEquals(404, detach.statusCode())
+    }
+
+    @Test
+    fun `이미 붙은 stationId 를 또 띄우려 하면 409 로 답한다`() {
+        val stationId = "CS-CONSOLE-DUPLICATE"
+        attach(stationId)
+
+        val (status, body) = post("/api/stations", attachBody(stationId))
+        assertEquals(409, status)
+        assertContains(body.path("error").asText(), stationId)
+
+        // 앞서 붙은 것은 그대로 살아 있다 — 실패한 두 번째 요청이 첫 번째를 밀어내지 않는다.
+        assertEquals(1, state().path("stations").size())
+
+        // 막히는 것은 **같은 식별자**뿐이다. 스테이션 여러 대를 동시에 붙일 수 있어야 한다.
+        attach("$stationId-2")
+        assertEquals(2, state().path("stations").size())
+    }
+
+    /**
+     * 화면은 클래스패스의 정적 파일 한 장이다.
+     *
+     * 눈으로 볼 것을 시험이 대신 보지는 못하지만, **경로가 살아 있는지**는 확인할 수 있다 —
+     * 리소스 위치가 어긋나면 데모 당일에야 알게 된다.
+     */
+    @Test
+    fun `화면이 정적 파일 한 장으로 나온다`() {
+        val page = http.send(
+            HttpRequest.newBuilder(uri("/")).GET().build(),
+            HttpResponse.BodyHandlers.ofString(),
+        )
+
+        assertEquals(200, page.statusCode())
+        assertContains(page.headers().firstValue("Content-Type").orElse(""), "text/html")
+        assertContains(page.body(), "시뮬레이터 제어 콘솔")
+    }
+
+    // ------------------------------------------------------------------ 공통
+
+    private fun attach(stationId: String): JsonNode {
+        val (status, body) = post("/api/stations", attachBody(stationId))
+        assertEquals(201, status, "붙이지 못했다: ${body.path("error").asText()}")
+        return body
+    }
+
+    private fun attachBody(stationId: String) =
+        """{"stationId":"$stationId","slots":4,"setSize":2}"""
+
+    /**
+     * 교환은 비동기로 돈다 — 접수는 202 고 진행은 상태 조회로 본다. 화면이 하는 일과 같다.
+     *
+     * 폴링이라 실제 시간을 쓴다. 콘솔의 계약이 "요청을 붙들지 않는다"인 이상 이 시험도
+     * 기다릴 수밖에 없다. 대신 **실패는 즉시** 드러낸다 — FAILED 를 보면 곧바로 터진다.
+     */
+    private fun awaitProgress(stationId: String, expected: String): JsonNode {
+        repeat(POLL_ATTEMPTS) {
+            val station = state().path("stations").firstOrNull { it.path("stationId").asText() == stationId }
+            if (station != null) {
+                val progress = station.path("progress").asText()
+                if (progress == expected) return station
+                if (progress == "FAILED") {
+                    throw AssertionError("시나리오가 실패했다: ${station.path("error").asText()}")
+                }
+            }
+            Thread.sleep(POLL_INTERVAL_MILLIS)
+        }
+        throw AssertionError("$stationId 가 $expected 에 이르지 못했다: ${state().toPrettyString()}")
+    }
+
+    private fun state(): JsonNode = MAPPER.readTree(
+        http.send(
+            HttpRequest.newBuilder(uri("/api/state")).GET().build(),
+            HttpResponse.BodyHandlers.ofString(),
+        ).body(),
+    )
+
+    private fun post(path: String, body: String): Pair<Int, JsonNode> {
+        val response = http.send(
+            HttpRequest.newBuilder(uri(path))
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(body))
+                .build(),
+            HttpResponse.BodyHandlers.ofString(),
+        )
+        return response.statusCode() to MAPPER.readTree(response.body())
+    }
+
+    private fun slot(station: JsonNode, slotId: Int): JsonNode =
+        assertNotNull(
+            station.path("slots").firstOrNull { it.path("slotId").asInt() == slotId },
+            "슬롯 $slotId 이 없다: ${station.toPrettyString()}",
+        )
+
+    private fun uri(path: String): URI = URI.create("http://localhost:${console.port}$path")
+
+    private companion object {
+        /** 20초. 교환 1건은 로컬에서 1초 안쪽이고, 20초를 넘겼다면 그건 느린 것이 아니라 멈춘 것이다. */
+        const val POLL_ATTEMPTS = 200
+        const val POLL_INTERVAL_MILLIS = 100L
+
+        val MAPPER = ObjectMapper()
+    }
+}

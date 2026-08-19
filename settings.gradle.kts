@@ -5,4 +5,5 @@ include(
     "swap-domain",
     "csms",
     "station-sim",
+    "sim-console",
 )

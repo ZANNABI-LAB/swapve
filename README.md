@@ -110,6 +110,28 @@ curl -X POST localhost:8080/api/swaps -H 'Content-Type: application/json' \
 
 계약의 전문은 [docs/API.md](docs/API.md) 에 있습니다.
 
+**화면으로 조종하려면** 제어 콘솔을 띄웁니다. CLI를 **대체하지 않고 얹는 것**입니다 —
+위의 절차는 그대로 유효합니다. 터미널 A(CSMS)는 띄워 둔 채로:
+
+```bash
+# 터미널 B — 시뮬레이터 제어 콘솔. 기본 8090 (CSMS의 8080과 부딪히지 않습니다)
+./gradlew :sim-console:run --args="--port 8090 --csms-url ws://localhost:8080/ocpp"
+```
+
+브라우저로 `localhost:8090` 을 열고 **붙이기** → **교환 시작** 을 누르면, 슬롯의 배터리가
+오가고 SoC가 바뀌는 것이 표에서 보입니다. **F1~F6 버튼**은 [PLAN §5.4](docs/PLAN.md)의 실패
+시나리오를 그대로 겁니다 — "배터리 부족을 눌러서 재현"이 버튼 하나입니다.
+
+- 화면은 **정적 HTML 한 장**이고 외부 CDN·폰트·프레임워크를 링크하지 않습니다. HTTP 서버도
+  JDK 내장 `com.sun.net.httpserver` 입니다 — **네트워크 없는 곳에서도 뜹니다**
+- **F1(배터리 부족)은 개시 주체가 CSMS인 시나리오라**(S02.FR.04) 콘솔이 대기 상태로 들어갑니다.
+  그때 화면에 뜨는 `curl` 한 줄을 그대로 치면 거부 사유가 화면에 남습니다
+- 제어 API를 직접 부를 수도 있습니다 — `POST /api/stations` · `POST /api/stations/{id}/swap`
+  (본문 `{"fault":"F3"}` 으로 장애 주입) · `DELETE /api/stations/{id}` · `GET /api/state`
+
+콘솔은 **시험계를 조종하는 화면**이지 관제 서버가 아닙니다. 교환 이력과 지표는 위의 CSMS
+REST API에 있고, 콘솔은 그것을 흉내내지 않습니다.
+
 **막히면?** 인가 토큰은 `csms/src/main/resources/application.yml` 의 `authorized-id-tokens`
 목록에 있어야 하고(기본값 `RFID-0001`), 배터리 일련번호는 `known-battery-serials` 에 있어야
 합니다. 목록 밖 배터리는 표준이 정한 방식으로 거부됩니다 ([PLAN §4.8](docs/PLAN.md)).
@@ -151,7 +173,7 @@ Out-In 순서(`--swap-order Out-In`)와 S02 대기 모드(`--remote-start`)도 �
 
 | 게이트 | 명령 | 무엇을 보장하나 |
 |---|---|---|
-| **L1 단위** | `./gradlew build` | 프레임 왕복 · **공식 스키마 181개 검증** · 상태머신 전이와 불변식 · REST 계약. **모듈 경계 검증 3종**(`ocpp-core`/`swap-domain` 에 프레임워크·외부 의존이 새어 들지 않았는가)이 함께 돕니다 |
+| **L1 단위** | `./gradlew build` | 프레임 왕복 · **공식 스키마 181개 검증** · 상태머신 전이와 불변식 · REST 계약. **모듈 경계 검증 4종**(`ocpp-core`/`swap-domain` 에 프레임워크·외부 의존이 새어 들지 않았는가, `station-sim`/`sim-console` 이 JDK 밖으로 나가지 않았는가)이 함께 돕니다 |
 | **L2 표준 적합성** | `./gradlew conformanceTest` | 공식 케이스 **`TC_S_102_CSMS` · `TC_S_103_CSMS` · `TC_S_104_CS`** 와 실패 시나리오 **F1~F6**. 앞의 둘은 시험 대상이 CSMS이고 시뮬레이터가 시험계이며, **`TC_S_104_CS`는 그 반대**입니다 |
 | **L3 부하 + 감사** | `./gradlew auditTest` | **스테이션 20대 동시 접속** 후 불변식 감사. 감사는 **이벤트 로그에서 상태를 재구성해** 인메모리 레지스트리와 대조합니다 |
 
@@ -192,7 +214,7 @@ Out-In 순서(`--swap-order Out-In`)와 S02 대기 모드(`--remote-start`)도 �
 | **S4** | 스테이션 20대 동시 → 불변식 감사 전항목 | `./gradlew auditTest` | `LoadAuditTest` (+ 감사 자체의 시험 `InvariantAuditTest`) |
 | **S5** | 성공률·소요시간·실패 사유가 REST로 조회 | `./gradlew build` | `SwapMetricsApiTest` · `SwapApiTest` · `ChargingApiTest` |
 | **S6** | 위 전부가 zannabi-code 게이트로 자동 검증 | 아래 "개발 방식" | `.zannabi/runs/` 증거 디렉토리 · [`.github/workflows/ci.yml`](.github/workflows/ci.yml) |
-| **S7** | README만 읽고 5분 내 실행 | 위 "5분 안에 돌려보기" | 실측 — 빌드 → 서버 기동 → 교환 1건 완주 |
+| **S7** | README만 읽고 5분 내 실행 | 위 "5분 안에 돌려보기" | 실측 — 빌드 → 서버 기동 → 교환 1건 완주. 제어 콘솔의 경로는 `SimConsoleControlTest` 가 매 빌드마다 확인합니다 |
 
 ---
 
@@ -254,13 +276,19 @@ swapve/
 ├─ ocpp-core/      OCPP-J 프레이밍 · 공식 스키마 검증 · 세션 계층   (프레임워크 무관)
 ├─ swap-domain/    Battery Swap 도메인 · 교환 상태머신 · 슬롯 모델  (I/O 없음)
 ├─ csms/           관제 서버 — WebSocket · REST API · 지표
-└─ station-sim/    스테이션 시뮬레이터 — 슬롯 · 배터리 · 장애 주입
+├─ station-sim/    스테이션 시뮬레이터 — 슬롯 · 배터리 · 장애 주입      (의존성 0)
+└─ sim-console/    시뮬레이터 제어 콘솔 — 데모용 화면 + 제어 API      (JDK 내장 HTTP)
 ```
 
 `ocpp-core` 와 `swap-domain` 은 프레임워크를 모릅니다. `String` ↔ 도메인 객체 변환만 합니다.
 덕분에 전송 계층을 나중에 교체할 수 있고, 테스트가 I/O 없이 돕니다. **그 경계는 주석이 아니라
 빌드 검사입니다** — `checkNoFrameworkImports` · `checkNoExternalDependencies` ·
-`checkNoForbiddenDependencies` 가 `./gradlew build` 에서 함께 돕니다.
+`checkNoForbiddenDependencies`(`station-sim` 과 `sim-console` 에 하나씩) 가
+`./gradlew build` 에서 함께 돕니다.
+
+`sim-console` 은 `station-sim` 에만 의존합니다. 의존 방향은
+`sim-console → station-sim → (ocpp-core, swap-domain)` 한 방향이고, **`csms` 는 이 사슬에
+없습니다** — 관제 서버가 스테이션을 조종하는 의존을 만들지 않기 위해서입니다.
 
 읽을 순서를 하나 고른다면:
 

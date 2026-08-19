@@ -25,6 +25,10 @@ dependencies {
     // 시험 전용 의존이다. main 의 의존 방향은 그대로 csms → (ocpp-core, swap-domain) 이고,
     // station-sim 은 Spring 을 여전히 모른다.
     testImplementation(project(":station-sim"))
+    // B24 — 제어 콘솔의 API 로 교환이 실제로 완주하는지는 **실제 CSMS 를 상대로** 확인해야
+    // 의미가 있다. 위와 같은 사정이고 같은 자리다: 시험 전용 의존이며, main 의 의존 방향은
+    // 그대로 csms → (ocpp-core, swap-domain) 이다. sim-console 은 csms 를 모른다.
+    testImplementation(project(":sim-console"))
 }
 
 /**

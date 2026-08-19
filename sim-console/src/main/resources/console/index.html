@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<!--
+  시뮬레이터 제어 콘솔 — 정적 파일 한 장 (B24).
+
+  외부 CDN·폰트·프레임워크를 링크하지 않는다. 네트워크 없는 곳에서도 떠야 하기 때문이고,
+  그 사실은 :sim-console:checkNoForbiddenDependencies 가 이 파일까지 훑어 확인한다.
+
+  화면은 예쁠 필요는 없고 **정확해야** 한다. 받지 않은 값은 — 로 두고, 붙지 않은 스테이션의
+  슬롯은 그리지 않는다.
+-->
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SwapVe — 시뮬레이터 제어 콘솔</title>
+<style>
+  :root { color-scheme: light dark; }
+  body {
+    margin: 0; padding: 1.5rem;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 14px; line-height: 1.5;
+  }
+  h1 { font-size: 1.2rem; margin: 0 0 .25rem; }
+  h2 { font-size: 1rem; margin: 2rem 0 .5rem; }
+  p.lede { margin: 0 0 1.5rem; opacity: .75; }
+  fieldset { border: 1px solid #8886; border-radius: 6px; padding: .75rem 1rem 1rem; }
+  legend { padding: 0 .4rem; font-weight: bold; }
+  label { display: inline-block; margin: .25rem .75rem .25rem 0; }
+  label span { display: block; font-size: .8rem; opacity: .75; }
+  input, select, button { font: inherit; padding: .25rem .4rem; }
+  input { width: 12rem; }
+  input.narrow { width: 4rem; }
+  button { cursor: pointer; border-radius: 4px; border: 1px solid #8886; background: #8881; }
+  button:hover { background: #8883; }
+  .card { border: 1px solid #8886; border-radius: 6px; padding: .75rem 1rem; margin: .75rem 0; }
+  .card header { display: flex; align-items: baseline; gap: .5rem; flex-wrap: wrap; }
+  .card header b { font-size: 1.05rem; }
+  .meta { font-size: .85rem; opacity: .75; margin: .35rem 0 .6rem; }
+  .badge { border-radius: 999px; padding: .05rem .55rem; font-size: .8rem; border: 1px solid; }
+  .ATTACHED { color: #666; }
+  .RUNNING, .AWAITING_REMOTE_START { color: #b26a00; }
+  .COMPLETED { color: #1a7f37; }
+  .REJECTED, .FAILED { color: #b3261e; }
+  table { border-collapse: collapse; width: 100%; max-width: 46rem; margin: .25rem 0 .75rem; }
+  th, td { text-align: left; padding: .2rem .5rem; border-bottom: 1px solid #8883; }
+  th { font-size: .8rem; opacity: .75; font-weight: normal; }
+  td.empty { opacity: .45; }
+  .actions { display: flex; gap: .35rem; flex-wrap: wrap; }
+  .note, .hint, .error {
+    border-left: 3px solid; padding: .35rem .6rem; margin: .4rem 0;
+    font-size: .85rem; white-space: pre-wrap; word-break: break-all;
+  }
+  .note { border-color: #b26a00; }
+  .hint { border-color: #0969da; }
+  .error { border-color: #b3261e; }
+  .faults li { margin: .2rem 0; }
+  .faults b { display: inline-block; min-width: 9rem; }
+  .none { opacity: .6; }
+</style>
+</head>
+<body>
+
+<h1>SwapVe — 시뮬레이터 제어 콘솔</h1>
+<p class="lede">
+  스테이션 <b>시뮬레이터</b>를 조종하는 시험계 화면입니다. 관제 서버(CSMS)가 아닙니다 —
+  교환 이력·지표는 CSMS 의 REST API 에 있습니다.
+</p>
+
+<fieldset>
+  <legend>스테이션 붙이기</legend>
+  <label>CSMS URL <span>스테이션 식별자 제외</span><input id="csmsUrl"></label>
+  <label>stationId <span>스테이션 식별자</span><input id="stationId" value="CS001"></label>
+  <label>슬롯 <span>=EVSE 수</span><input id="slots" class="narrow" value="4"></label>
+  <label>세트 <span>한 번에 오가는 수</span><input id="setSize" class="narrow" value="2"></label>
+  <label>순서 <span>SwapOrder</span>
+    <select id="swapOrder"><option>In-Out</option><option>Out-In</option></select>
+  </label>
+  <label>인가 토큰 <span>IdToken</span><input id="idToken" value="RFID-0001"></label>
+  <button id="attach">붙이기</button>
+  <div id="attachError"></div>
+</fieldset>
+
+<h2>붙어 있는 스테이션</h2>
+<div id="stations"></div>
+
+<h2>장애 주입 — PLAN §5.4 실패 시나리오</h2>
+<ul class="faults" id="faults"></ul>
+
+<script>
+"use strict";
+
+var state = { defaultCsmsUrl: "", faults: [], stations: [] };
+
+function el(tag, text, cls) {
+  var node = document.createElement(tag);
+  if (text !== undefined && text !== null) node.textContent = text;
+  if (cls) node.className = cls;
+  return node;
+}
+
+/** 모르는 값은 모른다고 적는다. 그럴듯한 기본값으로 채우지 않는다. */
+function orDash(value) {
+  return (value === null || value === undefined || value === "") ? "—" : String(value);
+}
+
+function percent(value) {
+  return (value === null || value === undefined) ? "—" : value.toFixed(1) + "%";
+}
+
+function request(method, path, body) {
+  return fetch(path, {
+    method: method,
+    headers: { "Content-Type": "application/json" },
+    body: body ? JSON.stringify(body) : undefined
+  }).then(function (response) {
+    return response.json().catch(function () { return {}; }).then(function (json) {
+      if (!response.ok) throw new Error((json.error || "요청이 실패했습니다") + " (" + response.status + ")");
+      return json;
+    });
+  });
+}
+
+/** CSMS 의 REST 주소는 WebSocket URL 과 같은 호스트다. F1 을 걸 때 안내에 쓴다. */
+function csmsHost(wsUrl) {
+  return String(wsUrl).replace(/^wss?:\/\//, "").split("/")[0];
+}
+
+function slotTable(station) {
+  if (!station.slots.length) return el("p", "슬롯 정보 없음", "none");
+
+  var table = el("table");
+  var head = el("tr");
+  ["슬롯", "역할", "배터리", "SoC", "SoH", "충전 트랜잭션"].forEach(function (title) {
+    head.appendChild(el("th", title));
+  });
+  table.appendChild(head);
+
+  station.slots.forEach(function (slot) {
+    var row = el("tr");
+    row.appendChild(el("td", slot.slotId));
+    row.appendChild(el("td", slot.role === "INSERT" ? "투입" : slot.role === "DISPENSE" ? "반출" : "—"));
+    if (slot.battery) {
+      row.appendChild(el("td", slot.battery.serialNumber));
+      row.appendChild(el("td", percent(slot.battery.soC)));
+      row.appendChild(el("td", percent(slot.battery.soH)));
+    } else {
+      row.appendChild(el("td", "비어 있음", "empty"));
+      row.appendChild(el("td", "—", "empty"));
+      row.appendChild(el("td", "—", "empty"));
+    }
+    row.appendChild(el("td", orDash(slot.chargingTransactionId)));
+    table.appendChild(row);
+  });
+  return table;
+}
+
+function stationCard(station) {
+  var card = el("div", null, "card");
+
+  var header = el("header");
+  header.appendChild(el("b", station.stationId));
+  header.appendChild(el("span", station.progress, "badge " + station.progress));
+  header.appendChild(el("span", station.connected ? "연결됨" : "끊김", "badge"));
+  if (station.fault) header.appendChild(el("span", "장애 " + station.fault, "badge"));
+  card.appendChild(header);
+
+  card.appendChild(el("div",
+    station.connectUrl +
+    "  ·  순서 " + station.swapOrder +
+    "  ·  토큰 " + station.idToken + "/" + station.idTokenType +
+    "  ·  requestId " + orDash(station.requestId) +
+    "  ·  오간 메시지 " + station.messageCount + " 건",
+    "meta"));
+
+  card.appendChild(slotTable(station));
+
+  if (station.progress === "AWAITING_REMOTE_START") {
+    card.appendChild(el("div",
+      "CSMS 가 개시해야 하는 시나리오입니다 (S02). 다른 터미널에서:\n" +
+      "curl -X POST " + csmsHost(station.csmsUrl) + "/api/swaps -H 'Content-Type: application/json' \\\n" +
+      "     -d '{\"stationId\":\"" + station.stationId + "\",\"idToken\":{\"idToken\":\"" +
+      station.idToken + "\",\"type\":\"" + station.idTokenType + "\"}}'",
+      "hint"));
+  }
+  if (station.note) card.appendChild(el("div", station.note, "note"));
+  if (station.error) card.appendChild(el("div", station.error, "error"));
+
+  var actions = el("div", null, "actions");
+  var swap = el("button", "교환 시작");
+  swap.onclick = function () { startSwap(station.stationId, null); };
+  actions.appendChild(swap);
+
+  state.faults.forEach(function (fault) {
+    var button = el("button", fault.id + " " + fault.title);
+    button.title = fault.expectation;
+    button.onclick = function () { startSwap(station.stationId, fault.id); };
+    actions.appendChild(button);
+  });
+
+  var detach = el("button", "내리기");
+  detach.onclick = function () {
+    request("DELETE", "/api/stations/" + encodeURIComponent(station.stationId)).then(refresh).catch(showError);
+  };
+  actions.appendChild(detach);
+  card.appendChild(actions);
+
+  return card;
+}
+
+function startSwap(stationId, fault) {
+  request("POST", "/api/stations/" + encodeURIComponent(stationId) + "/swap", { fault: fault })
+    .then(refresh)
+    .catch(showError);
+}
+
+function showError(failure) {
+  var box = document.getElementById("attachError");
+  box.textContent = "";
+  box.appendChild(el("div", failure.message, "error"));
+}
+
+function render() {
+  var container = document.getElementById("stations");
+  container.textContent = "";
+  if (!state.stations.length) {
+    container.appendChild(el("p", "아직 붙은 스테이션이 없습니다.", "none"));
+  } else {
+    state.stations.forEach(function (station) { container.appendChild(stationCard(station)); });
+  }
+
+  var faults = document.getElementById("faults");
+  faults.textContent = "";
+  state.faults.forEach(function (fault) {
+    var item = el("li");
+    item.appendChild(el("b", fault.id + " " + fault.title));
+    item.appendChild(el("span", " — " + fault.expectation));
+    faults.appendChild(item);
+  });
+}
+
+function refresh() {
+  return fetch("/api/state").then(function (response) { return response.json(); }).then(function (json) {
+    state = json;
+    var csmsUrl = document.getElementById("csmsUrl");
+    if (!csmsUrl.value) csmsUrl.value = json.defaultCsmsUrl;
+    render();
+  });
+}
+
+document.getElementById("attach").onclick = function () {
+  document.getElementById("attachError").textContent = "";
+  request("POST", "/api/stations", {
+    csmsUrl: document.getElementById("csmsUrl").value,
+    stationId: document.getElementById("stationId").value,
+    slots: Number(document.getElementById("slots").value),
+    setSize: Number(document.getElementById("setSize").value),
+    swapOrder: document.getElementById("swapOrder").value,
+    idToken: document.getElementById("idToken").value
+  }).then(refresh).catch(showError);
+};
+
+refresh();
+// 교환이 진행되는 동안 슬롯이 바뀌는 것이 보여야 한다. 상태는 시뮬레이터에게 매번 묻는다.
+setInterval(refresh, 1000);
+</script>
+</body>
+</html>
