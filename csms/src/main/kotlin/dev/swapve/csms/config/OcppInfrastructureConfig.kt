@@ -1,8 +1,8 @@
 package dev.swapve.csms.config
 
+import dev.swapve.csms.event.JdbcOcppEventLog
 import dev.swapve.ocpp.rpc.OcppFrameCodec
 import dev.swapve.ocpp.schema.OcppPayloadValidator
-import dev.swapve.ocpp.session.InMemoryOcppEventLog
 import dev.swapve.ocpp.session.InboundCallLedger
 import dev.swapve.ocpp.session.LocalStationCommandBus
 import dev.swapve.ocpp.session.SessionRegistry
@@ -10,6 +10,7 @@ import dev.swapve.ocpp.session.StationCommandBus
 import dev.swapve.ocpp.session.StationSerializer
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import org.springframework.jdbc.core.JdbcTemplate
 import java.time.Clock
 
 /**
@@ -62,11 +63,10 @@ class OcppInfrastructureConfig {
     /**
      * 추가 전용 이벤트 로그 (PLAN §11.1).
      *
-     * 인메모리다. DB 영속은 저장소 결정(PLAN §6) 뒤로 미룬다 — 지금 필요한 것은 원문이
-     * 빠짐없이 남는다는 사실이고, 그건 저장 매체와 무관하다.
+     * JDBC 로 영속한다. 파생 상태 복구의 원장은 이 원문 로그다.
      */
     @Bean
-    fun ocppEventLog(): InMemoryOcppEventLog = InMemoryOcppEventLog()
+    fun ocppEventLog(jdbc: JdbcTemplate): JdbcOcppEventLog = JdbcOcppEventLog(jdbc)
 
     @Bean
     fun sessionRegistry(): SessionRegistry = SessionRegistry()

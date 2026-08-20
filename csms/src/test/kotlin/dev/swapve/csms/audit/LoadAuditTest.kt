@@ -1,11 +1,11 @@
 package dev.swapve.csms.audit
 
+import dev.swapve.csms.event.JdbcOcppEventLog
 import dev.swapve.csms.support.FixedClockConfig
 import dev.swapve.csms.swap.ChargingTransactionRegistry
 import dev.swapve.csms.swap.SlotStateRegistry
 import dev.swapve.csms.swap.SwapTransactionRegistry
 import dev.swapve.ocpp.schema.OcppPayloadValidator
-import dev.swapve.ocpp.session.InMemoryOcppEventLog
 import dev.swapve.ocpp.session.SessionRegistry
 import dev.swapve.station.StationSimulator
 import kotlinx.coroutines.Dispatchers
@@ -73,7 +73,7 @@ class LoadAuditTest {
     private lateinit var chargingTransactions: ChargingTransactionRegistry
 
     @Autowired
-    private lateinit var eventLog: InMemoryOcppEventLog
+    private lateinit var eventLog: JdbcOcppEventLog
 
     @Autowired
     private lateinit var sessions: SessionRegistry
@@ -81,11 +81,13 @@ class LoadAuditTest {
     @Autowired
     private lateinit var validator: OcppPayloadValidator
 
+    private lateinit var runStationIds: List<String>
+
     @Test
     fun `스테이션 20대가 동시에 교환을 완주하고 불변식 감사를 전항목 통과한다`() {
         val elapsedMillis = runLoad()
 
-        val replayed = LoadScenario.stationIds.map { stationId ->
+        val replayed = runStationIds.map { stationId ->
             EventLogReplay.replay(stationId, eventLog.of(stationId))
         }
 
@@ -123,12 +125,14 @@ class LoadAuditTest {
      * @return 부하에 걸린 밀리초. 보고용이지 단언 대상이 아니다.
      */
     private fun runLoad(): Long {
+        val runId = "CS-LOAD-${System.nanoTime()}"
+        runStationIds = LoadScenario.stationIds(runId)
         val startedAt = System.nanoTime()
 
         runBlocking {
             repeat(LoadScenario.ROUNDS) { round ->
                 val simulators = (1..LoadScenario.STATION_COUNT).map { index ->
-                    LoadScenario.simulator(port, index, round)
+                    LoadScenario.simulator(port, index, round, runId)
                 }
 
                 try {
@@ -182,7 +186,7 @@ class LoadAuditTest {
     }
 
     private fun countConnected(): Int =
-        sessions.connectedStationIds.count { it in LoadScenario.stationIds }
+        sessions.connectedStationIds.count { it in runStationIds }
 
     private companion object {
         /** 접속 관측을 기다리는 상한. 넘기면 그냥 관측한 수로 단언에 들어가 실패로 남는다. */

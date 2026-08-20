@@ -365,7 +365,7 @@ class InvariantAuditTest {
 
         private fun append(direction: MessageDirection, action: String, messageId: String, payload: String) {
             seq++
-            // 결번을 만든다 — 정상 경로(InMemoryOcppEventLog)로는 불가능한 상황이다.
+            // 결번을 만든다 — 정상 이벤트 로그 경로로는 불가능한 상황이다.
             if (skipSeq && seq == 3L) seq++
             built += OcppEventRecord(seq, STATION, direction, action, messageId, payload, AT)
         }

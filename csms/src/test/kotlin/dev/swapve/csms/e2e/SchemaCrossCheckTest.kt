@@ -2,11 +2,11 @@ package dev.swapve.csms.e2e
 
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
+import dev.swapve.csms.event.JdbcOcppEventLog
 import dev.swapve.csms.support.FixedClockConfig
 import dev.swapve.ocpp.rpc.MessageType
 import dev.swapve.ocpp.schema.OcppPayloadValidator
 import dev.swapve.ocpp.schema.PayloadValidation
-import dev.swapve.ocpp.session.InMemoryOcppEventLog
 import dev.swapve.ocpp.session.OcppEventRecord
 import dev.swapve.station.StationSimulator
 import dev.swapve.station.SwapOrder
@@ -37,7 +37,7 @@ class SchemaCrossCheckTest {
     private var port: Int = 0
 
     @Autowired
-    private lateinit var csmsEventLog: InMemoryOcppEventLog
+    private lateinit var csmsEventLog: JdbcOcppEventLog
 
     @Autowired
     private lateinit var validator: OcppPayloadValidator
@@ -47,7 +47,7 @@ class SchemaCrossCheckTest {
     @ParameterizedTest(name = "{0} — 오간 모든 메시지가 공식 스키마를 통과한다")
     @EnumSource(SwapOrder::class)
     fun `양방향 전 메시지가 공식 스키마를 통과한다`(order: SwapOrder) {
-        val stationId = "CS-SCHEMA-${order.name}"
+        val stationId = uniqueStationId("CS-SCHEMA-${order.name}")
         val simulator = runScenario(order, stationId, 4301 + order.ordinal)
 
         val stationSide = simulator.eventLog.of(stationId)
@@ -69,7 +69,7 @@ class SchemaCrossCheckTest {
     @ParameterizedTest(name = "{0} — 오류 프레임이 하나도 오가지 않는다")
     @EnumSource(SwapOrder::class)
     fun `CALLERROR 가 오가지 않는다`(order: SwapOrder) {
-        val stationId = "CS-SCHEMA-CLEAN-${order.name}"
+        val stationId = uniqueStationId("CS-SCHEMA-CLEAN-${order.name}")
         val simulator = runScenario(order, stationId, 4311 + order.ordinal)
 
         val frames = (simulator.eventLog.of(stationId) + csmsEventLog.of(stationId)).map { typeOf(it) }
@@ -134,4 +134,6 @@ class SchemaCrossCheckTest {
         }
         return simulator
     }
+
+    private fun uniqueStationId(prefix: String): String = "$prefix-${System.nanoTime()}"
 }

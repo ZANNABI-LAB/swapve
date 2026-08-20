@@ -61,7 +61,11 @@ object LoadScenario {
 
     fun stationId(index: Int): String = "CS-LOAD-%02d".format(index)
 
+    fun stationId(runId: String, index: Int): String = "$runId-%02d".format(index)
+
     val stationIds: List<String> = (1..STATION_COUNT).map(::stationId)
+
+    fun stationIds(runId: String): List<String> = (1..STATION_COUNT).map { stationId(runId, it) }
 
     /** **순서를 섞는다** (PLAN §4.6). 홀수는 통상 순서, 짝수는 역순이다. */
     fun order(index: Int): SwapOrder = if (index % 2 == 0) SwapOrder.OUT_IN else SwapOrder.IN_OUT
@@ -97,14 +101,14 @@ object LoadScenario {
      * 충전 트랜잭션의 토큰을 절반씩 갈라 둔다 — Part 6 은 `Central`(설정된 토큰)과
      * `NoAuthorization`(빈 문자열) 둘 다 허용하고, 부하 중에도 두 형태가 함께 오간다.
      */
-    fun config(port: Int, index: Int, round: Int): StationSimConfig {
+    fun config(port: Int, index: Int, round: Int, runId: String? = null): StationSimConfig {
         val dispensed = dispensed(index, round)
         val slots = (insertSlots(round) + dispenseSlots(round)).map { slotId ->
             SlotConfig(slotId = slotId, battery = dispensed[slotId])
         }
         return StationSimConfig(
             csmsUrl = "ws://localhost:$port/ocpp",
-            stationId = stationId(index),
+            stationId = runId?.let { stationId(it, index) } ?: stationId(index),
             slots = slots,
             idToken = AUTHORIZED_TOKEN,
             requestId = requestId(round),
@@ -116,6 +120,6 @@ object LoadScenario {
         )
     }
 
-    fun simulator(port: Int, index: Int, round: Int): StationSimulator =
-        StationSimulator(config(port, index, round), clock = clock())
+    fun simulator(port: Int, index: Int, round: Int, runId: String? = null): StationSimulator =
+        StationSimulator(config(port, index, round, runId), clock = clock())
 }

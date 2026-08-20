@@ -5,13 +5,13 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.node.ObjectNode
 import dev.swapve.csms.auth.AuthorizationRegistry
 import dev.swapve.csms.auth.AuthorizationStatus
+import dev.swapve.csms.event.JdbcOcppEventLog
 import dev.swapve.csms.station.StationRegistry
 import dev.swapve.csms.support.FixedClockConfig
 import dev.swapve.csms.support.OcppTestClient
 import dev.swapve.csms.ws.AuthMethod
 import dev.swapve.ocpp.schema.OcppPayloadValidator
 import dev.swapve.ocpp.schema.PayloadValidation
-import dev.swapve.ocpp.session.InMemoryOcppEventLog
 import dev.swapve.ocpp.session.MessageDirection
 import dev.swapve.swap.IdToken
 import dev.swapve.swap.StationId
@@ -50,7 +50,7 @@ class OcppEndpointTest {
     private lateinit var validator: OcppPayloadValidator
 
     @Autowired
-    private lateinit var eventLog: InMemoryOcppEventLog
+    private lateinit var eventLog: JdbcOcppEventLog
 
     private val mapper = ObjectMapper()
 
@@ -271,11 +271,12 @@ class OcppEndpointTest {
 
     @Test
     fun `오간 메시지가 원문 그대로 이벤트 로그에 남는다`() {
-        connect("CS-EVENTLOG").use { client ->
+        val stationId = "CS-EVENTLOG-${System.nanoTime()}"
+        connect(stationId).use { client ->
             callResult(client, "h1", "Heartbeat", "{}")
         }
 
-        val records = eventLog.of("CS-EVENTLOG")
+        val records = eventLog.of(stationId)
         assertEquals(2, records.size, "수신 1건 · 송신 1건이 남아야 한다: $records")
         assertEquals(MessageDirection.INBOUND, records[0].direction)
         assertEquals("Heartbeat", records[0].action)

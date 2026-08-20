@@ -38,12 +38,27 @@ dependencies {
  * (PLAN §5.3), 그건 시험에서도 마찬가지다. 다만 시험이 만든 파일까지 작업 디렉토리에
  * 쌓일 이유는 없으므로 시스템 프로퍼티로 덮는다. **인메모리로 바꾸지 않는다** — 그러면
  * "재시작 후에도 남는가"를 시험이 확인할 수 없다.
+ *
+ * 태스크마다 DB 디렉토리를 나누고 시작할 때 비운다. `SwapMetricsService` 가 이벤트 로그
+ * 전체를 스캔해 §11.1 전역 지표를 계산하는 것은 운영에서 맞는 동작이지만, 앞선 시험 실행이
+ * 남긴 로그까지 다음 실행이 같이 세면 그것은 시험 격리의 결함이다. `conformanceTest` 와
+ * `auditTest` 를 매번 실제로 돌리는 이유와 같은 논지다.
  */
 tasks.withType<Test>().configureEach {
+    val h2Directory = layout.buildDirectory.dir("test-h2/$name").get().asFile
+    val h2Database = h2Directory.resolve("swapve")
+
     systemProperty(
         "spring.datasource.url",
-        "jdbc:h2:file:${layout.buildDirectory.get()}/test-h2/swapve;AUTO_SERVER=TRUE;DB_CLOSE_DELAY=-1",
+        "jdbc:h2:file:${h2Database.absolutePath};AUTO_SERVER=TRUE;DB_CLOSE_DELAY=-1",
     )
+    systemProperty("csms.recovery.enabled", "false")
+
+    doFirst {
+        if (!h2Directory.deleteRecursively()) {
+            throw org.gradle.api.GradleException("시험용 H2 디렉토리를 비우지 못했다: $h2Directory")
+        }
+    }
 }
 
 /**

@@ -1,0 +1,25 @@
+{
+  "gates": [
+    {
+      "name": "build",
+      "cmd": "./gradlew :csms:cleanTest build"
+    },
+    {
+      "name": "conformance",
+      "cmd": "./gradlew conformanceTest"
+    },
+    {
+      "name": "audit",
+      "cmd": "./gradlew auditTest"
+    },
+    {
+      "name": "recovery",
+      "cmd": "./gradlew :csms:cleanTest :csms:test --tests '*EventLogRecoveryTest*' --tests '*SwapMetricsApiTest*'"
+    }
+  ],
+  "budget": 3,
+  "planModel": "claude-opus-5",
+  "verifyRepeat": 2,
+  "gateTimeoutMs": 900000,
+  "execAgent": "codex"
+}

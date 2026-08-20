@@ -7,7 +7,9 @@ import dev.swapve.ocpp.session.MessageDirection
 import dev.swapve.ocpp.session.OcppEventRecord
 import dev.swapve.ocpp.swap.AvailabilityState
 import dev.swapve.ocpp.swap.BatterySwapWire
+import dev.swapve.swap.IdToken
 import dev.swapve.swap.SlotState
+import java.time.Instant
 
 /**
  * ★ **이벤트 로그에서 파생 상태를 되살린다** (PLAN §11.1).
@@ -51,6 +53,7 @@ object EventLogReplay {
     data class ReplaySwap(
         val stationId: String,
         val requestId: Int,
+        val idToken: IdToken,
         val authorizedBeforeFirstEvent: Boolean,
         val batteriesIn: List<ReplayBattery>,
         val batteriesOut: List<ReplayBattery>,
@@ -58,6 +61,10 @@ object EventLogReplay {
         val duplicateEvents: Int,
         val firstSeq: Long,
         val lastSeq: Long,
+        val authorizedAt: Instant?,
+        val inAt: Instant?,
+        val outAt: Instant?,
+        val timedOutAt: Instant?,
     ) {
         val isCompleted: Boolean get() = batteriesIn.isNotEmpty() && batteriesOut.isNotEmpty() && !outTimedOut
 
@@ -65,15 +72,31 @@ object EventLogReplay {
         val slots: Set<Int> get() = (batteriesIn + batteriesOut).map { it.slotId }.toSet()
     }
 
+    /** 로그에서 되살린 충전 트랜잭션 사건 하나. */
+    data class ReplayChargingEvent(
+        val eventType: String,
+        val triggerReason: String,
+        val seqNo: Int,
+        val slotId: Int?,
+        val chargingState: String?,
+        val stoppedReason: String?,
+        val idToken: IdToken?,
+        val at: Instant,
+        val socPercent: Double?,
+    )
+
     /** 로그에서 되살린 충전 트랜잭션 (S04). 교환과 **다른 키**다 (PLAN §5.1). */
     data class ReplayCharging(
         val stationId: String,
         val transactionId: String,
         val slotId: Int?,
+        val events: List<ReplayChargingEvent>,
         val eventTypes: List<String>,
         val isEnded: Boolean,
         val startSeq: Long?,
         val endSeq: Long?,
+        val startedAt: Instant?,
+        val endedAt: Instant?,
     )
 
     /** CALL 한 건과 그 응답. 응답이 없으면 [response] 가 `null` — 그것이 유실이다. */
@@ -96,6 +119,7 @@ object EventLogReplay {
         val records: List<OcppEventRecord>,
         val swaps: Map<Int, ReplaySwap>,
         val slotStates: Map<Int, SlotState>,
+        val slotObservedAt: Map<Int, Instant>,
         val charging: Map<String, ReplayCharging>,
         val exchanges: List<ReplayExchange>,
         /** CALL 이 아닌데 짝을 찾지 못한 응답 — 있어서는 안 된다. */
@@ -107,12 +131,14 @@ object EventLogReplay {
     fun replay(stationId: String, records: List<OcppEventRecord>): ReplayedStation {
         val ordered = records.sortedBy { it.seq }
         val (exchanges, orphans) = pairCalls(stationId, ordered)
+        val (slotStates, slotObservedAt) = replaySlotStates(ordered)
 
         return ReplayedStation(
             stationId = stationId,
             records = ordered,
             swaps = replaySwaps(stationId, ordered),
-            slotStates = replaySlotStates(ordered),
+            slotStates = slotStates,
+            slotObservedAt = slotObservedAt,
             charging = replayCharging(stationId, ordered),
             exchanges = exchanges,
             orphanResponses = orphans,
@@ -128,14 +154,29 @@ object EventLogReplay {
      */
     private fun replaySwaps(stationId: String, records: List<OcppEventRecord>): Map<Int, ReplaySwap> {
         val grants = mutableSetOf<String>()
+        val remoteGrants = LinkedHashMap<Int, RemoteGrant>()
         val swaps = LinkedHashMap<Int, ReplaySwap>()
 
         records.forEach { record ->
-            if (record.direction != MessageDirection.INBOUND || typeOf(record) != MessageType.CALL) return@forEach
+            if (typeOf(record) != MessageType.CALL) return@forEach
             val payload = callPayload(record)
 
-            when (record.action) {
-                BatterySwapWire.AUTHORIZE -> {
+            when {
+                record.direction == MessageDirection.OUTBOUND && record.action == BatterySwapWire.REQUEST_BATTERY_SWAP -> {
+                    val response = responseOf(records, record)
+                    val accepted = response?.let { resultPayload(it).path("status").asText() } ==
+                        BatterySwapWire.GENERIC_ACCEPTED
+                    if (accepted) {
+                        remoteGrants[payload.path("requestId").asInt()] = RemoteGrant(
+                            idToken = idTokenOf(payload.path("idToken")),
+                            at = response?.occurredAt ?: record.occurredAt,
+                        )
+                    }
+                }
+
+                record.direction != MessageDirection.INBOUND -> Unit
+
+                record.action == BatterySwapWire.AUTHORIZE -> {
                     // 인가가 **났는지**는 우리가 낸 응답이 정한다. 요청만으로는 알 수 없다.
                     val accepted = responseOf(records, record)
                         ?.let { resultPayload(it).path("idTokenInfo").path("status").asText() } ==
@@ -143,16 +184,21 @@ object EventLogReplay {
                     if (accepted) grants += tokenKey(payload.path("idToken"))
                 }
 
-                BatterySwapWire.BATTERY_SWAP -> {
+                record.action == BatterySwapWire.BATTERY_SWAP -> {
                     val requestId = payload.path("requestId").asInt()
                     val batteries = batteriesOf(payload.path("batteryData"))
                     val existing = swaps[requestId]
+                    val remoteGrant = remoteGrants[requestId]
                     val authorized = existing?.authorizedBeforeFirstEvent
-                        ?: (tokenKey(payload.path("idToken")) in grants)
+                        ?: (
+                            tokenKey(payload.path("idToken")) in grants ||
+                                remoteGrant?.idToken == idTokenOf(payload.path("idToken"))
+                            )
 
                     val base = existing ?: ReplaySwap(
                         stationId = stationId,
                         requestId = requestId,
+                        idToken = idTokenOf(payload.path("idToken")),
                         authorizedBeforeFirstEvent = authorized,
                         batteriesIn = emptyList(),
                         batteriesOut = emptyList(),
@@ -160,12 +206,16 @@ object EventLogReplay {
                         duplicateEvents = 0,
                         firstSeq = record.seq,
                         lastSeq = record.seq,
+                        authorizedAt = authorizedAt(records, record, payload.path("idToken")) ?: remoteGrant?.at,
+                        inAt = null,
+                        outAt = null,
+                        timedOutAt = null,
                     )
 
                     swaps[requestId] = when (payload.path("eventType").asText()) {
                         BatterySwapWire.BATTERY_IN ->
                             if (base.batteriesIn.isEmpty()) {
-                                base.copy(batteriesIn = batteries, lastSeq = record.seq)
+                                base.copy(batteriesIn = batteries, lastSeq = record.seq, inAt = record.occurredAt)
                             } else {
                                 // 같은 반쪽이 또 왔다 — 멱등 무시 대상이다 (PLAN §5.4 F4).
                                 base.copy(duplicateEvents = base.duplicateEvents + 1, lastSeq = record.seq)
@@ -173,13 +223,13 @@ object EventLogReplay {
 
                         BatterySwapWire.BATTERY_OUT ->
                             if (base.batteriesOut.isEmpty()) {
-                                base.copy(batteriesOut = batteries, lastSeq = record.seq)
+                                base.copy(batteriesOut = batteries, lastSeq = record.seq, outAt = record.occurredAt)
                             } else {
                                 base.copy(duplicateEvents = base.duplicateEvents + 1, lastSeq = record.seq)
                             }
 
                         BatterySwapWire.BATTERY_OUT_TIMEOUT ->
-                            base.copy(outTimedOut = true, lastSeq = record.seq)
+                            base.copy(outTimedOut = true, lastSeq = record.seq, timedOutAt = record.occurredAt)
 
                         else -> base.copy(lastSeq = record.seq)
                     }
@@ -191,6 +241,11 @@ object EventLogReplay {
         return swaps.filterValues { it.authorizedBeforeFirstEvent }
     }
 
+    private data class RemoteGrant(
+        val idToken: IdToken,
+        val at: Instant,
+    )
+
     /**
      * 슬롯 점유 상태 재구성 — `NotifyEvent` 의 `Connector`/`AvailabilityState` 만 읽는다.
      *
@@ -198,8 +253,9 @@ object EventLogReplay {
      * 를 직접 해석하면 CSMS 와 같은 실수를 독립적으로 반복할 수 있으므로, 프로덕션 코드가
      * 지나는 그 문을 그대로 지난다.
      */
-    private fun replaySlotStates(records: List<OcppEventRecord>): Map<Int, SlotState> {
+    private fun replaySlotStates(records: List<OcppEventRecord>): Pair<Map<Int, SlotState>, Map<Int, Instant>> {
         val states = LinkedHashMap<Int, SlotState>()
+        val observedAt = LinkedHashMap<Int, Instant>()
 
         records.forEach { record ->
             if (record.direction != MessageDirection.INBOUND) return@forEach
@@ -215,10 +271,11 @@ object EventLogReplay {
                 val holdsBattery = AvailabilityState.holdsBattery(event.path("actualValue").asText())
                     ?: return@forEach
                 states[evseId] = if (holdsBattery) SlotState.HOLDS_BATTERY else SlotState.EMPTY
+                observedAt[evseId] = timestampOf(event, record.occurredAt)
             }
         }
 
-        return states
+        return states to observedAt
     }
 
     /** 충전 트랜잭션 재구성 — `TransactionEvent` 만으로. 교환을 참조하지 않는다 (PLAN §5.1). */
@@ -233,16 +290,30 @@ object EventLogReplay {
             val transactionId = payload.path("transactionInfo").path("transactionId").asText().ifBlank { return@forEach }
             val eventType = payload.path("eventType").asText()
             val slotId = payload.path("evse").path("id").takeIf { it.isInt }?.asInt()
+            val event = ReplayChargingEvent(
+                eventType = eventType,
+                triggerReason = payload.path("triggerReason").asText(),
+                seqNo = payload.path("seqNo").asInt(),
+                slotId = slotId,
+                chargingState = payload.path("transactionInfo").path("chargingState").takeIf { it.isTextual }?.asText(),
+                stoppedReason = payload.path("transactionInfo").path("stoppedReason").takeIf { it.isTextual }?.asText(),
+                idToken = idTokenOfOrNull(payload.path("idToken")),
+                at = timestampOf(payload, record.occurredAt),
+                socPercent = socPercent(payload),
+            )
 
             val existing = transactions[transactionId]
             transactions[transactionId] = ReplayCharging(
                 stationId = stationId,
                 transactionId = transactionId,
                 slotId = existing?.slotId ?: slotId,
-                eventTypes = existing?.eventTypes.orEmpty() + eventType,
+                events = existing?.events.orEmpty() + event,
+                eventTypes = existing?.eventTypes.orEmpty() + event.eventType,
                 isEnded = eventType == BatterySwapWire.TX_ENDED,
                 startSeq = existing?.startSeq ?: record.seq.takeIf { eventType == BatterySwapWire.TX_STARTED },
                 endSeq = if (eventType == BatterySwapWire.TX_ENDED) record.seq else existing?.endSeq,
+                startedAt = existing?.startedAt ?: record.occurredAt.takeIf { eventType == BatterySwapWire.TX_STARTED },
+                endedAt = if (eventType == BatterySwapWire.TX_ENDED) record.occurredAt else existing?.endedAt,
             )
         }
 
@@ -308,8 +379,44 @@ object EventLogReplay {
                 typeOf(it) == MessageType.CALL_RESULT
         }
 
+    private fun authorizedAt(records: List<OcppEventRecord>, call: OcppEventRecord, idToken: JsonNode): Instant? =
+        records.asSequence()
+            .filter { it.seq < call.seq }
+            .filter { it.direction == MessageDirection.INBOUND && it.action == BatterySwapWire.AUTHORIZE }
+            .filter { typeOf(it) == MessageType.CALL }
+            .filter { tokenKey(callPayload(it).path("idToken")) == tokenKey(idToken) }
+            .lastOrNull { authorizeAccepted(records, it) }
+            ?.let { responseOf(records, it)?.occurredAt ?: it.occurredAt }
+
+    private fun authorizeAccepted(records: List<OcppEventRecord>, call: OcppEventRecord): Boolean =
+        responseOf(records, call)
+            ?.let { resultPayload(it).path("idTokenInfo").path("status").asText() } ==
+            BatterySwapWire.AUTHORIZATION_ACCEPTED
+
     private fun tokenKey(node: JsonNode): String =
         node.path("idToken").asText() + "|" + node.path("type").asText()
+
+    private fun idTokenOf(node: JsonNode): IdToken =
+        IdToken(node.path("idToken").asText(), node.path("type").asText())
+
+    private fun idTokenOfOrNull(node: JsonNode): IdToken? {
+        val value = node.path("idToken").takeIf { it.isTextual }?.asText()
+        val type = node.path("type").takeIf { it.isTextual }?.asText()
+        return if (!value.isNullOrBlank() && !type.isNullOrBlank()) IdToken(value, type) else null
+    }
+
+    private fun timestampOf(payload: JsonNode, fallback: Instant): Instant =
+        payload.path("timestamp").takeIf { it.isTextual }?.asText()
+            ?.let { runCatching { Instant.parse(it) }.getOrNull() }
+            ?: fallback
+
+    private fun socPercent(payload: JsonNode): Double? =
+        payload.path("meterValue")
+            .flatMap { it.path("sampledValue") }
+            .lastOrNull { it.path("measurand").asText() == BatterySwapWire.MEASURAND_SOC }
+            ?.path("value")
+            ?.takeIf { it.isNumber }
+            ?.asDouble()
 
     private fun batteriesOf(array: JsonNode): List<ReplayBattery> = array.map { item ->
         ReplayBattery(

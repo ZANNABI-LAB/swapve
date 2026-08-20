@@ -4,9 +4,9 @@ import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import dev.swapve.csms.auth.AuthorizationRegistry
 import dev.swapve.csms.auth.AuthorizationStatus
+import dev.swapve.csms.event.JdbcOcppEventLog
 import dev.swapve.csms.swap.OutTimedOutLedger
 import dev.swapve.csms.swap.SwapTransactionRegistry
-import dev.swapve.ocpp.session.InMemoryOcppEventLog
 import dev.swapve.ocpp.session.MessageDirection
 import dev.swapve.ocpp.session.OcppEventRecord
 import dev.swapve.ocpp.swap.BatterySwapWire
@@ -24,7 +24,7 @@ import java.time.Duration
  *
  * 1. **필요한 값이 전부 이미 있는 기록에서 파생 계산된다.** 성공률은
  *    [SwapTransactionRegistry] 의 상태 분포이고, 소요시간은 그 상태에 이미 들어 있는
- *    시각들의 차이이며, 실패 사유는 거부·이상·멱등 기록과 [InMemoryOcppEventLog] 의 원문에
+ *    시각들의 차이이며, 실패 사유는 거부·이상·멱등 기록과 [JdbcOcppEventLog] 의 원문에
  *    있다. PLAN §11.1 이 이벤트 로그에 건 **유일한 규칙**이 *"파생 상태는 이 로그에서 계산될
  *    수 있어야 한다"* 이고, 지표야말로 그 규칙이 실제로 지켜지는지 확인하는 자리다.
  * 2. **카운터를 따로 두면 진실의 원본이 둘이 된다.** `Counter.increment()` 를 코드 곳곳에
@@ -50,7 +50,7 @@ class SwapMetricsService(
     private val transactions: SwapTransactionRegistry,
     private val outTimedOutLedger: OutTimedOutLedger,
     private val authorizations: AuthorizationRegistry,
-    private val eventLog: InMemoryOcppEventLog,
+    private val eventLog: JdbcOcppEventLog,
     private val mapper: ObjectMapper,
     private val clock: Clock,
 ) {

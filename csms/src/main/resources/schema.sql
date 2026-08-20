@@ -35,3 +35,15 @@ CREATE TABLE IF NOT EXISTS swap_out_timed_out (
 
     CONSTRAINT pk_swap_out_timed_out PRIMARY KEY (station_id, request_id)
 );
+
+CREATE TABLE IF NOT EXISTS ocpp_event (
+    station_id   VARCHAR(64)  NOT NULL,
+    seq          BIGINT       NOT NULL,
+    direction    VARCHAR(16)  NOT NULL,
+    action       VARCHAR(128),
+    message_id   VARCHAR(255) NOT NULL,
+    payload      CLOB         NOT NULL,
+    occurred_at  TIMESTAMP    NOT NULL,
+
+    CONSTRAINT pk_ocpp_event PRIMARY KEY (station_id, seq)
+);

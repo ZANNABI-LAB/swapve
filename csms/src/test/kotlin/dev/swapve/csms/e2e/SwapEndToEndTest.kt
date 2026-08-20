@@ -1,10 +1,10 @@
 package dev.swapve.csms.e2e
 
+import dev.swapve.csms.event.JdbcOcppEventLog
 import dev.swapve.csms.support.FixedClockConfig
 import dev.swapve.csms.swap.ChargingTransactionRegistry
 import dev.swapve.csms.swap.SlotStateRegistry
 import dev.swapve.csms.swap.SwapTransactionRegistry
-import dev.swapve.ocpp.session.InMemoryOcppEventLog
 import dev.swapve.ocpp.session.MessageDirection
 import dev.swapve.ocpp.swap.BatterySwapWire
 import dev.swapve.station.StationSimulator
@@ -55,7 +55,7 @@ class SwapEndToEndTest {
     private lateinit var chargingTransactions: ChargingTransactionRegistry
 
     @Autowired
-    private lateinit var eventLog: InMemoryOcppEventLog
+    private lateinit var eventLog: JdbcOcppEventLog
 
     // ------------------------------------------------------------------ S1
 
@@ -161,7 +161,7 @@ class SwapEndToEndTest {
 
     @Test
     fun `이벤트 로그에 교환 전체가 원문으로 남는다`() {
-        val stationId = "CS-E2E-LOG"
+        val stationId = "CS-E2E-LOG-${System.nanoTime()}"
         val requestId = 4102
         runScenario(SwapOrder.IN_OUT, stationId, requestId)
 

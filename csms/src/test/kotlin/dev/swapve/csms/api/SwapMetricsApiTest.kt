@@ -46,9 +46,10 @@ import kotlin.test.assertTrue
  *
  * ### 단 하나, 영속 장부만은 정확한 수를 단언할 수 없다
  *
- * `OUT_TIMED_OUT` 장부는 H2 파일에 남고 **다른 시험 클래스가 남긴 행과 같은 파일을 공유한다**
- * (PLAN §5.3 — 이것만 영속된다). 그건 결함이 아니라 그 장부의 성질이다 — 프로세스와 시험을
- * 가로질러 남는 채무이기 때문이다. 그래서 이 블록만 `>=` 로 단언한다.
+ * `OUT_TIMED_OUT` 장부는 H2 파일에 남고 **같은 Gradle test 태스크 실행 안에서 다른 시험
+ * 클래스가 남긴 행과 같은 파일을 공유한다** (PLAN §5.3 — 이것만 영속된다). 그건 결함이
+ * 아니라 그 장부의 성질이다 — 프로세스 안에서 남는 채무이기 때문이다. 그래서 이 블록만
+ * `>=` 로 단언한다.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @Import(MutableClockConfig::class)
