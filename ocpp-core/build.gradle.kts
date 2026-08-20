@@ -102,8 +102,17 @@ val syncOcppSchemas by tasks.registering(Sync::class) {
             .writeText(schemas.joinToString("\n", postfix = "\n") { it.name.removeSuffix(".json") })
 
         // 판본을 스키마 원문에서 읽는다. 손으로 적으면 교체할 때 어긋난다.
-        val commentOf = Regex(""""comment"\s*:\s*"([^"]*)"""")
-        val versions = schemas.mapNotNull { commentOf.find(it.readText())?.groupValues?.get(1) }.distinct()
+        // 정규식이 아니라 JSON 으로 읽는다. `comment` 값에 따옴표나 이스케이프가 들어오면
+        // 정규식은 조용히 잘린 문자열을 내놓고, 그것이 그대로 `_version.txt` 가 된다.
+        val versions = schemas.map { file ->
+            val parsed = groovy.json.JsonSlurper().parse(file) as? Map<*, *>
+                ?: error("스키마를 JSON 객체로 읽지 못했다: ${file.name}")
+
+            // 없는 것을 건너뛰지 않는다. 건너뛰면 판본을 밝히지 않는 파일이 섞여 들어와도
+            // 검사가 통과하고, `_version.txt` 가 전량을 대표하지 못하게 된다.
+            parsed["comment"]?.toString()
+                ?: error("스키마에 comment 가 없어 판본을 알 수 없다: ${file.name}")
+        }.distinct()
 
         check(versions.size == 1) {
             "스키마 판본이 섞여 있다 (${versions.size} 종):\n" + versions.joinToString("\n") { "  - $it" }

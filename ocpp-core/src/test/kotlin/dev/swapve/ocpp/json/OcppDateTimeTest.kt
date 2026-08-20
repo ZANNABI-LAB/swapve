@@ -37,6 +37,15 @@ class OcppDateTimeTest {
     }
 
     @Test
+    fun `연대를 넘어가도 연도를 잃지 않는다`() {
+        // 패턴의 yyyy 는 연대(era) 기준이라 서기 1년 이전이 양수로 뒤집힌다. uuuu 여야
+        // 0년이 0000 으로, 그 이전이 음수로 나온다. 실무 값은 아니지만 조용히 틀린
+        // 시각을 만드는 종류라 고정해 둔다.
+        assertEquals("0000-01-01T00:00:00.000Z", OcppDateTime.format(at("0000-01-01T00:00:00Z")))
+        assertEquals("-0001-01-01T00:00:00.000Z", OcppDateTime.format(at("-0001-01-01T00:00:00Z")))
+    }
+
+    @Test
     fun `언제나 UTC 로 낸다`() {
         // 같은 순간을 오프셋으로 적어 넣어도 출력은 Z 하나뿐이다.
         assertEquals("2026-08-18T00:30:00.000Z", OcppDateTime.format(at("2026-08-18T09:30:00+09:00")))

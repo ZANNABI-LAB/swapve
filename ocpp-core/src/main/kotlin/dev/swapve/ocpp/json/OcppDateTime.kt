@@ -17,7 +17,7 @@ import java.time.format.DateTimeFormatter
 object OcppDateTime {
 
     private val FORMAT: DateTimeFormatter =
-        DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'").withZone(ZoneOffset.UTC)
+        DateTimeFormatter.ofPattern("uuuu-MM-dd'T'HH:mm:ss.SSS'Z'").withZone(ZoneOffset.UTC)
 
     /** Renders [at] as a schema `date-time` string in UTC, with a three-digit fraction. */
     fun format(at: Instant): String = FORMAT.format(at)

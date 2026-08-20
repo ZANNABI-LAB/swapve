@@ -19,7 +19,7 @@ import java.util.concurrent.ThreadLocalRandom
  *
  * Widening it is out of scope: it would take a change to the standard.
  */
-object  SwapRequestIds {
+object SwapRequestIds {
 
     /** A fresh positive `requestId`. Never `0` — that reads as "absent" rather than as a value. */
     fun newId(): Int = ThreadLocalRandom.current().nextInt(1, Int.MAX_VALUE)

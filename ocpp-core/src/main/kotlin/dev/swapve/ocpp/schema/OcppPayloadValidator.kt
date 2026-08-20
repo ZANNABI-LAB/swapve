@@ -29,7 +29,6 @@ class OcppPayloadValidator {
 
     private val factory = JsonSchemaFactory.getInstance(SpecVersion.VersionFlag.V6)
     private val compiled = ConcurrentHashMap<String, JsonSchema>()
-    private val unknownNames = ConcurrentHashMap.newKeySet<String>()
 
     /**
      * Validates a `CALL` payload. [action] is the frame's action, without a suffix
@@ -109,12 +108,11 @@ class OcppPayloadValidator {
 
     /** Compiles and caches the schema if the name is on the classpath, `null` otherwise. */
     private fun schemaOf(name: String): JsonSchema? {
-        if (name in unknownNames) return null
         compiled[name]?.let { return it }
-        if (!OcppSchemas.contains(name)) {
-            unknownNames += name
-            return null
-        }
+        // Unknown names are deliberately not remembered. The name comes off the wire, so a
+        // cache of the misses would grow with whatever a peer chooses to send; [OcppSchemas]
+        // answers this in constant time, which is what makes remembering unnecessary.
+        if (!OcppSchemas.contains(name)) return null
         return compiled.computeIfAbsent(name) { factory.getSchema(OcppSchemas.read(it)) }
     }
 
