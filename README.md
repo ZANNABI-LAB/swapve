@@ -4,9 +4,9 @@
 
 # SwapVe
 
-> **Open-source OCPP 2.1 battery swapping server (CSMS) for the JVM.**
-> Implements the Battery Swap functional block of OCPP 2.1 (IEC 63584-210),
-> verified against the OCA conformance test cases.
+> **OCPP 2.1 Battery Swap(Block S) 라이브러리와 시험 도구 — JVM 용.**
+> 코덱·세션 계층과 교환 도메인 모델, 스테이션 시뮬레이터, 그리고
+> 그것들이 무엇을 시험하는지 보여주는 **참조 CSMS 구현**으로 이루어져 있습니다.
 
 [![status](https://img.shields.io/badge/status-MVP%20complete%20(M0–M10)-brightgreen)]()
 [![license](https://img.shields.io/badge/license-Apache--2.0-blue)]()
@@ -14,21 +14,56 @@
 
 ---
 
-## 무엇인가
+## 무엇을 제공하는가
 
-배터리 교환 스테이션(BSS)을 관리하는 **CSMS**와, 이를 시험하기 위한 **스테이션 시뮬레이터**입니다.
+**네 가지를 따로 가져다 쓸 수 있습니다.** 전부 쓸 필요가 없고, 그렇게 설계돼 있습니다.
 
-OCPP 2.1이 2025년 1월 **Battery Swap 기능 블록(Block S)** 을 정식 편입했습니다.
-전동킥보드·전기자전거 같은 2·3륜과 일반 EV의 배터리 교환을 표준으로 다룹니다.
-조사 시점 기준, **서버 측에서 이 블록을 구현한 오픈소스가 확인되지 않습니다.**
+| 무엇 | 모듈 | 가져다 쓰는 경우 |
+|---|---|---|
+| **OCPP 2.1 코덱 · 세션 계층** | `ocpp-core` | JVM 에서 OCPP-J 프레임과 **공식 스키마 181개** 검증이 필요할 때. 프레임워크를 모릅니다. 코덱·스키마 층은 **Java 에서도 호출됩니다**(실측 — 세션 층은 Kotlin 전용, [LAYERS §4](docs/LAYERS.md)) |
+| **Battery Swap 도메인 모델** | `swap-domain` | 교환 상태머신·슬롯 모델·불변식이 필요할 때. I/O 가 없습니다 |
+| **스테이션 시뮬레이터 + 제어 콘솔** | `station-sim` · `sim-console` | **자기 CSMS 를 Block S 로 시험**할 때. 장애 시나리오 F1~F6 을 버튼 하나로 겁니다 |
+| **참조 CSMS 구현** | `csms` | 위의 것들이 실제로 어떻게 맞물리는지 볼 때. 적합성 케이스가 이것을 대상으로 돕니다 |
 
-| 프로젝트 | 언어 | OCPP | Battery Swap |
+> **완제품 CSMS 를 약속하지 않습니다.** `csms` 는 제품이 아니라 **참조 구현**입니다 —
+> 시험 도구가 무엇을 시험하는지 보여주는 자리입니다. 없는 것은 아래 "무엇이 아닌가"에 적었습니다.
+
+**아직 Maven Central 에 배포되지 않았습니다.** 지금은 소스로 씁니다
+(`./gradlew build`). 배포 계획은 [BACKLOG B07](BACKLOG.md) 에 있습니다.
+
+바로 돌려보려면 → [5분 안에 돌려보기](#5분-안에-돌려보기)
+**라이브러리로 가져다 쓰려면** → [docs/LAYERS.md](docs/LAYERS.md) 에 층 경계가 있습니다 — 어디까지 쓸 수 있고 그러면 무엇을 떠안는지.
+
+## 왜 이것이 필요한가
+
+OCPP 2.1 이 2025년 1월 **Battery Swap 기능 블록(Block S)** 을 정식 편입했습니다.
+전동킥보드·전기자전거 같은 2·3륜과 일반 EV 의 배터리 교환을 표준으로 다룹니다.
+
+**"2.1 을 지원한다"는 것은 이 프로젝트의 차별점이 아닙니다.** 공개 직전 재검증(2026-08)에서
+2.1 에 손대는 구현이 이미 여럿 확인됐습니다. 우리가 하는 주장은 더 좁습니다 —
+**Block S 를 실제로 다루는 오픈소스가 확인되지 않습니다.** 서버 측 구현도,
+Block S 를 걸어 볼 수 있는 시험 도구도 그렇습니다.
+
+| 프로젝트 | 역할 | OCPP 2.1 | Battery Swap (Block S) |
 |---|---|---|---|
-| [SteVe](https://github.com/steve-community/steve) | Java | 1.6만 | ❌ |
-| [CitrineOS](https://github.com/citrineos/citrineos) | TypeScript | 2.0.1 전용 | ❌ |
-| [MaEVe](https://github.com/thoughtworks/maeve-csms) | Go | 1.6J + 2.0.1 | ❌ |
-| [EVerest libocpp](https://github.com/EVerest/libocpp) | C++ | 1.6/2.0.1/2.1 | 충전기 측 |
-| **SwapVe** | **Kotlin** | **2.1** | **✅ 서버 측** |
+| [SteVe](https://github.com/steve-community/steve) | CSMS (Java) | ❌ 1.6J 전용 | ❌ |
+| [CitrineOS](https://github.com/citrineos/citrineos) | CSMS (TypeScript, 2.0.1 인증 추진) | 로드맵의 "2025 기타 주제"에만 | 언급 없음 |
+| [MaEVe](https://github.com/thoughtworks/maeve-csms) | CSMS (Go) | ❌ 1.6J + 2.0.1 | ❌ |
+| [EVerest libocpp](https://github.com/EVerest/libocpp) | **충전기 측** 라이브러리 (C++) | "개발 중" | 언급 없음 |
+| Solidstudio VCP | **CS 시뮬레이터** (CSMS 아님) | ✅ 지원함 | 확인 안 됨 |
+| ocpp-rs | 라이브러리 + 시뮬레이터 (Rust) | ❌ 1.6J / 2.0.1 | ❌ |
+| tzi-OCTT | CSMS 검증 pytest 스위트 | ❌ 2.0.1 / 1.6J | — |
+| OCTT (공식) | 적합성 시험 도구 — **유료·구독** | ❌ 2.0.1 / 1.6 케이스셋 | — |
+| **SwapVe** | **라이브러리 + 시험 도구 + 참조 CSMS** (Kotlin) | ✅ | ✅ |
+
+표의 세 표기는 서로 다른 뜻입니다. **❌** 는 지원하지 않는다고 확인된 것,
+**"언급 없음"** 은 프로젝트 문서·이슈에서 그 주제를 찾지 못한 것, **"확인 안 됨"** 은
+지원 여부를 판단할 근거를 얻지 못한 것입니다. 마지막 둘은 *없다는 증거*가 아닙니다.
+
+**반증을 환영합니다.** Block S 메시지(`RequestBatterySwap` · `BatterySwap` 트랜잭션 이벤트)를
+다루는 구현을 아신다면 이슈로 알려 주시면 이 표를 고치겠습니다.
+적합성에 관한 주장의 범위는 아래 [적합성](#적합성-conformance) 절에 따로 적었습니다 —
+**OCTT 공식 인증은 받지 않았습니다.**
 
 ## 무엇이 아닌가
 
@@ -227,7 +262,7 @@ Out-In 순서(`--swap-order Out-In`)와 S02 대기 모드(`--remote-start`)도 �
 
 | 게이트 | 명령 | 무엇을 보장하나 |
 |---|---|---|
-| **L1 단위** | `./gradlew build` | 프레임 왕복 · **공식 스키마 181개 검증** · 상태머신 전이와 불변식 · REST 계약. **모듈 경계 검증 4종**(`ocpp-core`/`swap-domain` 에 프레임워크·외부 의존이 새어 들지 않았는가, `station-sim`/`sim-console` 이 JDK 밖으로 나가지 않았는가)이 함께 돕니다 |
+| **L1 단위** | `./gradlew build` | 프레임 왕복 · **공식 스키마 181개 검증** · 상태머신 전이와 불변식 · REST 계약. **모듈 경계 검증 5종**(`ocpp-core`/`swap-domain` 에 프레임워크·외부 의존이 새어 들지 않았는가, `station-sim`/`sim-console` 이 JDK 밖으로 나가지 않았는가, `java-compat` 이 Java 로만 쓰였는가)과 **Java 호환 시험 13건**([docs/LAYERS.md §4](docs/LAYERS.md))이 함께 돕니다 |
 | **L2 표준 적합성** | `./gradlew conformanceTest` | 공식 케이스 **`TC_S_102_CSMS` · `TC_S_103_CSMS` · `TC_S_104_CS`** 와 실패 시나리오 **F1~F6**. 앞의 둘은 시험 대상이 CSMS이고 시뮬레이터가 시험계이며, **`TC_S_104_CS`는 그 반대**입니다 |
 | **L3 부하 + 감사** | `./gradlew auditTest` | **스테이션 20대 동시 접속** 후 불변식 감사. 감사는 **이벤트 로그에서 상태를 재구성해** 인메모리 레지스트리와 대조합니다 |
 
@@ -331,7 +366,8 @@ swapve/
 ├─ swap-domain/    Battery Swap 도메인 · 교환 상태머신 · 슬롯 모델  (I/O 없음)
 ├─ csms/           관제 서버 — WebSocket · REST API · 지표
 ├─ station-sim/    스테이션 시뮬레이터 — 슬롯 · 배터리 · 장애 주입      (의존성 0)
-└─ sim-console/    시뮬레이터 제어 콘솔 — 데모용 화면 + 제어 API      (JDK 내장 HTTP)
+├─ sim-console/    시뮬레이터 제어 콘솔 — 데모용 화면 + 제어 API      (JDK 내장 HTTP)
+└─ java-compat/    Java 호환 게이트 — 코덱·스키마 층을 Java 로 호출       (시험만, Kotlin 0줄)
 ```
 
 `ocpp-core` 와 `swap-domain` 은 프레임워크를 모릅니다. `String` ↔ 도메인 객체 변환만 합니다.
@@ -339,6 +375,7 @@ swapve/
 빌드 검사입니다** — `checkNoFrameworkImports` · `checkNoExternalDependencies` ·
 `checkNoForbiddenDependencies`(`station-sim` 과 `sim-console` 에 하나씩) 가
 `./gradlew build` 에서 함께 돕니다.
+**층마다의 계약(코루틴 요구 여부·시각·공유 규칙)은 [docs/LAYERS.md](docs/LAYERS.md) 에 있습니다.**
 
 `sim-console` 은 `station-sim` 에만 의존합니다. 의존 방향은
 `sim-console → station-sim → (ocpp-core, swap-domain)` 한 방향이고, **`csms` 는 이 사슬에
@@ -348,8 +385,10 @@ swapve/
 
 1. **[docs/PLAN.md](docs/PLAN.md)** — 프로토콜 명세(§4), 도메인 설계(§5), 검증 전략(§7).
    스펙 원문 대조로 계획서를 정정한 이력이 §0에 남아 있습니다
-2. **[docs/API.md](docs/API.md)** — 앱이 호출할 REST 계약과 Basic 인증 경계
-3. **[BACKLOG.md](BACKLOG.md)** — 범위 밖으로 밀어낸 것들과 그것을 꺼낼 트리거
+2. **[docs/LAYERS.md](docs/LAYERS.md)** — 층 경계. 코덱은 I/O 무관, 세션은 코루틴 전용.
+   라이브러리로 쓸 때 여러분이 떠안는 것과 떠안지 않는 것
+3. **[docs/API.md](docs/API.md)** — 앱이 호출할 REST 계약과 Basic 인증 경계
+4. **[BACKLOG.md](BACKLOG.md)** — 범위 밖으로 밀어낸 것들과 그것을 꺼낼 트리거
 
 | M | 내용 | 상태 |
 |---|---|---|
