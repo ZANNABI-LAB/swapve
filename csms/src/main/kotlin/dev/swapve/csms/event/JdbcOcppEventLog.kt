@@ -72,6 +72,20 @@ class JdbcOcppEventLog(private val jdbc: JdbcTemplate) : OcppEventSink {
             stationId,
         )
 
+    /** 한 스테이션의 창 안 기록을 `seq` 순서로. */
+    fun of(stationId: String, since: Instant): List<OcppEventRecord> =
+        jdbc.query(
+            """
+            SELECT station_id, seq, direction, action, message_id, payload, occurred_at
+            FROM ocpp_event
+            WHERE station_id = ? AND occurred_at >= ?
+            ORDER BY seq
+            """.trimIndent(),
+            ::map,
+            stationId,
+            Timestamp.from(since),
+        )
+
     /** 전체 기록. 스테이션별 순번이라 전역 순서는 `occurred_at, station_id, seq` 정렬일 뿐이다. */
     fun all(): List<OcppEventRecord> =
         jdbc.query(
@@ -83,11 +97,54 @@ class JdbcOcppEventLog(private val jdbc: JdbcTemplate) : OcppEventSink {
             ::map,
         )
 
+    /**
+     * 창 안 전체 기록.
+     *
+     * `occurred_at` 인덱스는 아직 두지 않는다. 이 질의나 보존 정리가 실제 병목으로 측정될 때
+     * 추가하면 되고, 지금은 `schema.sql` 한 장의 단순성이 더 값지다.
+     */
+    fun since(from: Instant): List<OcppEventRecord> =
+        jdbc.query(
+            """
+            SELECT station_id, seq, direction, action, message_id, payload, occurred_at
+            FROM ocpp_event
+            WHERE occurred_at >= ?
+            ORDER BY occurred_at, station_id, seq
+            """.trimIndent(),
+            ::map,
+            Timestamp.from(from),
+        )
+
     fun stationIds(): List<String> =
         jdbc.queryForList("SELECT DISTINCT station_id FROM ocpp_event ORDER BY station_id", String::class.java)
 
+    fun stationIdsSince(from: Instant): List<String> =
+        jdbc.queryForList(
+            "SELECT DISTINCT station_id FROM ocpp_event WHERE occurred_at >= ? ORDER BY station_id",
+            String::class.java,
+            Timestamp.from(from),
+        )
+
     fun size(): Int =
         jdbc.queryForObject("SELECT COUNT(*) FROM ocpp_event", Int::class.java) ?: 0
+
+    fun deleteOlderThan(stationId: String, cutoff: Instant): Int =
+        jdbc.update(
+            "DELETE FROM ocpp_event WHERE station_id = ? AND occurred_at < ?",
+            stationId,
+            Timestamp.from(cutoff),
+        )
+
+    fun trimToMaxPerStation(stationId: String, max: Int): Int {
+        val maxSeq = jdbc.queryForObject(
+            "SELECT COALESCE(MAX(seq), 0) FROM ocpp_event WHERE station_id = ?",
+            Long::class.java,
+            stationId,
+        ) ?: 0L
+        val threshold = if (max <= 0) maxSeq else maxSeq - max
+        if (threshold <= 0L) return 0
+        return jdbc.update("DELETE FROM ocpp_event WHERE station_id = ? AND seq <= ?", stationId, threshold)
+    }
 
     private fun seedNextSeq(stationId: String): Long =
         (jdbc.queryForObject(

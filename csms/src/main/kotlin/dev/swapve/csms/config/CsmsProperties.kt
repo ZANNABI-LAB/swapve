@@ -23,6 +23,8 @@ import java.time.Duration
  * @param maxTextMessageSize 텍스트 프레임 버퍼 상한. OCPP 페이로드는 작지만
  *   `GetCompositeSchedule` 류는 커질 수 있어 기본 64 KiB 로 둔다.
  * @param callTimeout CSMS 가 보낸 CALL 의 응답 대기 한도 (Part 4 §4.1.1).
+ * @param retention 이벤트 로그 보존·복구 창 정책. 감사 원문 보존과 기동 리플레이 비용은
+ *   서로 다른 목적이라 한 값으로 묶지 않는다.
  */
 @ConfigurationProperties(prefix = "csms")
 data class CsmsProperties(
@@ -33,6 +35,7 @@ data class CsmsProperties(
     val knownBatterySerials: List<String> = emptyList(),
     val maxTextMessageSize: Int = 64 * 1024,
     val callTimeout: Duration = Duration.ofSeconds(30),
+    val retention: Retention = Retention(),
 ) {
 
     /**
@@ -44,5 +47,22 @@ data class CsmsProperties(
     data class AuthorizedIdToken(
         val idToken: String,
         val type: String,
+    )
+
+    /**
+     * 이벤트 로그 보존 정책.
+     *
+     * `replayWindow` 는 기동 시간을 제한하는 값이고, `eventLog` 는 감사·분쟁에서 원문을
+     * 확인할 수 있는 기간이다. 복구 7일과 감사 30일을 한 값으로 묶으면 부팅 비용을 줄이는
+     * 결정이 곧 감사 원문을 버리는 결정이 되어 버린다.
+     *
+     * `maxEventsPerStation` 은 기간 정리 뒤에도 남은 비정상 잔량을 자르는 안전망이다.
+     */
+    data class Retention(
+        val eventLog: Duration = Duration.ofDays(30),
+        val replayWindow: Duration = Duration.ofDays(7),
+        val maxEventsPerStation: Int = 100_000,
+        val enabled: Boolean = true,
+        val sweepInterval: Duration = Duration.ofHours(1),
     )
 }

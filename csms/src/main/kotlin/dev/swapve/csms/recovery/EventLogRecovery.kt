@@ -3,6 +3,7 @@ package dev.swapve.csms.recovery
 import dev.swapve.csms.audit.EventLogReplay
 import dev.swapve.csms.audit.EventLogReplay.ReplayBattery
 import dev.swapve.csms.audit.EventLogReplay.ReplaySwap
+import dev.swapve.csms.config.CsmsProperties
 import dev.swapve.csms.event.JdbcOcppEventLog
 import dev.swapve.csms.swap.ChargingEvent
 import dev.swapve.csms.swap.ChargingTransactionRegistry
@@ -19,6 +20,7 @@ import org.springframework.boot.ApplicationArguments
 import org.springframework.boot.ApplicationRunner
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.stereotype.Component
+import java.time.Clock
 
 /**
  * OCPP 원문 이벤트 로그에서 파생 레지스트리를 복원한다.
@@ -27,16 +29,22 @@ import org.springframework.stereotype.Component
  * 같은 상태가 나오는지 직접 확인할 수 있다.
  */
 @Component
-class EventLogRecovery(private val eventLog: JdbcOcppEventLog) {
+class EventLogRecovery(
+    private val eventLog: JdbcOcppEventLog,
+    private val clock: Clock,
+    private val properties: CsmsProperties,
+) {
 
     fun recover(
         swaps: SwapTransactionRegistry,
         slots: SlotStateRegistry,
         charging: ChargingTransactionRegistry,
-        stationIds: List<String> = eventLog.stationIds(),
+        stationIds: List<String>? = null,
     ) {
-        stationIds.forEach { stationId ->
-            recoverStation(EventLogReplay.replay(stationId, eventLog.of(stationId)), swaps, slots, charging)
+        val since = clock.instant().minus(properties.retention.replayWindow)
+        val replayStations = stationIds ?: eventLog.stationIdsSince(since)
+        replayStations.forEach { stationId ->
+            recoverStation(EventLogReplay.replay(stationId, eventLog.of(stationId, since)), swaps, slots, charging)
         }
     }
 

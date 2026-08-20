@@ -53,6 +53,7 @@ tasks.withType<Test>().configureEach {
         "jdbc:h2:file:${h2Database.absolutePath};AUTO_SERVER=TRUE;DB_CLOSE_DELAY=-1",
     )
     systemProperty("csms.recovery.enabled", "false")
+    systemProperty("csms.retention.enabled", "false")
 
     doFirst {
         if (!h2Directory.deleteRecursively()) {

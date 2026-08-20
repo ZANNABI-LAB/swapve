@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import dev.swapve.csms.auth.AuthorizationRegistry
 import dev.swapve.csms.auth.AuthorizationStatus
+import dev.swapve.csms.config.CsmsProperties
 import dev.swapve.csms.event.JdbcOcppEventLog
 import dev.swapve.csms.swap.OutTimedOutLedger
 import dev.swapve.csms.swap.SwapTransactionRegistry
@@ -36,8 +37,8 @@ import java.time.Duration
  * 4. **의존성이 늘지 않는다.** `spring-boot-starter-actuator` 없이 끝난다.
  *
  * 규모가 커져 **시계열**(시간에 따른 추이)이 필요해지면 그때는 이야기가 다르다. 이 계산은
- * 언제나 "지금까지의 전량"이라 구간 질의를 할 수 없기 때문이다. 그때 붙일 자리도 여기다 —
- * 이벤트 로그가 남아 있으므로 소급 계산이 가능하다.
+ * `csms.retention.event-log` 보존 창을 한 번 훑어 "현재 보존 중인 원문" 기준으로 답한다.
+ * 그보다 오래된 기간까지 보려면 보존 정책보다 긴 별도 지표 저장소가 필요해지는 시점이다.
  *
  * ### 계산 창(window)이 두 개라는 사실을 숨기지 않는다
  *
@@ -53,6 +54,7 @@ class SwapMetricsService(
     private val eventLog: JdbcOcppEventLog,
     private val mapper: ObjectMapper,
     private val clock: Clock,
+    private val properties: CsmsProperties,
 ) {
 
     fun collect(): SwapMetrics {
@@ -62,7 +64,9 @@ class SwapMetricsService(
         val rejections = transactions.rejections()
         val anomalies = transactions.anomalies()
         val ignored = transactions.ignoredEvents()
-        val batteryRejections = batteryRejectionReasons()
+        val eventWindow = eventLog.since(clock.instant().minus(properties.retention.eventLog))
+        val batteryRejections = batteryRejectionReasons(eventWindow)
+        val sessionReplays = sessionReplays(eventWindow)
 
         val completed = states.filterIsInstance<SwapTransaction.Completed>()
         val outTimedOut = states.filterIsInstance<SwapTransaction.OutTimedOut>()
@@ -114,11 +118,11 @@ class SwapMetricsService(
                     // F4 — 새 messageId 로 온 중복. 상태머신이 잡았다.
                     "F4" to ignored.size,
                     // F6 — 같은 messageId 재전송. 세션의 멱등 원장이 잡았다.
-                    "F6" to sessionReplays(),
+                    "F6" to sessionReplays,
                 ),
                 stateMachineIgnores = ignored.size,
                 byIgnoreReason = ignored.groupingBy { it.reason.name }.eachCount(),
-                sessionReplays = sessionReplays(),
+                sessionReplays = sessionReplays,
             ),
             ledger = outTimedOutLedger.all().let { records ->
                 SwapLedgerMetrics(
@@ -170,10 +174,10 @@ class SwapMetricsService(
      * @return `reasonCode` 별 건수. 지금은 `BatteryUnknown` 하나지만, 표(§4.9.1)의 다른
      *   사유를 쓰게 되면 코드 수정 없이 따라온다.
      */
-    private fun batteryRejectionReasons(): Map<String, Int> {
+    private fun batteryRejectionReasons(records: List<OcppEventRecord>): Map<String, Int> {
         val counts = LinkedHashMap<String, Int>()
 
-        eventLog.all().forEach { record ->
+        records.forEach { record ->
             if (record.direction != MessageDirection.OUTBOUND) return@forEach
             if (record.action != BatterySwapWire.BATTERY_SWAP) return@forEach
 
@@ -200,10 +204,10 @@ class SwapMetricsService(
      * action 을 가리지 않는다. 멱등 원장은 `BatterySwap` 만이 아니라 모든 수신 CALL 에
      * 적용되고, 재전송이 일어났다는 사실 자체가 관측 대상이다.
      */
-    private fun sessionReplays(): Int {
+    private fun sessionReplays(records: List<OcppEventRecord>): Int {
         var replays = 0
 
-        eventLog.all()
+        records
             .filter { it.direction == MessageDirection.INBOUND && isCall(it) }
             .groupingBy { it.stationId to it.messageId }
             .eachCount()
