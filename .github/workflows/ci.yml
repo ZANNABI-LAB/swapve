@@ -2,7 +2,7 @@
 # 그 파일이 이 프로젝트의 **완료의 정의**이므로, 여기 목록이 그것과 갈리면 CI 가
 # 초록인데 완료 기준은 확인되지 않은 상태가 된다. 게이트를 늘릴 때 두 곳을 같이 고친다.
 #
-#   L1 단위        :csms:cleanTest build     — 단위 시험 + 모듈 경계 검증 3종
+#   L1 단위        :csms:cleanTest build     — 단위 시험 + 모듈 경계 검증 5종 + Java 호환 시험
 #   L2 표준 적합성  conformanceTest           — TC_S_102/103_CSMS + 실패 F1~F6 (인증 BASIC)
 #   L3 부하 + 감사  auditTest                 — 스테이션 20대 동시 → 불변식 감사 (S4, 인증 BASIC)
 #   L4 복구·보존   EventLogRecovery/Retention/SwapMetrics — B02 · B21
