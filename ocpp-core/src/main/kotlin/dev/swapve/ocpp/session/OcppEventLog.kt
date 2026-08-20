@@ -2,31 +2,31 @@ package dev.swapve.ocpp.session
 
 import java.time.Instant
 
-/** 메시지가 오간 방향. */
+/** Which way a message travelled. */
 enum class MessageDirection {
-    /** 스테이션 → 우리 */
+    /** Station → us. */
     INBOUND,
 
-    /** 우리 → 스테이션 */
+    /** Us → station. */
     OUTBOUND,
 }
 
 /**
- * 오간 OCPP 메시지 하나의 추가 전용(append-only) 기록.
+ * An append-only record of one OCPP message that passed through.
  *
- * 필드 구성은 이벤트 로그 설계 그대로다. **파생 상태가 이 로그에서 재구성 가능해야 한다는 것이
- * 유일한 규칙**이므로, 해석한 결과가 아니라 [payload] 에 **원문 그대로**를 남긴다.
- * 우리가 지금 이해하지 못하는 필드도 나중에 읽을 수 있어야 한다 (정보를 버리지 않는다).
+ * The one rule this log carries is that **derived state must be reconstructible from it**. So
+ * [payload] holds the message **verbatim** rather than anything parsed out of it — fields we do
+ * not understand today still have to be readable later.
  *
- * 이 로그 하나가 과금·로밍·감사·수평확장 네 가지 확장을 동시에 연다 (표).
- *
- * @param seq **스테이션 내** 증가 순번. 스테이션끼리는 비교 대상이 아니다 — 서로 다른 연결의
- * 메시지에 전역 순서를 매기는 것은 지킬 수 없는 약속이다 (수평 확장).
- * @param action `BatterySwap`, `TransactionEvent` … CALLRESULT/CALLERROR 는 원래 CALL 의
- *   action 을 채운다. 짝을 찾지 못했으면 `null` 이다 — 모른다는 사실도 기록이다.
- * @param messageId OCPP-J uniqueId. 메시지 타입조차 읽지 못한 경우에는
- *   [dev.swapve.ocpp.rpc.OcppFrameCodec.UNREADABLE_MESSAGE_ID] 가 들어온다.
- * @param payload 프레임 **원문 한 줄 전체**. 페이로드만이 아니라 `[2,"id","Action",{...}]` 전부다.
+ * @param seq an increasing sequence **within a station**. Not comparable across stations —
+ *   promising a global order over messages from separate connections is a promise that cannot
+ *   be kept once this spreads across nodes.
+ * @param action `BatterySwap`, `TransactionEvent`, … For a CALLRESULT or CALLERROR this is the
+ *   action of the originating CALL, or `null` when no match was found — not knowing is a fact
+ *   worth recording too.
+ * @param messageId the OCPP-J uniqueId. When even the message type was unreadable this holds
+ *   [dev.swapve.ocpp.rpc.OcppFrameCodec.UNREADABLE_MESSAGE_ID].
+ * @param payload the **entire raw frame line**, not just the payload — `[2,"id","Action",{…}]`.
  */
 data class OcppEventRecord(
     val seq: Long,
@@ -39,17 +39,19 @@ data class OcppEventRecord(
 )
 
 /**
- * 이벤트를 받아 적는 자리.
+ * Where events are written.
  *
- * 이 프로젝트는 구현체 하나짜리 인터페이스를 두지 않는다. 그런데 이벤트 로그는 **인터셉터 자리 하나**를
- * 명시적으로 요구한다. 지금은 인메모리 구현 하나뿐이고 DB 영속은 저장소 결정(설계 원칙) 뒤로 미룬다 —
- * 그 교체 지점이 여기다.
+ * This project does not add interfaces that have a single implementation, and this is the
+ * deliberate exception: **the event log needs exactly one interception point**, and persistence
+ * is a consumer's decision, not this module's. An in-memory implementation ships with it; a
+ * durable one plugs in here.
  *
- * `seq` 부여는 구현의 몫이다. 스테이션 내 순서를 아는 것은 로그를 쥔 쪽이지 세션이 아니다.
+ * Assigning `seq` belongs to the implementation. Knowing a station's order is the log's job,
+ * not the session's.
  */
 fun interface OcppEventSink {
 
-    /** 기록하고, 순번이 부여된 레코드를 돌려준다. */
+    /** Records the event and returns it with its sequence number assigned. */
     fun append(
         stationId: String,
         direction: MessageDirection,
@@ -61,14 +63,14 @@ fun interface OcppEventSink {
 }
 
 /**
- * 인메모리 이벤트 로그.
+ * An in-memory event log.
  *
- * **DB 영속은 이 마일스톤에서 하지 않는다** (저장소 결정, 이벤트 로그 "테이블 1개 + 인터셉터 1개").
- * 지금 필요한 것은 "파생 상태를 이 로그만으로 재구성할 수 있는가"를 실제로 증명하는 것이고,
- * 그건 저장 매체와 무관하다.
+ * **Not durable, on purpose.** What this module has to establish is that derived state can be
+ * reconstructed from the log at all, and that is independent of the storage medium — which is a
+ * consumer's choice. Implement [OcppEventSink] to persist.
  *
- * 스레드 안전하다. `seq` 부여와 적재가 한 임계구역 안에서 일어나므로 순번과 적재 순서가
- * 어긋나지 않는다.
+ * Thread-safe: `seq` assignment and insertion happen in one critical section, so the numbering
+ * never disagrees with the insertion order.
  */
 class InMemoryOcppEventLog : OcppEventSink {
 
@@ -99,12 +101,12 @@ class InMemoryOcppEventLog : OcppEventSink {
         record
     }
 
-    /** 한 스테이션의 기록을 `seq` 순서로. 재구성은 항상 이 단위로 한다. */
+    /** One station's records in `seq` order. Reconstruction always works on this unit. */
     fun of(stationId: String): List<OcppEventRecord> = synchronized(lock) {
         byStation[stationId].orEmpty().toList()
     }
 
-    /** 전체 기록을 적재 순서로. 스테이션을 가로지르는 `seq` 는 없으므로 순서는 적재순일 뿐이다. */
+    /** Every record in insertion order. There is no `seq` across stations, so that is all it is. */
     fun all(): List<OcppEventRecord> = synchronized(lock) { arrayListOf<OcppEventRecord>().apply { addAll(arrivalOrder) } }
 
     fun size(): Int = synchronized(lock) { arrivalOrder.size }

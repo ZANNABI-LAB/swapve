@@ -5,51 +5,52 @@ import com.fasterxml.jackson.databind.node.ObjectNode
 import dev.swapve.ocpp.rpc.RpcErrorCode
 
 /**
- * 보내려는(또는 받은) 요청 하나 — `(action, payload)`.
+ * One request to send, or one that arrived — `(action, payload)`.
  *
- * **messageId 가 없다.** 발번은 전송 시점에 [dev.swapve.ocpp.rpc.MessageIds] 가 한다
- * (Part 4 §4.1.4). 호출자가 id 를 만들어 넘기게 두면
- * 재접속을 넘나드는 유일성 규칙을 호출자마다 다시 지켜야 한다.
+ * **No messageId.** Ids are issued at transmit time by [dev.swapve.ocpp.rpc.MessageIds]
+ * (Part 4 §4.1.4). Letting callers supply one would make every caller responsible for the
+ * uniqueness rule that spans reconnects.
  *
- * 재전송(타임아웃 후 다시 보내기)은 원본과 **같은 messageId 를 써도 된다(MAY)** 는 것이
- * 스펙이지만, 지금은 재전송 자체를 세션이 하지 않는다 — 타임아웃을 호출자에게 알리고 끝낸다.
+ * The spec says a retransmission MAY reuse the original messageId, but the session does not
+ * retransmit at all — it reports the timeout to the caller and stops there.
  */
 data class OcppCall(
     val action: String,
     val payload: ObjectNode,
 ) {
     init {
-        require(action.isNotBlank()) { "action 은 비어 있을 수 없다 (Part 4 §4.1.6)" }
+        require(action.isNotBlank()) { "action must not be blank (Part 4 §4.1.6)" }
     }
 }
 
 /**
- * CALL 하나의 결말.
+ * How one CALL ended.
  *
- * **예외를 던지지 않는다.** 응답 실패도, 타임아웃도, 연결 없음도 전부 값이다 — 호출자가
- * `try/catch` 없이 `when` 하나로 전 경우를 다루게 하려는 것이고, 특히 "연결이 없다"는
- * 정상 운영 중 늘 일어나는 일이지 예외적 사건이 아니다.
+ * **Never throws.** A rejection, a timeout, a missing connection — all of them are values, so
+ * callers handle every case in one `when` instead of a `try`/`catch`. "Not connected" in
+ * particular is ordinary operation, not an exceptional event: stations drop off all the time.
  */
 sealed interface OcppResult {
 
-    /** CALLRESULT 를 받았고 공식 스키마도 통과했다. */
+    /** A CALLRESULT arrived and satisfied the official schema. */
     data class Accepted(val messageId: String, val payload: ObjectNode) : OcppResult
 
-    /** CALLERROR 를 받았다. 상대가 요청을 처리하지 못했다 (Part 4 §4.2.3). */
+    /** A CALLERROR arrived — the peer could not handle the request (Part 4 §4.2.3). */
     data class Rejected(
         val messageId: String,
         val errorCode: String,
         val errorDescription: String,
         val errorDetails: ObjectNode,
     ) : OcppResult {
-        /** 표(Part 4 §4.3)에 있는 코드면 해당 값, 아니면 `null`. 원문은 [errorCode] 에 남아 있다. */
+        /** The matching code if it is in the table (Part 4 §4.3), otherwise `null`. The raw string stays in [errorCode]. */
         val knownErrorCode: RpcErrorCode? get() = RpcErrorCode.parse(errorCode)
     }
 
     /**
-     * CALLRESULT 는 받았지만 공식 스키마를 통과하지 못했다.
+     * A CALLRESULT arrived but did not satisfy the official schema.
      *
-     * 세션이 상대에게 `CALLRESULTERROR`(타입 5) 로 알린 뒤 이 값을 돌려준다 (Part 4 §4.2.5).
+     * The session tells the peer with a `CALLRESULTERROR` (type 5) before returning this
+     * (Part 4 §4.2.5).
      */
     data class InvalidResponse(
         val messageId: String,
@@ -58,38 +59,38 @@ sealed interface OcppResult {
     ) : OcppResult
 
     /**
-     * 정해진 시간 안에 응답도 오류도 오지 않았다 (Part 4 §4.1.1).
+     * Neither a response nor an error arrived in time (Part 4 §4.1.1).
      *
-     * 이 시점부터 그 messageId 의 pending 은 정리된다. 뒤늦게 도착하는 CALLRESULT 는
-     * 짝이 없는 응답으로 취급되어 기록만 남고 버려진다.
+     * The pending entry for that messageId is dropped at this point. A CALLRESULT that arrives
+     * later is treated as an unmatched response: recorded, then discarded.
      */
     data class TimedOut(val messageId: String) : OcppResult
 
     /**
-     * 그 스테이션의 연결이 없다.
+     * That station has no connection.
      *
-     * **예외가 아니라 결과다.** 스테이션은 언제든 끊긴다.
+     * **A result, not an exception.** Stations disconnect as a matter of course.
      */
     data class NotConnected(val stationId: String) : OcppResult
 }
 
 /**
- * 수신한 CALL 에 대해 상위 계층이 내놓는 답.
+ * What the layer above answers an incoming CALL with.
  *
- * 상위 계층은 프레임도 messageId 도 모른다. **무엇으로 답할지**만 정하고, 그걸 어떤 프레임에
- * 실어 언제 보낼지는 세션이 정한다.
+ * That layer knows nothing of frames or messageIds. It decides **what to answer**; the session
+ * decides which frame carries it and when it goes out.
  */
 sealed interface InboundResponse {
 
-    /** CALLRESULT 로 답한다. */
+    /** Answer with a CALLRESULT. */
     data class Respond(val payload: ObjectNode) : InboundResponse {
         companion object {
-            /** *"Empty response by CSMS to confirm receipt"* — `BatterySwapResponse` 같은 빈 응답. */
+            /** *"Empty response by CSMS to confirm receipt"* — as `BatterySwapResponse` is. */
             fun empty(): Respond = Respond(JsonNodeFactory.instance.objectNode())
         }
     }
 
-    /** CALLERROR 로 답한다 (Part 4 §4.2.3). */
+    /** Answer with a CALLERROR (Part 4 §4.2.3). */
     data class Fail(
         val errorCode: RpcErrorCode,
         val errorDescription: String,
@@ -98,19 +99,19 @@ sealed interface InboundResponse {
 }
 
 /**
- * 수신한 CALL 을 처리한다.
+ * Handles an incoming CALL.
  *
- * 이 함수는 **같은 스테이션에 대해 직렬로만 호출된다** ([StationSerializer]). 그러니 구현이
- * 스테이션 단위 락을 또 잡을 필요가 없다.
+ * Called **serially per station** ([StationSerializer]), so an implementation needs no
+ * station-scoped lock of its own.
  *
- * 예외를 던지면 그 messageId 의 멱등 기록이 지워지고 상대에게
- * [RpcErrorCode.InternalError] 가 회신된다 — 즉 **재전송하면 다시 처리된다.**
+ * Throwing clears the idempotency record for that messageId and answers the peer with
+ * [RpcErrorCode.InternalError] — meaning **a retransmission will be processed again**.
  */
 typealias OcppCallHandler = suspend (stationId: String, call: OcppCall) -> InboundResponse
 
 /**
- * 수신한 SEND 를 처리한다 (Part 4 §4.2.4).
+ * Handles an incoming SEND (Part 4 §4.2.4).
  *
- * 돌려줄 것이 없다. **SEND 에는 CALLRESULT/CALLERROR 로 응답해서는 안 된다(SHALL NOT).**
+ * Returns nothing. **A SEND SHALL NOT be answered with a CALLRESULT or CALLERROR.**
  */
 typealias OcppSendHandler = suspend (stationId: String, send: OcppCall) -> Unit
