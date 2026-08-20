@@ -8,6 +8,10 @@ coroutines = "1.10.1"
 # csms 전용. ocpp-core / swap-domain 은 Spring 을 모른다 (PLAN §6 설계원칙 1)
 spring-boot = "3.4.1"
 spring-dependency-management = "1.1.7"
+# Maven Central Portal 배포. Sonatype 공식 Gradle 플러그인이 아직 없어 커뮤니티 표준을 쓴다.
+# ⚠️ 0.34.0 이 **Kotlin 2.1.x 를 지원하는 마지막 판**이다 (0.35.0 부터 KGP 2.2.0 을 요구한다).
+# Kotlin 을 올릴 때 이 버전도 같이 올린다 — 배포하려고 Kotlin 을 올리지는 않는다.
+maven-publish = "0.34.0"
 
 [libraries]
 jackson-databind = { module = "com.fasterxml.jackson.core:jackson-databind", version.ref = "jackson" }
@@ -41,3 +45,4 @@ kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 kotlin-spring = { id = "org.jetbrains.kotlin.plugin.spring", version.ref = "kotlin" }
 spring-boot = { id = "org.springframework.boot", version.ref = "spring-boot" }
 spring-dependency-management = { id = "io.spring.dependency-management", version.ref = "spring-dependency-management" }
+maven-publish = { id = "com.vanniktech.maven.publish", version.ref = "maven-publish" }

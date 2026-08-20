@@ -243,6 +243,7 @@ battery swap **via a smartphone app, e.g. by scanning a QR code**"*. 즉
 | [docs/API.md](docs/API.md) | REST 계약 전문과 설계 근거 |
 | [docs/CONFIGURATION.md](docs/CONFIGURATION.md) | 스테이션 인증 · REST 인증 · TLS |
 | [docs/CONFORMANCE.md](docs/CONFORMANCE.md) | 적합성 케이스 · 성공 기준 S1~S7 · 감사 출력 |
+| [docs/PUBLISHING.md](docs/PUBLISHING.md) | Maven Central 배포 절차와 그 앞에 두는 리허설 |
 | [docs/PLAN.md](docs/PLAN.md) | 프로토콜 명세(§4) · 도메인 설계(§5) · 검증 전략(§7) · 마일스톤 M0~M10(§8). 스펙 원문 대조로 계획서를 정정한 이력이 §0 에 있습니다 |
 | [BACKLOG.md](BACKLOG.md) | 범위 밖으로 밀어낸 것들과 그것을 꺼낼 트리거 |
 

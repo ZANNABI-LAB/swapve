@@ -32,11 +32,14 @@ application {
  * 산문으로 적어두면 지켜졌는지 알 수 없으므로 `check` 에 물려 기계 검증한다.
  * (`station-sim:checkNoForbiddenDependencies` 와 **같은 취지의 같은 검사**다.)
  */
+// 좌표를 하드코딩하지 않는다 — `station-sim` 의 같은 검사와 같은 사정이다.
+val internalGroup = rootProject.group
+
 val allowedCompileDependencies = setOf(
     // 이 저장소의 모듈. 콘솔이 기대는 유일한 코드다
-    "swapve:station-sim",
-    "swapve:ocpp-core",
-    "swapve:swap-domain",
+    "$internalGroup:station-sim",
+    "$internalGroup:ocpp-core",
+    "$internalGroup:swap-domain",
     "org.jetbrains.kotlin:kotlin-stdlib",
     "org.jetbrains:annotations",
     // ocpp-core 가 api 로 노출하는 것들

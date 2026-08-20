@@ -1,5 +1,6 @@
 plugins {
     alias(libs.plugins.kotlin.jvm) apply false
+    alias(libs.plugins.maven.publish) apply false
 }
 
 subprojects {
@@ -39,6 +40,94 @@ subprojects {
         useJUnitPlatform {
             excludeTags(ConformanceTag.VALUE, AuditTag.VALUE)
         }
+    }
+}
+
+/**
+ * ★ **Maven Central 배포** (공개 로드맵 6단계 · BACKLOG B07).
+ *
+ * **라이브러리 두 개만 올린다.** `csms` · `station-sim` · `sim-console` 은 애플리케이션이고,
+ * `java-compat` 은 시험 전용이라 좌표를 가질 이유가 없다. 남이 의존으로 적을 수 있는 것은
+ * 프레임워크를 모르는 두 모듈뿐이다 (docs/LAYERS.md).
+ *
+ * Sonatype 은 아직 Central Portal 용 공식 Gradle 플러그인을 내놓지 않았다. 커뮤니티 표준을
+ * 쓰되, **빌드 스크립트의 의존이지 라이브러리의 런타임 의존이 아니다** — `swap-domain` 의
+ * `checkNoExternalDependencies` 는 `compileClasspath` 를 보므로 영향이 없다.
+ *
+ * 좌표와 버전은 `gradle.properties` 에 있다. 절차는 `docs/PUBLISHING.md`.
+ */
+val publishedModules = setOf("ocpp-core", "swap-domain")
+
+subprojects {
+    if (name !in publishedModules) return@subprojects
+
+    apply(plugin = "com.vanniktech.maven.publish")
+
+    extensions.configure<com.vanniktech.maven.publish.MavenPublishBaseExtension> {
+        publishToMavenCentral()
+
+        // 서명은 Central 의 요구사항이다. 키가 없는 환경(로컬 리허설·CI 의 일반 빌드)에서는
+        // 아래 `signing.required` 가 이를 건너뛰게 한다 — 리허설이 키 때문에 막히면 안 된다.
+        signAllPublications()
+
+        coordinates(rootProject.group.toString(), project.name, rootProject.version.toString())
+
+        pom {
+            name.set("SwapVe ${project.name}")
+            description.set(
+                when (project.name) {
+                    "ocpp-core" ->
+                        "OCPP 2.1 (OCPP-J) framing, official JSON schema validation, and session layer for the JVM. Framework-agnostic."
+                    else ->
+                        "OCPP 2.1 Battery Swap (Block S) domain model: swap state machine, slot model, and invariants. No I/O, no dependencies."
+                },
+            )
+            inceptionYear.set("2026")
+            url.set("https://github.com/ZANNABI-LAB/swapve")
+
+            licenses {
+                license {
+                    name.set("The Apache License, Version 2.0")
+                    url.set("https://www.apache.org/licenses/LICENSE-2.0.txt")
+                    distribution.set("https://www.apache.org/licenses/LICENSE-2.0.txt")
+                }
+            }
+            developers {
+                developer {
+                    id.set("ZANNABI-LAB")
+                    name.set("ZANNABI LAB")
+                    url.set("https://github.com/ZANNABI-LAB")
+                }
+            }
+            scm {
+                url.set("https://github.com/ZANNABI-LAB/swapve")
+                connection.set("scm:git:git://github.com/ZANNABI-LAB/swapve.git")
+                developerConnection.set("scm:git:ssh://git@github.com/ZANNABI-LAB/swapve.git")
+            }
+        }
+    }
+
+    /**
+     * ⚠️ **jar 안에 `LICENSE` 와 `NOTICE` 를 넣는다.** 리허설에서 빠져 있는 것을 발견했다.
+     *
+     * 두 가지 이유가 있고 둘 다 강제다:
+     * ① Apache-2.0 §4(d) — NOTICE 파일이 있는 저작물을 재배포할 때 그 고지를 함께 준다.
+     * ② **`ocpp-core` 의 jar 에는 OCA 공식 스키마 181개가 들어 있다** (CC BY-ND 4.0).
+     *    저장소를 안 보고 좌표만으로 받은 사람은 NOTICE 를 볼 방법이 jar 안뿐이다.
+     *
+     * sources jar 에도 스키마가 실리므로 모든 `Jar` 태스크에 건다.
+     */
+    tasks.withType<Jar>().configureEach {
+        metaInf {
+            from(rootProject.file("LICENSE"), rootProject.file("NOTICE"))
+        }
+    }
+
+    // 서명 키가 없으면 서명을 요구하지 않는다. **배포 경로는 이 완화를 타지 않는다** —
+    // Central 이 서명 없는 번들을 거절하므로, 키를 잊으면 업로드 단계에서 잡힌다.
+    extensions.configure<SigningExtension>("signing") {
+        isRequired = providers.gradleProperty("signingInMemoryKey").isPresent ||
+            providers.gradleProperty("signing.keyId").isPresent
     }
 }
 

@@ -255,6 +255,7 @@ why the metrics avoid Micrometer) is in **[docs/API.md](docs/API.md)**.
 | [docs/API.md](docs/API.md) | Full REST contract and design record |
 | [docs/CONFIGURATION.md](docs/CONFIGURATION.md) | Station authentication · REST authentication · TLS |
 | [docs/CONFORMANCE.md](docs/CONFORMANCE.md) | Conformance cases · success criteria S1–S7 · audit output |
+| [docs/PUBLISHING.md](docs/PUBLISHING.md) | How releases reach Maven Central — and the rehearsal that must pass first |
 | [docs/PLAN.md](docs/PLAN.md) | Protocol spec (§4) · domain design (§5) · verification strategy (§7) · milestones M0–M10 (§8). §0 records where reading the spec proved the plan wrong |
 | [BACKLOG.md](BACKLOG.md) | What was pushed out of scope, and the trigger that would pull it back |
 

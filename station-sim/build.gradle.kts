@@ -27,10 +27,13 @@ application {
  * 산문으로 적어두면 지켜졌는지 알 수 없으므로 `check` 에 물려 기계 검증한다.
  * (`swap-domain:checkNoExternalDependencies` · `ocpp-core:checkNoFrameworkImports` 와 같은 취지다.)
  */
+// 좌표를 하드코딩하지 않는다 — 그룹 ID 는 배포(B07)를 하며 바뀌었고, 또 바뀔 수 있다.
+val internalGroup = rootProject.group
+
 val allowedCompileDependencies = setOf(
     // 이 저장소의 모듈. 시뮬레이터가 기대는 유일한 코드다
-    "swapve:ocpp-core",
-    "swapve:swap-domain",
+    "$internalGroup:ocpp-core",
+    "$internalGroup:swap-domain",
     "org.jetbrains.kotlin:kotlin-stdlib",
     "org.jetbrains:annotations",
     // ocpp-core 가 api 로 노출하는 것들
