@@ -13,7 +13,7 @@ import java.util.concurrent.TimeUnit
  * 시험용 OCPP 스테이션 클라이언트.
  *
  * JDK 내장 [java.net.http.WebSocket] 을 쓴다 — 의존성이 0 이고, M6 의 `station-sim` 이 쓸
- * 것과 같은 스택이다 (PLAN §6 기술선택). 즉 이 클라이언트로 통과한 시험은 시뮬레이터에서도
+ * 것과 같은 스택이다 (기술선택). 즉 이 클라이언트로 통과한 시험은 시뮬레이터에서도
  * 같은 방식으로 붙는다는 뜻이다.
  *
  * 받은 텍스트는 큐에 쌓아 두고 [receive] 로 꺼낸다. 부분 프레임은 [last] 가 참이 될 때까지

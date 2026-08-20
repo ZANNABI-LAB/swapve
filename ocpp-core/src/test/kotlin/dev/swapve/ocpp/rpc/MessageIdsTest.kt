@@ -19,7 +19,7 @@ class MessageIdsTest {
 
     @Test
     fun `사전순 정렬이 생성순과 같다`() {
-        // 시간순 정렬 가능 = 이벤트 로그(PLAN §11.1)의 순서 재구성이 공짜가 된다
+        // 시간순 정렬 가능 = 이벤트 로그의 순서 재구성이 공짜가 된다
         val ids = List(1_000) { MessageIds.next() }
         assertEquals(ids, ids.sorted())
     }

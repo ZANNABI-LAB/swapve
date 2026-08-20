@@ -9,7 +9,7 @@ import com.github.f4b6a3.tsid.TsidCreator
  * 달라야 한다(MUST). 연결이 끊겼다 다시 붙어도 마찬가지다.**
  *
  * 그래서 `AtomicInteger` 같은 로컬 카운터를 쓰지 않는다 — 재시작하면 값이 되돌아가고,
- * 인스턴스를 늘리면 충돌한다 (PLAN §11.5). TSID는 시간순 정렬이 가능하면서 13자라
+ * 인스턴스를 늘리면 충돌한다. TSID는 시간순 정렬이 가능하면서 13자라
  * 36자 한도에 여유가 크다.
  */
 object MessageIds {

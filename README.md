@@ -38,7 +38,7 @@
 > The codec and schema layers **are callable from Java** — the session layer is Kotlin-only.
 > That is measured, not assumed: see [LAYERS §4](docs/LAYERS.md).
 
-**Not yet published to Maven Central.** For now you build from source ([B07](BACKLOG.md)).
+**Not yet published to Maven Central.** For now you build from source (B07).
 
 ## Quick start
 
@@ -68,7 +68,7 @@ station-sim → ws://localhost:8080/ocpp/CS001 (순서 In-Out, 배터리 2 개)
 
 <sub>The simulator's console output is currently Korean: *"swap complete: requestId=1001,
 42 messages exchanged."* Log message localization is tracked with the docs under
-[B06](BACKLOG.md).</sub>
+B06.</sub>
 
 **Terminal C** — query exactly what an app would see.
 
@@ -85,7 +85,7 @@ curl localhost:8080/api/stations/CS001/charging-transactions   # charging of the
 <details>
 <summary><b>Reverse-order swaps · CSMS-initiated swaps (S02) · the control console</b></summary>
 
-The reverse order (`Out-In`) is equally standard and works as-is ([PLAN §4.6](docs/PLAN.md)):
+The reverse order (`Out-In`) is equally standard and works as-is — swap order is direction-agnostic by design:
 
 ```bash
 ./gradlew :station-sim:run --args="--csms-url ws://localhost:8080/ocpp --station-id CS001 --swap-order Out-In --request-id 1002"
@@ -112,7 +112,7 @@ replacing it** — everything above still works:
 ```
 
 Open `localhost:8090`, then **Connect → Start swap**. The **F1–F6 buttons** fire the failure
-scenarios from [PLAN §5.4](docs/PLAN.md) — "reproduce an empty-inventory rejection" is one click.
+failure scenarios — "reproduce an empty-inventory rejection" is one click.
 
 - The page is **a single static HTML file** with no CDN, font, or framework links. The HTTP server
   is the JDK's own `com.sun.net.httpserver` — **it comes up with no network at all**
@@ -141,7 +141,7 @@ Excluding it, the whole thing is **under three minutes**.
 The three `curl` calls were verified in a separate environment as well:
 
 - `/api/swaps/CS001:1001` → `status: COMPLETED`, with `batteriesIn` (2, SoC 12/13%) and
-  `batteriesOut` (2, SoC 95%) **both** present ([PLAN §11.2](docs/PLAN.md))
+  `batteriesOut` (2, SoC 95%) **both** present, which is what keeps billing computable later
 - `/api/metrics/swaps` → `successRate: 1.0`, duration percentiles, and `failures.byScenario`
   split across F1·F2·F3·F5 (F4 and F6 are idempotent, so they do not count as failures)
 - `/api/stations/CS001/charging-transactions` → charging transactions per slot
@@ -158,12 +158,12 @@ Spring context on every build.
   its own Basic realm, and `sim-console` binds to loopback. There is no mTLS (B12), no credential
   rotation, no rate limiting, no operational audit trail.
 - **Single instance.** Horizontal scaling is not blocked — `stationId` serialization and TSIDs are
-  already in place (§11.5) — but it is not implemented ([B11](BACKLOG.md)). Restarts *are* survived:
+  already in place (§11.5) — but it is not implemented (B11). Restarts *are* survived:
   raw OCPP messages persist to an event log (H2) and derived registries are rebuilt from that log at
   startup (`EventLogRecovery`). Data outside the retention windows (7 days recovery · 30 days audit)
   is not reconstructable.
 - **Smart charging, tariffs, roaming, and horizontal scaling are out of scope**
-  ([PLAN §3](docs/PLAN.md)). Not implemented — but **not designed out either** ([PLAN §11](docs/PLAN.md)).
+  Not implemented — but **not designed out either**.
 - **No dashboard or UI.** Reading stops at REST.
 
 ## Why Block S
@@ -196,7 +196,7 @@ either way. The latter two are *not evidence of absence.*
 ## Verification — three gates
 
 The three gates **answer different questions**, which is why they were not merged into one
-([PLAN §7.3](docs/PLAN.md)).
+
 
 | Gate | Command | What it guarantees |
 |---|---|---|
@@ -256,12 +256,10 @@ why the metrics avoid Micrometer) is in **[docs/API.md](docs/API.md)**.
 | [docs/CONFIGURATION.md](docs/CONFIGURATION.md) | Station authentication · REST authentication · TLS |
 | [docs/CONFORMANCE.md](docs/CONFORMANCE.md) | Conformance cases · success criteria S1–S7 · audit output |
 | [docs/PUBLISHING.md](docs/PUBLISHING.md) | How releases reach Maven Central — and the rehearsal that must pass first |
-| [docs/PLAN.md](docs/PLAN.md) | Protocol spec (§4) · domain design (§5) · verification strategy (§7) · milestones M0–M10 (§8). §0 records where reading the spec proved the plan wrong |
-| [BACKLOG.md](BACKLOG.md) | What was pushed out of scope, and the trigger that would pull it back |
 
 > ⚠️ **The documents under `docs/` are currently written in Korean.** The code, identifiers, and
 > commit messages that matter for reading the source are language-neutral; translating the deep-dive
-> docs is tracked as [B06](BACKLOG.md).
+> docs is tracked as B06.
 
 ## How this is built
 
@@ -270,7 +268,7 @@ verification-first external runner: every claim of completion must come with mac
 evidence.
 
 ```bash
-zannabi run "<task>" --cwd . \
+zannabi run "<task>" --cwd. \
   --gate "unit:./gradlew test" \
   --gate "conformance:./gradlew conformanceTest" \
   --gate "audit:./gradlew auditTest" --budget 3

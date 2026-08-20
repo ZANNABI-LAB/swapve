@@ -12,7 +12,7 @@ class SlotTest {
 
     @Test
     fun `EMPTY 는 배터리가 없다는 뜻이다`() {
-        // ⚠️ PLAN §4.2 — 프로토콜의 가용성 열거형은 의미가 반대다. 도메인은 관측 사실대로 명명한다.
+        // ⚠️ 프로토콜의 가용성 열거형은 의미가 반대다. 도메인은 관측 사실대로 명명한다.
         val slot = Slot(SlotId(1), SlotState.EMPTY)
 
         assertNull(slot.battery)
@@ -29,7 +29,7 @@ class SlotTest {
 
     @Test
     fun `슬롯 상태 이름에 프로토콜 어휘가 새어 들어오지 않았다`() {
-        // 이 목록이 늘거나 이름이 프로토콜 열거형으로 바뀌면 PLAN §6 원칙 4 위반이다.
+        // 이 목록이 늘거나 이름이 프로토콜 열거형으로 바뀌면 도메인이 프로토콜 열거형을 그대로 쓰지 않는다는 원칙 위반이다.
         assertEquals(
             setOf("EMPTY", "HOLDS_BATTERY", "UNUSABLE"),
             SlotState.entries.map { it.name }.toSet(),
@@ -50,7 +50,7 @@ class SlotTest {
 
     @Test
     fun `스테이션은 소유 사업자를 가진다`() {
-        // PLAN §11.3 — 값이 항상 하나여도 둔다.
+        // 값이 항상 하나여도 둔다.
         val station = Station(
             id = StationId("KR-SEOUL-001"),
             operatorId = OperatorId("ZIGBANG-MOBILITY"),
@@ -80,6 +80,6 @@ class SlotTest {
         val seoul = SwapKey(StationId("KR-SEOUL-001"), SwapRequestId(42))
         val busan = SwapKey(StationId("KR-BUSAN-007"), SwapRequestId(42))
 
-        assertTrue(seoul != busan, "requestId 는 스테이션 범위에서만 유일하다 (PLAN §5.3)")
+        assertTrue(seoul != busan, "requestId 는 스테이션 범위에서만 유일하다")
     }
 }

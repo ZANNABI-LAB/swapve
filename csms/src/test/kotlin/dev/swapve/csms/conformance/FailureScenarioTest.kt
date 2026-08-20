@@ -44,7 +44,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /**
- * ★★ **실패 시나리오 F1~F6 — 성공 기준 S3** (PLAN §2, §5.4).
+ * ★★ **실패 시나리오 F1~F6 — 성공 기준 S3** (실패 시나리오).
  *
  * ### 무엇을 새로 증명하는가
  *
@@ -55,7 +55,7 @@ import kotlin.test.assertTrue
  *
  * ### 공통 규칙 — 모든 위반은 CALLRESULT 로 정상 응답한다
  *
- * `BatterySwapResponse` 는 거부할 수 없다 (PLAN §4.3). 인가가 없어도(F5), 중복이어도(F4)
+ * `BatterySwapResponse` 는 거부할 수 없다. 인가가 없어도(F5), 중복이어도(F4)
  * 응답은 정상 회신이고 사실만 기록에 남는다. 거부가 필요하면 §4.8 customData 를 쓴다(F3).
  */
 @Tag("conformance")
@@ -88,7 +88,7 @@ class FailureScenarioTest {
     /**
      * **F1 — 배터리 부족.** 스테이션이 `Rejected` + `NoBatteryAvailable`, CSMS 가 기록한다.
      *
-     * 이것이 곧 `TC_S_102_CSMS` 다 (PLAN §5.4 표). 전 시퀀스 단언은 그 시험에 있고,
+     * 이것이 곧 `TC_S_102_CSMS` 다 (표). 전 시퀀스 단언은 그 시험에 있고,
      * 여기서는 **F1 이 실패 시나리오 목록의 한 항목으로서** 실제 연결 위에서 도는지 본다.
      */
     @Test
@@ -122,7 +122,7 @@ class FailureScenarioTest {
      * > **S03.FR.06** — *"Situation needs to be reported, because CSMS ends up with an
      * > **orphan BatteryIn for which a BatteryOut is missing**."*
      *
-     * 두 종류의 타임아웃 중 CSMS 가 통보받는 쪽이다 (PLAN §4.7). 인가 후 배터리를 넣지 않은
+     * 두 종류의 타임아웃 중 CSMS 가 통보받는 쪽이다. 인가 후 배터리를 넣지 않은
      * 타임아웃은 스테이션이 자체 종료하고 CSMS 는 **아무것도 받지 못하므로** 여기서 시험할
      * 대상 자체가 없다.
      */
@@ -139,12 +139,12 @@ class FailureScenarioTest {
         )
         assertEquals(2, state.ledgerImbalance, "입고 2개에 대응하는 출고가 없다")
 
-        // ★ 영속 — PLAN §5.3 이 이 한 줄에만 "영속 저장 필요"를 달았다.
+        // ★ 영속 — 불변식 가운데 이 한 줄에만 "영속 저장 필요"가 달려 있다.
         val persisted = assertNotNull(outTimedOutLedger.find(key), "장부가 영속되지 않았다")
         assertEquals(2, persisted.ledgerImbalance)
         assertEquals(ConformanceScenario.VALID_ID_TOKEN, persisted.idToken)
 
-        // orphan 배터리의 serialNumber·soC·soH 가 양쪽 다 보존됐다 (PLAN §11.2 — 과금 근거).
+        // orphan 배터리의 serialNumber·soC·soH 가 양쪽 다 보존됐다 (과금 근거).
         val serials = persisted.orphanBatteriesIn.map { it.serialNumber }.sorted()
         assertEquals(listOf("1234", "5678"), serials)
         val bySerial = persisted.orphanBatteriesIn.associateBy { it.serialNumber }
@@ -153,7 +153,7 @@ class FailureScenarioTest {
     }
 
     /**
-     * ★ **F2 의 나머지 절반 — 프로세스가 죽어도 남는다** (PLAN §5.3 *"영속 저장 필요"*).
+     * ★ **F2 의 나머지 절반 — 프로세스가 죽어도 남는다** (*"영속 저장 필요"*).
      *
      * 위 시험이 확인하는 것은 **"썼다"이지 "남는다"가 아니다.** 인메모리 DB 였다면 위 단언은
      * 그대로 통과하면서도 요구를 만족하지 못한다. 그래서 여기서는 두 가지를 따로 확인한다:
@@ -194,7 +194,7 @@ class FailureScenarioTest {
 
     /**
      * **F3 — 미등록 배터리.** CSMS 가 `BatterySwapResponse.customData` 로
-     * `Rejected` / `BatteryUnknown` 을 알린다 (PLAN §4.8, §10 결정 #7).
+     * `Rejected` / `BatteryUnknown` 을 알린다 (확정 결정 결정 #7).
      *
      * ### 이 시험이 확인하는 두 가지
      *
@@ -241,7 +241,7 @@ class FailureScenarioTest {
 
         // ★ customData 를 붙여도 공식 스키마를 통과한다.
         ConformanceScenario.assertAllSchemaValid(records, validator)
-        // 거부하더라도 CALLERROR 가 아니다 (PLAN §4.3).
+        // 거부하더라도 CALLERROR 가 아니다.
         ConformanceScenario.assertNoErrorFrames(records)
     }
 
@@ -315,7 +315,7 @@ class FailureScenarioTest {
             "이상 이벤트가 기록되지 않았다: ${swaps.anomalies()}",
         )
 
-        // ★ 그럼에도 응답은 정상 회신됐다 — BatterySwap 은 거부할 수 없다 (PLAN §4.3).
+        // ★ 그럼에도 응답은 정상 회신됐다 — BatterySwap 은 거부할 수 없다.
         val records = simulator.eventLog.of(stationId)
         assertTrue(
             records.stationReceived().any { it.action == BatterySwapWire.BATTERY_SWAP },
@@ -329,7 +329,7 @@ class FailureScenarioTest {
     /**
      * **F6 — 재접속 중 재전송.** WebSocket 재연결 후 CALL 재전송 → 멱등 처리, 장부 무결.
      *
-     * ### 이것이 M4·M7 의 핵심 위험이다 (PLAN §8)
+     * ### 이것이 M4·M7 의 핵심 위험이다
      *
      * > *"재접속 시 스테이션이 CALL 을 재전송하면 중복 `BatterySwap` 이 발생하고, 멱등
      * > 처리가 없으면 장부가 깨진다."*
@@ -423,7 +423,7 @@ class FailureScenarioTest {
                 it.insertBatteries()
                 then(it)
 
-                // 어느 시나리오에서도 오류 프레임은 오가지 않는다 (PLAN §5.4).
+                // 어느 시나리오에서도 오류 프레임은 오가지 않는다.
                 ConformanceScenario.assertNoErrorFrames(it.eventLog.of(stationId))
                 ConformanceScenario.assertAllSchemaValid(it.eventLog.of(stationId), validator)
 

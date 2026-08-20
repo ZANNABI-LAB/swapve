@@ -72,16 +72,16 @@ data class ChargingTransaction(
      * 충전 상한에 닿아 급전이 멈췄다 (`SuspendedEVSE`, S04.FR.06).
      *
      * **끝난 것이 아니다.** [isEnded] 와 함께 보면 "멈췄지만 살아 있다"가 읽힌다 — 그것이
-     * PLAN §4.10 표 4행이 말하는 상태다.
+     * 충전 트랜잭션의 종료 상태다.
      */
     val isSuspended: Boolean
         get() = !isEnded && chargingState == BatterySwapWire.CHARGING_STATE_SUSPENDED_EVSE
 }
 
 /**
- * 충전 트랜잭션 기록소 (S04, PLAN §4.10).
+ * 충전 트랜잭션 기록소 (S04).
  *
- * ### ★ 교환 트랜잭션과 절대 합치지 않는다 (PLAN §5.1)
+ * ### ★ 교환 트랜잭션과 절대 합치지 않는다
  *
  * 저장소도 다르고 키도 다르다. 교환은 `(stationId, requestId)` 로 묶이고, 충전은
  * `(stationId, transactionId)` 로 묶인다. **들어온 배터리의 충전은 교환이 끝난 뒤에도 며칠
@@ -93,9 +93,9 @@ data class ChargingTransaction(
  *
  * ### 기록만 한다
  *
- * MVP 범위는 *"시뮬레이터가 발신하고 CSMS 가 수신·기록"* 까지다 (PLAN §4.10, §10 결정 #8).
+ * MVP 범위는 *"시뮬레이터가 발신하고 CSMS 가 수신·기록"* 까지다 (확정 결정 결정 #8).
  * 스마트차징도 요금도 여기서 하지 않는다. 나중에 붙일 때 필요한 것은 전부
- * 이벤트 로그(PLAN §11.1)와 이 기록 위의 순수 계산이다.
+ * 이벤트 로그와 이 기록 위의 순수 계산이다.
  *
  * ### 재부팅으로 끊긴 트랜잭션도 지우지 않는다 (S04.FR.11)
  *
@@ -135,14 +135,14 @@ class ChargingTransactionRegistry {
             .maxByOrNull { it.startedAt ?: Instant.MIN }
 
     /**
-     * **어느 배터리**의 충전인지를 붙인다 (PLAN §5.1 — 조회에서 슬롯과 배터리가 읽혀야 한다).
+     * **어느 배터리**의 충전인지를 붙인다 (조회에서 슬롯과 배터리가 읽혀야 한다).
      *
      * `BatterySwapRequest(BatteryIn)` 이 `(evseId, serialNumber)` 를 실어 오는 그 순간이
      * CSMS 가 슬롯과 배터리를 잇는 **유일한 지점**이다. `TransactionEvent` 도 `NotifyEvent` 도
      * 일련번호를 싣지 않는다.
      *
      * 교환을 참조하지 않는다는 점이 중요하다. 이 함수가 받는 것은 `(슬롯, 일련번호)` 라는
-     * 사실뿐이고, 그 뒤 교환이 완료되든 타임아웃이 나든 이 기록은 그대로다 (§5.1).
+     * 사실뿐이고, 그 뒤 교환이 완료되든 타임아웃이 나든 이 기록은 그대로다 (생명주기 분리).
      *
      * @return 붙인 뒤의 트랜잭션. 그 슬롯에 도는 트랜잭션이 없으면 `null` — 배터리가 꽂혔는데
      *   충전이 시작되지 않은 상태이고, 없는 트랜잭션을 만들어 내지 않는다.

@@ -38,7 +38,7 @@
 > 코덱·스키마 층은 **Java 에서도 호출됩니다** — 세션 층은 Kotlin 전용입니다
 > (짐작이 아니라 실측입니다: [LAYERS §4](docs/LAYERS.md)).
 
-**아직 Maven Central 에 배포되지 않았습니다.** 지금은 소스로 씁니다 ([B07](BACKLOG.md)).
+**아직 Maven Central 에 배포되지 않았습니다.** 지금은 소스로 씁니다 (B07).
 
 ## 빠른 시작
 
@@ -80,7 +80,7 @@ curl localhost:8080/api/stations/CS001/charging-transactions   # 들어온 배�
 <details>
 <summary><b>역순 교환 · 앱처럼 CSMS 가 시작하기(S02) · 제어 콘솔</b></summary>
 
-역순 교환(`Out-In`)도 표준이고, 그대로 돕니다 ([PLAN §4.6](docs/PLAN.md)):
+역순 교환(`Out-In`)도 표준이고, 그대로 돕니다 (교환 순서):
 
 ```bash
 ./gradlew :station-sim:run --args="--csms-url ws://localhost:8080/ocpp --station-id CS001 --swap-order Out-In --request-id 1002"
@@ -105,7 +105,7 @@ curl -X POST localhost:8080/api/swaps -H 'Content-Type: application/json' \
 ./gradlew :sim-console:run --args="--port 8090 --csms-url ws://localhost:8080/ocpp"
 ```
 
-`localhost:8090` 에서 **붙이기 → 교환 시작**. **F1~F6 버튼**은 [PLAN §5.4](docs/PLAN.md) 의
+`localhost:8090` 에서 **붙이기 → 교환 시작**. **F1~F6 버튼**은 실패 시나리오 의
 실패 시나리오를 그대로 겁니다 — "배터리 부족을 눌러서 재현"이 버튼 하나입니다.
 
 - 화면은 **정적 HTML 한 장**이고 외부 CDN·폰트·프레임워크를 링크하지 않습니다. HTTP 서버도
@@ -134,7 +134,7 @@ curl -X POST localhost:8080/api/swaps -H 'Content-Type: application/json' \
 `curl` 세 줄도 별도 환경에서 실행해 확인했습니다:
 
 - `/api/swaps/CS001:1001` → `status: COMPLETED`, `batteriesIn` 2개(SoC 12·13%)와
-  `batteriesOut` 2개(SoC 95%)가 **양쪽 다** 실립니다 ([PLAN §11.2](docs/PLAN.md))
+  `batteriesOut` 2개(SoC 95%)가 **양쪽 다** 실립니다 (과금 여지)
 - `/api/metrics/swaps` → `successRate: 1.0`, 소요시간 백분위, `failures.byScenario` 가
   F1·F2·F3·F5 로 구분 (F4·F6 은 멱등이라 실패로 세지 않습니다)
 - `/api/stations/CS001/charging-transactions` → 슬롯별 충전 트랜잭션
@@ -150,11 +150,11 @@ curl -X POST localhost:8080/api/swaps -H 'Content-Type: application/json' \
 - **닫힌 경계와 남은 경계가 다릅니다.** WebSocket 은 기본 `BASIC`, REST 는 별도 Basic,
   `sim-console` 은 loopback 바인딩입니다. mTLS(B12)·자격증명 회전·운영용 감사·속도 제한은 없습니다.
 - **단일 인스턴스입니다.** 수평 확장은 봉쇄하지 않았지만(§11.5 의 `stationId` 직렬화·TSID)
-  구현하지 않았습니다 ([B11](BACKLOG.md)). 재시작은 견딥니다 — 이벤트 로그(H2)에 OCPP 원문이
+  구현하지 않았습니다 (B11). 재시작은 견딥니다 — 이벤트 로그(H2)에 OCPP 원문이
   남고 기동 시 파생 레지스트리를 그 로그에서 복원합니다(`EventLogRecovery`).
   다만 보존 창(복구 7일 · 감사 30일) 밖은 재구성 대상이 아닙니다.
-- **스마트차징·요금·로밍·수평 확장은 범위 밖입니다** ([PLAN §3](docs/PLAN.md)).
-  구현하지 않았을 뿐 **봉쇄하지도 않았습니다** ([PLAN §11](docs/PLAN.md)).
+- **스마트차징·요금·로밍·수평 확장은 범위 밖입니다** (범위).
+  구현하지 않았을 뿐 **봉쇄하지도 않았습니다** (확장 여지).
 - **대시보드·UI 가 없습니다.** 조회는 REST 까지입니다.
 
 ## 왜 Block S 인가
@@ -185,7 +185,7 @@ OCPP 2.1 이 2025년 1월 **Battery Swap 기능 블록(Block S)** 을 정식 편
 
 ## 검증 — 게이트 세 개
 
-세 게이트는 **서로 다른 질문에 답합니다.** 그래서 하나로 합치지 않았습니다 ([PLAN §7.3](docs/PLAN.md)).
+세 게이트는 **서로 다른 질문에 답합니다.** 그래서 하나로 합치지 않았습니다 (게이트).
 
 | 게이트 | 명령 | 무엇을 보장하나 |
 |---|---|---|
@@ -244,8 +244,6 @@ battery swap **via a smartphone app, e.g. by scanning a QR code**"*. 즉
 | [docs/CONFIGURATION.md](docs/CONFIGURATION.md) | 스테이션 인증 · REST 인증 · TLS |
 | [docs/CONFORMANCE.md](docs/CONFORMANCE.md) | 적합성 케이스 · 성공 기준 S1~S7 · 감사 출력 |
 | [docs/PUBLISHING.md](docs/PUBLISHING.md) | Maven Central 배포 절차와 그 앞에 두는 리허설 |
-| [docs/PLAN.md](docs/PLAN.md) | 프로토콜 명세(§4) · 도메인 설계(§5) · 검증 전략(§7) · 마일스톤 M0~M10(§8). 스펙 원문 대조로 계획서를 정정한 이력이 §0 에 있습니다 |
-| [BACKLOG.md](BACKLOG.md) | 범위 밖으로 밀어낸 것들과 그것을 꺼낼 트리거 |
 
 ## 개발 방식
 
@@ -253,7 +251,7 @@ battery swap **via a smartphone app, e.g. by scanning a QR code**"*. 즉
 개발합니다. 모든 완료 선언에 기계 검증 가능한 증거를 요구합니다.
 
 ```bash
-zannabi run "<작업>" --cwd . \
+zannabi run "<작업>" --cwd. \
   --gate "unit:./gradlew test" \
   --gate "conformance:./gradlew conformanceTest" \
   --gate "audit:./gradlew auditTest" --budget 3

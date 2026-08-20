@@ -14,7 +14,7 @@ import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * per-station 직렬화 (PLAN §11.5).
+ * per-station 직렬화.
  *
  * **직렬화 키는 `stationId` 다. 세션 객체가 아니다.** 로컬에선 `stationId` 기반 락이고,
  * 분산되면 그대로 파티셔닝 키가 된다.
@@ -81,7 +81,7 @@ class StationSerializationTest {
     @Test
     fun `같은 스테이션의 두 연결도 같은 락을 공유한다`() = runTest {
         // 재접속으로 세션이 바뀌어도 직렬화가 끊기면 안 된다 — 세션 객체로 락을 잡으면
-        // 정확히 그 일이 벌어진다 (PLAN §11.5).
+        // 정확히 그 일이 벌어진다.
         val handled = Collections.synchronizedList(mutableListOf<Int>())
         val serializer = StationSerializer()
         val ledger = InboundCallLedger()

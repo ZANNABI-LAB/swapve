@@ -66,7 +66,7 @@ class OcppSessionTimeoutTest {
         advanceUntilIdle()
         assertIs<OcppResult.Accepted>(second.await())
 
-        // 그리고 늦은 응답도 기록에는 남아 있다 (PLAN §11.1 — 정보를 버리지 않는다).
+        // 그리고 늦은 응답도 기록에는 남아 있다 (정보를 버리지 않는다).
         val late = connection.log.of(connection.stationId)
             .filter { it.direction == MessageDirection.INBOUND && it.messageId == abandonedId }
         assertEquals(1, late.size)

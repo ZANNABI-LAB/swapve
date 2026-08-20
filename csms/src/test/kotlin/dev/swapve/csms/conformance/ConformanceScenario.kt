@@ -21,7 +21,7 @@ import java.time.ZoneOffset
 import kotlin.test.assertTrue
 
 /**
- * ★ **공식 적합성 케이스의 값들 — 스펙 원문 그대로** (Part 6 p.1366–1369, PLAN §7.1).
+ * ★ **공식 적합성 케이스의 값들 — 스펙 원문 그대로** (Part 6 p.1366–1369).
  *
  * ### 왜 값을 한 곳에 모으나
  *
@@ -32,7 +32,7 @@ import kotlin.test.assertTrue
  * ### 시험계(Test System) 역할은 station-sim 이 맡는다
  *
  * 시험 대상(System under test)은 **CSMS** 다. 시뮬레이터는 스펙 시퀀스를 그대로 연기하고,
- * 우리가 만든 CSMS 가 그 앞에서 시험받는다 (PLAN §7.1).
+ * 우리가 만든 CSMS 가 그 앞에서 시험받는다.
  */
 object ConformanceScenario {
 
@@ -65,7 +65,7 @@ object ConformanceScenario {
     /**
      * 스펙이 지정한 트랜잭션 식별자들.
      *
-     * ### ★ `-1`/`-2` 와 `-3`/`-4` 의 차이가 이 케이스의 함정이다 (PLAN §7.1 읽을 것 5)
+     * ### ★ `-1`/`-2` 와 `-3`/`-4` 의 차이가 이 케이스의 함정이다 (읽을 것 5)
      *
      * - `…-3` / `…-4` — **입고** 배터리의 충전. step 5/9 에서 **시작**된다.
      * - `…-1` / `…-2` — **반출** 배터리의 충전. 이 시나리오 **이전에** 시작됐고 step 13/17 에서
@@ -125,7 +125,7 @@ object ConformanceScenario {
             SlotConfig(EVSE_A, battery = null, connectorId = CONNECTOR_ID, chargingTransactionId = TX_INSERTED_A),
             SlotConfig(EVSE_B, battery = null, connectorId = CONNECTOR_ID, chargingTransactionId = TX_INSERTED_B),
             // ★ 이 두 슬롯의 충전은 이 시나리오 **이전에** 시작됐다. 부팅 때 Started 를
-            //   보내지 않으므로 CSMS 는 종료만 보게 된다 (PLAN §7.1 읽을 것 5).
+            // 보내지 않으므로 CSMS 는 종료만 보게 된다 (읽을 것 5).
             SlotConfig(
                 EVSE_C,
                 battery = DISPENSED_C,
@@ -154,7 +154,7 @@ object ConformanceScenario {
     /**
      * `TC_S_102_CSMS` 의 스테이션 구성 — **내줄 배터리가 하나도 없다.**
      *
-     * 재고 판정은 스테이션이 하므로 (PLAN §4.5, S02.FR.04), 이 구성의 시뮬레이터는
+     * 재고 판정은 스테이션이 하므로 (S02.FR.04), 이 구성의 시뮬레이터는
      * `RequestBatterySwapRequest` 에 `Rejected` + `NoBatteryAvailable` 로 답한다.
      */
     fun emptyStationConfig(port: Int, stationId: String) = StationSimConfig(
@@ -174,7 +174,7 @@ object ConformanceScenario {
     )
 
     /**
-     * F3 — 이용자가 **우리 것이 아닌 배터리**를 가져왔다 (PLAN §5.4).
+     * F3 — 이용자가 **우리 것이 아닌 배터리**를 가져왔다.
      *
      * `TC_S_103_CSMS` 와 같은 시퀀스를 돌되 투입 배터리의 일련번호만 등록 목록 밖의 값이다.
      * 적합성 케이스 쪽 구성을 건드리지 않는 것이 요점이다 — 그쪽은 **거부가 붙지 않는다**를
@@ -222,7 +222,7 @@ object ConformanceScenario {
      *
      * 검사 대상이 우리가 만든 객체가 아니라 **실제로 소켓을 지난 바이트**라는 것이 요점이다.
      * F3 의 `customData` 거부 응답도 이 검사를 지난다 — 표준이 정한 우회가 정말로 표준
-     * 스키마를 통과하는지는 주장이 아니라 실행되는 검사로 확인해야 한다 (PLAN §4.8).
+     * 스키마를 통과하는지는 주장이 아니라 실행되는 검사로 확인해야 한다.
      */
     fun assertAllSchemaValid(records: List<OcppEventRecord>, validator: OcppPayloadValidator) {
         var checked = 0

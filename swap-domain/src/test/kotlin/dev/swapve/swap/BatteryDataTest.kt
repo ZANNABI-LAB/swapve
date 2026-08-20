@@ -39,7 +39,7 @@ class BatteryDataTest {
 
     @Test
     fun `인가 토큰은 식별자와 종류를 함께 가진다`() {
-        // PLAN §11.3 — 사용자 테이블 FK 가 아니라 값 객체다.
+        // 사용자 테이블 FK 가 아니라 값 객체다.
         val token = IdToken("049A1B2C3D", "ISO14443")
 
         assertEquals(token, IdToken("049A1B2C3D", "ISO14443"))
@@ -49,7 +49,7 @@ class BatteryDataTest {
 
     @Test
     fun `토큰 종류는 표에 없는 값도 받는다`() {
-        // 로밍 토큰은 우리가 아는 종류가 아닐 수 있다. 버리지 않고 기록한다 (PLAN §11.0).
+        // 로밍 토큰은 우리가 아는 종류가 아닐 수 있다. 버리지 않고 기록한다.
         assertEquals("SomeRoamingScheme", IdToken("XYZ", "SomeRoamingScheme").type)
     }
 }

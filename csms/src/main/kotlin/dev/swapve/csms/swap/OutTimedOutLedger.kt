@@ -35,24 +35,24 @@ data class OutTimedOutRecord(
 }
 
 /**
- * `OUT_TIMED_OUT` 장부 — **유일하게 영속되는 상태** (PLAN §5.3, §5.4 F2).
+ * `OUT_TIMED_OUT` 장부 — **유일하게 영속되는 상태** (실패 시나리오 F2).
  *
  * ### 왜 이것만 DB 인가
  *
  * 교환 상태도 슬롯 상태도 충전 트랜잭션도 전부 인메모리다. 그것들은 이벤트 로그에서
- * 재구성 가능한 **파생 상태**이기 때문이다 (PLAN §11.1). 그런데 `OUT_TIMED_OUT` 은 다르다:
+ * 재구성 가능한 **파생 상태**이기 때문이다. 그런데 `OUT_TIMED_OUT` 은 다르다:
  *
  * > **S03.FR.06** — *"Situation needs to be reported, because CSMS ends up with an
  * > **orphan BatteryIn for which a BatteryOut is missing**."*
  *
  * 이건 조회용 색인이 아니라 **보상해야 할 채무**다. 프로세스가 죽었다고 이용자가 넣은
- * 배터리가 사라지지 않는다. PLAN §5.3 이 불변식 표에서 이 한 줄에만 "영속 저장 필요"를
+ * 배터리가 사라지지 않는다. 불변식 가운데 이 한 줄에만 "영속 저장 필요"가
  * 달아 둔 이유이고, §6 기술선택이 H2 를 지목한 이유다.
  *
  * ### 최소로 끝낸다
  *
  * `JdbcTemplate` 하나에 테이블 하나다. JPA 도 마이그레이션 도구도 넣지 않는다 — 이 한 장부에
- * 필요한 최소를 넘는 순간 과설계다 (PLAN §11.0). 스키마는 `schema.sql` 한 장이 전부다.
+ * 필요한 최소를 넘는 순간 과설계다. 스키마는 `schema.sql` 한 장이 전부다.
  *
  * ### 멱등하게 쓴다
  *
@@ -116,7 +116,7 @@ class OutTimedOutLedger(private val jdbc: JdbcTemplate) {
      *
      * 별도 테이블로 정규화하지 않는다. 이 장부는 조회 대상이 아니라 **보상 대기 목록**이고,
      * 배터리 단위로 질의할 일이 없다. 필요해지면 그때 원문에서 펼치면 된다 — 정보는
-     * 버려지지 않았다 (PLAN §11.0).
+     * 버려지지 않았다.
      */
     private fun encode(batteries: List<BatteryData>): String {
         val array = JsonNodeFactory.instance.arrayNode()

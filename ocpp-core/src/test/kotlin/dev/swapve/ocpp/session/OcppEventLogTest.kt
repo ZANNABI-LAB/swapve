@@ -21,7 +21,7 @@ import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 /**
- * 추가 전용 이벤트 로그 (PLAN §11.1).
+ * 추가 전용 이벤트 로그.
  *
  * *"파생 상태(교환 트랜잭션 등)는 이 로그에서 계산될 수 있어야 한다. 그게 유일한 규칙이다."*
  *
@@ -75,7 +75,7 @@ class OcppEventLogTest {
         first.session.receive(callText("a2", "BatterySwap", batterySwapPayload(1, "BatteryOut")))
         advanceUntilIdle()
 
-        // PLAN §11.1 — seq 는 "스테이션 내 순서"다. 스테이션을 가로지르는 전역 순서가 아니다.
+        // seq 는 "스테이션 내 순서"다. 스테이션을 가로지르는 전역 순서가 아니다.
         assertEquals(listOf(1L, 2L, 3L, 4L), log.of("ST-A").map { it.seq })
         assertEquals(listOf(1L, 2L), log.of("ST-B").map { it.seq })
         assertEquals(6, log.size())
@@ -86,7 +86,7 @@ class OcppEventLogTest {
         val connection = TestConnection()
         val requestId = 1234
 
-        // PLAN §7.1 TC_S_103_CSMS 를 줄인 시퀀스 — 원격 개시(S02) → 입고 → 출고.
+        // TC_S_103_CSMS 를 줄인 시퀀스 — 원격 개시(S02) → 입고 → 출고.
         val remoteStart = async {
             connection.session.call(OcppCall("RequestBatterySwap", requestBatterySwapPayload(requestId)))
         }
@@ -112,10 +112,10 @@ class OcppEventLogTest {
 
         val completed = assertIs<SwapTransaction.Completed>(reconstructed, "로그만으로 교환 완료를 재구성하지 못했다")
         assertEquals(SwapKey(StationId(connection.stationId), SwapRequestId(requestId)), completed.key)
-        // PLAN §5.3 불변식 — 들어온 배터리 수 = 나간 배터리 수
+        // 불변식 — 들어온 배터리 수 = 나간 배터리 수
         assertEquals(2, completed.batteriesIn.size)
         assertEquals(2, completed.batteriesOut.size)
-        // PLAN §11.2 — 양쪽 SoC 가 다 남아 있으므로 과금이 나중에 순수 계산이 된다.
+        // 양쪽 SoC 가 다 남아 있으므로 과금이 나중에 순수 계산이 된다.
         assertEquals(listOf("1234", "5678"), completed.batteriesIn.map { it.serialNumber })
         assertEquals(listOf("4321", "8765"), completed.batteriesOut.map { it.serialNumber })
         assertTrue(completed.batteriesOut.sumOf { it.soC } > completed.batteriesIn.sumOf { it.soC })
@@ -125,7 +125,7 @@ class OcppEventLogTest {
      * 이벤트 레코드 하나를 교환 사건으로 옮긴다.
      *
      * **로그에 남은 것만 쓴다** — 세션 내부 상태도, 원래 프레임 객체도 보지 않는다.
-     * 이게 PLAN §11.1 이 요구하는 "재구성 가능하다"의 뜻이다.
+     * 이게 "이벤트 로그만으로 재구성 가능하다"의 뜻이다.
      */
     private fun toSwapEvent(record: OcppEventRecord): SwapEvent? {
         val frame = mapper.readTree(record.payload)
@@ -135,7 +135,7 @@ class OcppEventLogTest {
 
         return when (record.action) {
             // CSMS 가 보낸 원격 개시가 수락됐다는 것은 응답을 봐야 알 수 있으나, 여기서는
-            // 인가 시점만 필요하므로 요청 자체를 인가 사건으로 옮긴다 (PLAN §4.4 S02).
+            // 인가 시점만 필요하므로 요청 자체를 인가 사건으로 옮긴다 (S02).
             "RequestBatterySwap" -> SwapEvent.Authorized(
                 key = SwapKey(stationId, SwapRequestId(payload.get("requestId").intValue())),
                 idToken = idTokenOf(payload),

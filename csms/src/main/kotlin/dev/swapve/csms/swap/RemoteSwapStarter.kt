@@ -36,7 +36,7 @@ sealed interface RemoteSwapStart {
     data class Accepted(val key: SwapKey, val transaction: SwapTransaction) : RemoteSwapStart
 
     /**
-     * 스테이션이 `Rejected` 로 답했다 (PLAN §5.4 F1 = `TC_S_102_CSMS`).
+     * 스테이션이 `Rejected` 로 답했다 (F1 = `TC_S_102_CSMS`).
      *
      * 교환은 **열리지 않았다.** 사유는 스테이션이 정한다 (S02.FR.04) — 보통
      * [BatteryRejectionReason.NO_BATTERY_AVAILABLE] 이다.
@@ -56,12 +56,12 @@ sealed interface RemoteSwapStart {
 }
 
 /**
- * S02 — CSMS 가 교환을 개시한다 (PLAN §4.4).
+ * S02 — CSMS 가 교환을 개시한다.
  *
  * > *"EV Driver requests CSMS to initiate a battery swap **via a smartphone app, e.g. by
  * > scanning a QR code** or selecting the appropriate station in the app."*
  *
- * ### 왜 M7 에 있나 (PLAN §0 v3.1 범위 조정)
+ * ### 왜 M7 에 있나 (v3.1 범위 조정)
  *
  * v3 는 S02 를 M8 에 두었다. 그런데 **`TC_S_103_CSMS` 의 1단계가 CSMS 의
  * `RequestBatterySwapRequest` 발신**이다. 발신 경로가 없으면 적합성을 통과할 수 없으므로
@@ -69,11 +69,11 @@ sealed interface RemoteSwapStart {
  *
  * ### REST 컨트롤러를 만들지 않는다
  *
- * 이 클래스의 [start] 가 **발신을 촉발하는 내부 진입점의 전부**다 (PLAN §8, §10 결정 #2).
+ * 이 클래스의 [start] 가 **발신을 촉발하는 내부 진입점의 전부**다 (확정 결정 결정 #2).
  * 앱이 소비할 `POST /api/swaps` 는 M8 에서 이 함수를 부르는 얇은 껍데기가 된다 — 지금
- * 없는 소비자를 위해 엔드포인트를 미리 뚫는 것이 과설계다 (PLAN §11.0).
+ * 없는 소비자를 위해 엔드포인트를 미리 뚫는 것이 과설계다.
  *
- * ### 세션 객체를 만지지 않는다 (PLAN §11.5)
+ * ### 세션 객체를 만지지 않는다
  *
  * 발신은 [StationCommandBus] 로만 한다. 이 클래스는 `stationId` 만 알고, 그 스테이션의
  * 세션이 이 JVM 에 있는지조차 모른다. 분산이 필요해지면 버스 구현체만 바뀐다.
@@ -94,7 +94,7 @@ class RemoteSwapStarter(
      * [stationId] 에 교환을 시작하라고 지시한다.
      *
      * @param requestId 상관 번호. 생략하면 **CSMS 가 발번한다** — S02 에서 발번 주체는
-     *   CSMS 다 (PLAN §4.4 표). 스테이션은 이어지는 `BatterySwapRequest` 에 **같은 값을
+     * CSMS 다 (표). 스테이션은 이어지는 `BatterySwapRequest` 에 **같은 값을
      *   써야 한다(SHALL)** (S02.FR.02).
      */
     suspend fun start(
@@ -118,7 +118,7 @@ class RemoteSwapStarter(
         val key = SwapKey(stationId, SwapRequestId(requestId))
         val payload = requestPayload(requestId, idToken)
 
-        // 우리가 만든 요청도 공식 스키마로 자기 검증한다 (PLAN §6 설계원칙 2). 손으로 필드를
+        // 우리가 만든 요청도 공식 스키마로 자기 검증한다 (설계원칙 2). 손으로 필드를
         // 짐작하다 틀리면 스테이션이 아니라 여기서 터진다.
         val validation = validator.validateCall(BatterySwapWire.REQUEST_BATTERY_SWAP, payload)
         if (validation is PayloadValidation.Invalid) {
@@ -141,7 +141,7 @@ class RemoteSwapStarter(
      * `RequestBatterySwapResponse` 를 읽는다.
      *
      * `Accepted` 면 **여기서 교환을 연다.** S01 과 달리 CSMS 가 requestId 를 알고 있으므로
-     * PLAN §5.2 그림의 *"AUTHORIZED — requestId 확정"* 이 S02 에서는 그대로 성립한다
+     * 상태머신의 *"AUTHORIZED — requestId 확정"* 이 S02 에서는 그대로 성립한다
      * (S01 에서 왜 성립하지 않는지는 `AuthorizationRegistry` KDoc 에 적혀 있다).
      */
     private fun interpret(key: SwapKey, idToken: IdToken, response: JsonNode): RemoteSwapStart {
@@ -175,7 +175,7 @@ class RemoteSwapStarter(
         }
 
     /**
-     * 이 스테이션의 신원이 **어떻게 확인됐는지** (PLAN §11.4).
+     * 이 스테이션의 신원이 **어떻게 확인됐는지**.
      *
      * 부팅 기록에 남아 있으면 그 값을, 아직 부팅 기록이 없으면 [AuthMethod.NONE] 이다 —
      * MVP 의 모든 연결이 그 값이라 실질적 차이는 없지만, 프로파일이 올라가면 여기가

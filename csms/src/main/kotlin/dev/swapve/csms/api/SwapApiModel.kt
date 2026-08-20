@@ -12,7 +12,7 @@ import java.time.Duration
 import java.time.Instant
 
 /**
- * 앱이 보내는 교환 시작 요청 — QR 로 얻는 정보 그대로 (PLAN §3).
+ * 앱이 보내는 교환 시작 요청 — QR 로 얻는 정보 그대로.
  *
  * > **S02 - Battery Swap Remote Start**: *"EV Driver requests CSMS to initiate a battery swap
  * > via a smartphone app, e.g. by scanning a QR code or selecting the appropriate station in
@@ -20,7 +20,7 @@ import java.time.Instant
  *
  * ### `requestId` 가 없는 것이 의도다
  *
- * S02 의 발번 주체는 **CSMS** 다 (PLAN §4.4 표). 앱이 상관 번호를 정하게 두면 그 규칙이
+ * S02 의 발번 주체는 **CSMS** 다 (표). 앱이 상관 번호를 정하게 두면 그 규칙이
  * 클라이언트로 새고, 스테이션이 이어지는 `BatterySwapRequest` 에 같은 값을 써야 한다는
  * S02.FR.02 의 책임 소재가 흐려진다. 발번은 `SwapRequestIds` 한 곳에서만 일어난다.
  *
@@ -38,7 +38,7 @@ data class StartSwapRequest @JsonCreator constructor(
 /**
  * `IdTokenType` 의 REST 표현 — `(idToken, type)`.
  *
- * **사용자 테이블의 FK 가 아니라 값 객체다** (PLAN §11.3). 표준이 `type` 을 필수로 두므로
+ * **사용자 테이블의 FK 가 아니라 값 객체다**. 표준이 `type` 을 필수로 두므로
  * 계약도 둘을 함께 받는다. 로밍이 붙으면 우리 DB 에 없는 토큰이 여기로 들어온다.
  */
 data class IdTokenPayload @JsonCreator constructor(
@@ -51,7 +51,7 @@ data class IdTokenPayload @JsonCreator constructor(
 }
 
 /**
- * 교환 진행 상태 (PLAN §5.2).
+ * 교환 진행 상태.
  *
  * 도메인의 [SwapTransaction] sealed 타입을 그대로 직렬화하지 않고 여기로 옮긴다. 도메인
  * 타입의 모양이 곧 앱 계약이 되면 **상태머신을 고칠 수 없게 된다** — 필드 이름 하나를
@@ -68,14 +68,14 @@ enum class SwapStatus {
 }
 
 /**
- * 배터리 한 개 — **`serialNumber`·`soC`·`soH` 를 전부 내보낸다** (PLAN §11.2).
+ * 배터리 한 개 — **`serialNumber`·`soC`·`soH` 를 전부 내보낸다**.
  *
  * > *"the price can depend, for example, on the difference between the state of charge of the
  * > old and new batteries"* (Part 2 S. Ch.1)
  *
  * 여기서 하나라도 버리면 나중에 과금이 **기존 데이터 위의 순수 계산**이 되지 못한다.
- * 요금 계산 자체는 범위 밖이지만 (PLAN §3), 그 근거를 없애는 것은 범위 조정이 아니라
- * 되돌릴 수 없는 전제다 (PLAN §11.0).
+ * 요금 계산 자체는 범위 밖이지만, 그 근거를 없애는 것은 범위 조정이 아니라
+ * 되돌릴 수 없는 전제다.
  */
 data class BatteryView(
     val slotId: Int,
@@ -94,7 +94,7 @@ data class BatteryView(
 }
 
 /**
- * ★ 장부 불균형 — `OUT_TIMED_OUT` 교환에서 **반드시 드러나야 하는 것** (PLAN §5.3, §5.4 F2).
+ * ★ 장부 불균형 — `OUT_TIMED_OUT` 교환에서 **반드시 드러나야 하는 것** (실패 시나리오 F2).
  *
  * > **S03.FR.06** — *"Situation needs to be reported, because CSMS ends up with an
  * > **orphan BatteryIn for which a BatteryOut is missing**."*
@@ -139,7 +139,7 @@ data class SwapView(
          * 도메인 상태를 조회 결과로 옮긴다.
          *
          * [SwapTransaction.Idle] 은 교환이 아니므로 `null` 이다. 상태머신은 이상 사건을
-         * 받아도 상태를 `Idle` 그대로 돌려주고 (PLAN §5.4 F5), 그 사실이 보관소에 남는다 —
+         * 받아도 상태를 `Idle` 그대로 돌려주고 (F5), 그 사실이 보관소에 남는다 —
          * 그것을 "교환"으로 보여 주면 **열린 적 없는 교환이 조회되는** 셈이 된다.
          *
          * @param ledger 영속된 장부 불균형. `OUT_TIMED_OUT` 이 아니면 무시된다.
@@ -240,7 +240,7 @@ enum class StartSwapOutcome {
     /**
      * 스테이션이 `Rejected`. **오류가 아니다** → 200.
      *
-     * 재고 판정은 스테이션이 한다 (PLAN §4.5, S02.FR.04). 배터리가 없는 것은 시스템 장애가
+     * 재고 판정은 스테이션이 한다 (S02.FR.04). 배터리가 없는 것은 시스템 장애가
      * 아니라 정상적으로 일어나는 운영 상태이고, 앱은 그 사유를 이용자에게 보여 주면 된다.
      * 5xx 로 답하면 앱이 재시도 대상으로 오해한다.
      */
@@ -255,7 +255,7 @@ enum class StartSwapOutcome {
  *
  * @param swap [StartSwapOutcome.ACCEPTED] 일 때만. 거부는 교환을 열지 않으므로 조회할
  *   대상 자체가 없다.
- * @param reasonCode 스테이션이 보낸 `statusInfo.reasonCode` **원문** (PLAN §4.9.1). 부록
+ * @param reasonCode 스테이션이 보낸 `statusInfo.reasonCode` **원문**. 부록
  *   표 밖의 값이 와도 버리지 않는다.
  * @param reason 사전 정의 사유로 해석됐으면 그 이름. 아니면 `null` 이고 [reasonCode] 만 남는다.
  */

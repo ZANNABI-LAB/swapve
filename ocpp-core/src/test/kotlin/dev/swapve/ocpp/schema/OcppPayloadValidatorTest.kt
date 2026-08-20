@@ -15,7 +15,7 @@ import kotlin.test.assertTrue
 /**
  * M2 — 공식 스키마 검증과 CALLERROR 코드 결정 정책 (Part 4 §4.1.6, §4.2.4, §4.3).
  *
- * PLAN §7.3 L1 게이트의 "181개 공식 스키마 검증 통과" 항목에 해당한다.
+ * L1 게이트의 "181개 공식 스키마 검증 통과" 항목에 해당한다.
  */
 class OcppPayloadValidatorTest {
 
@@ -32,7 +32,7 @@ class OcppPayloadValidatorTest {
         return validation
     }
 
-    /** PLAN §7.1 TC_S_103_CSMS step 11 — 배터리 2개 세트가 공식 테스트다. */
+    /** TC_S_103_CSMS step 11 — 배터리 2개 세트가 공식 테스트다. */
     private val batteryInPayload = obj(
         """
         {
@@ -56,7 +56,7 @@ class OcppPayloadValidatorTest {
 
     @Test
     fun `TC_S_103_CSMS step 21 의 BatteryOut 페이로드도 통과한다`() {
-        // 출고 슬롯(C,D)은 입고 슬롯(A,B)과 다르다 — PLAN §7.1 읽어낼 것 2
+        // 출고 슬롯(C,D)은 입고 슬롯(A,B)과 다르다 — 적합성 케이스에서 읽어낸 것
         val payload = obj(
             """
             {
@@ -96,7 +96,7 @@ class OcppPayloadValidatorTest {
 
     @Test
     fun `공식 스키마 181개가 모두 draft-06 으로 컴파일된다`() {
-        // PLAN §7.3 L1 — 하나라도 컴파일되지 않으면 그 action 은 런타임에 NotImplemented 로 오해된다
+        // L1 게이트 — 하나라도 컴파일되지 않으면 그 action 은 런타임에 NotImplemented 로 오해된다
         OcppSchemas.names.forEach { name ->
             val validation = validator.validateAgainst(name, mapper.createObjectNode())
             val notImplemented = validation is PayloadValidation.Invalid &&

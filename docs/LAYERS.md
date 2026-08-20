@@ -38,7 +38,7 @@
 **`swap-domain` 은 `ocpp-core` 아래에 있지 않습니다.** 둘은 서로를 모릅니다 —
 main 소스에 의존이 없습니다. 프로토콜과 도메인을 잇는 것은 `csms` 의 일입니다.
 (`ocpp-core` 의 *테스트*만 `swap-domain` 을 씁니다. 이벤트 로그로 상태를 재구성할 수 있음을
-증명하는 데 상태머신이 필요해서입니다 — [PLAN §11.1](PLAN.md).)
+증명하는 데 상태머신이 필요해서입니다 — 이벤트 로그.)
 
 경계는 주석이 아니라 **`./gradlew build` 에서 도는 검사**입니다.
 
@@ -126,7 +126,7 @@ val result: OcppResult = session.call(OcppCall("RequestBatterySwap", payload))
 `call()` 은 **예외를 던지지 않습니다.** 타임아웃도 연결 끊김도 전부 `OcppResult` 값입니다.
 
 **전송 SPI 인터페이스를 두지 않았습니다.** 함수 하나를 받습니다 — 구현체가 하나뿐인
-인터페이스는 확장이 아니라 부채이기 때문입니다 ([PLAN §11.0](PLAN.md)).
+인터페이스는 확장이 아니라 부채이기 때문입니다 (설계 원칙).
 
 ### D — 도메인은 순수 상태머신입니다
 
@@ -136,7 +136,7 @@ val rebuilt:   SwapTransaction = SwapStateMachine.replay(initial, events)   // �
 ```
 
 `replay` 가 있다는 것이 감사(`auditTest`)의 근거입니다 — 이벤트 로그에서 재구성한 상태를
-인메모리 레지스트리와 대조합니다 ([PLAN §11.1](PLAN.md)).
+인메모리 레지스트리와 대조합니다 (이벤트 로그).
 
 ---
 
@@ -150,7 +150,7 @@ val rebuilt:   SwapTransaction = SwapStateMachine.replay(initial, events)   // �
 | 재접속 · 백오프 | 세션은 재접속을 시도하지 않습니다. 새 연결에는 새 세션을 만듭니다 |
 | 코루틴 스코프와 생명주기 | `close()` 는 부릅니다만, 스코프는 여러분이 소유합니다 |
 | 동시 송신 직렬화 | `transmit` 이 스레드 안전해야 합니다. `csms` 는 `ConcurrentWebSocketSessionDecorator` 를 씁니다 |
-| `ledger` · `serializer` 를 **세션보다 오래 살리기** | 둘 다 키가 `stationId` 입니다. 재접속으로 세션이 바뀌어도 멱등이 이어지려면 밖에서 보관해야 합니다 ([PLAN §5.4 F6](PLAN.md)) |
+| `ledger` · `serializer` 를 **세션보다 오래 살리기** | 둘 다 키가 `stationId` 입니다. 재접속으로 세션이 바뀌어도 멱등이 이어지려면 밖에서 보관해야 합니다 (실패 시나리오 F6) |
 
 ---
 
@@ -200,7 +200,7 @@ Java 로 세션을 세우는 시험을 쓰려다 **컴파일 단계에서 막혔
 
 이 결과가 아프지 않은 이유는 **층을 이미 갈라 두었기 때문**입니다. Java 소비자가 원하는 것은
 대개 **코덱과 스키마 검증**(JVM 진영에 2.1 코덱이 사실상 없다는 것이 배포 근거입니다 —
-[BACKLOG B07](../BACKLOG.md))이고, 그 층은 **열려 있습니다.**
+배포 계획은 B07 입니다). 그 층은 **열려 있습니다.**
 
 세션 층까지 Java 에 열려면 방법은 있습니다 — 생성자에 `@JvmOverloads`, `callTimeout` 을
 `java.time.Duration` 으로 받는 오버로드, `suspend` 를 감싼 블로킹 파사드. **지금 하지 않습니다.**

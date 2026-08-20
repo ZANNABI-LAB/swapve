@@ -119,7 +119,7 @@ class InvariantAuditTest {
     @Test
     fun `교환 완료로 입고 슬롯 충전이 닫히면 교환 충전 분리가 실패한다`() {
         val fixture = Fixture()
-        // 들어온 배터리의 충전을 교환 종료와 함께 닫아 버렸다 — PLAN §5.1 이 금지하는 상황이다.
+        // 들어온 배터리의 충전을 교환 종료와 함께 닫아 버렸다 — 두 생명주기를 합치면 안 된다는 규칙이 금지하는 상황이다.
         fixture.endIncomingCharging = true
 
         assertFails(fixture, "교환/충전 분리", "교환 완료와 함께 끊겼다")

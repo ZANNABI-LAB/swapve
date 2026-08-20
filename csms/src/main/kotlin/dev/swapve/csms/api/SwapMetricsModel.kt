@@ -5,7 +5,7 @@ import java.time.Instant
 import kotlin.math.ceil
 
 /**
- * 소요시간 분포 — **평균만으로는 쓸모가 적다** (PLAN §2 S5).
+ * 소요시간 분포 — **평균만으로는 쓸모가 적다** (S5).
  *
  * 교환 소요시간은 대칭 분포가 아니다. 대부분 수십 초에 끝나고 소수가 이용자 사정으로 길게
  * 끌린다. 그런 분포에서 평균 하나는 "빠른 것도 느린 것도 아닌, 아무도 겪지 않은 값"이
@@ -75,14 +75,14 @@ data class SwapCounts(
 )
 
 /**
- * ★ **실패 사유 — "실패 12건"은 정보가 아니다** (PLAN §2 S5).
+ * ★ **실패 사유 — "실패 12건"은 정보가 아니다** (S5).
  *
- * PLAN §5.4 의 F1~F6 과 §4.9.1 의 `reasonCode` 두 축으로 각각 센다. 한 축으로만 세면
+ * F1~F6 과 배터리 거부 `reasonCode` 두 축으로 각각 센다. 한 축으로만 세면
  * *"거부 3건"* 이 배터리 부족인지 미등록 배터리인지 알 수 없다.
  *
  * @param byScenario **실패인 시나리오만** — F1(배터리 부족)·F2(수령 타임아웃)·F3(미등록
  *   배터리)·F5(순서 위반). F4·F6 은 여기 없다 ([SwapIdempotencyMetrics] 참조).
- * @param byReasonCode 부록 `reason_codes.csv` 의 사유별 (PLAN §4.9.1). F1 의
+ * @param byReasonCode 부록 `reason_codes.csv` 의 사유별. F1 의
  *   `RequestBatterySwapResponse.statusInfo` 와 F3 의 `customData.statusInfo` 가 **같은 표를
  *   쓰므로 한 map 에 모은다.**
  * @param byAnomalyReason F5 의 세부 — 인가 없음/키 불일치/수량 불일치 …
@@ -113,7 +113,7 @@ data class SwapFailureMetrics(
  * - [sessionReplays] (F6) — 같은 messageId 재전송. **M4 멱등 원장**이 상위 계층을 부르지도
  *   않고 저장된 응답을 그대로 냈다. 그래서 상태머신 기록에는 아무것도 없고, 대신
  *   **이벤트 로그에 같은 `(stationId, messageId)` 의 수신 CALL 이 두 번** 남아 있다
- *   (PLAN §11.1 — 파생 상태는 이 로그에서 계산될 수 있어야 한다).
+ * (파생 상태는 이 로그에서 계산될 수 있어야 한다).
  */
 data class SwapIdempotencyMetrics(
     val byScenario: Map<String, Int>,
@@ -126,7 +126,7 @@ data class SwapIdempotencyMetrics(
  * 영속 장부 — **다른 질문에 답한다.**
  *
  * 위의 모든 수치는 *"이 프로세스가 본 교환"* 에 대한 것이라 재시작하면 0 부터 다시 센다.
- * 이 블록만은 H2 에서 읽으므로 **재시작을 가로질러 남는다** (PLAN §5.3 — `OUT_TIMED_OUT` 만
+ * 이 블록만은 H2 에서 읽으므로 **재시작을 가로질러 남는다** (`OUT_TIMED_OUT` 만
  * 영속). 보상해야 할 채무의 총계이지 이번 관측 구간의 실패 수가 아니다. 두 값이 다르다고
  * 해서 어느 한쪽이 틀린 것이 아니다.
  */
@@ -136,7 +136,7 @@ data class SwapLedgerMetrics(
 )
 
 /**
- * `GET /api/metrics/swaps` — **성공 기준 S5** (PLAN §2).
+ * `GET /api/metrics/swaps` — **성공 기준 S5**.
  *
  * > *"교환 성공률·소요시간·실패 사유가 REST 로 조회"*
  *

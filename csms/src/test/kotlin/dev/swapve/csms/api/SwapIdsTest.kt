@@ -8,7 +8,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
 /**
- * 복합키의 URL 표현 (PLAN §5.3).
+ * 복합키의 URL 표현.
  *
  * 교환은 `(stationId, requestId)` 로만 유일하므로 `{id}` 하나에 둘이 들어간다. 콜론이
  * 구분자로 안전한 근거는 **Part 4 §3.1.1 이 스테이션 식별자에 콜론을 금지**한다는 것이고,
@@ -47,7 +47,7 @@ class SwapIdsTest {
             "CS001:",
             "CS001:abc",
             "CS001:4.2",
-            // Int 범위를 넘는 값. requestId 는 스키마상 integer 다 (PLAN §4.3).
+            // Int 범위를 넘는 값. requestId 는 스키마상 integer 다.
             "CS001:99999999999",
         ).forEach { assertNull(SwapIds.parse(it), "'$it' 이 상관키로 읽혔다") }
     }

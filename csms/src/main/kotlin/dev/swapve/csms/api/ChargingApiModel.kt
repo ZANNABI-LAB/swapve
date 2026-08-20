@@ -5,7 +5,7 @@ import dev.swapve.ocpp.swap.BatterySwapWire
 import java.time.Instant
 
 /**
- * 충전 트랜잭션의 진행 상태 (S04, PLAN §4.10).
+ * 충전 트랜잭션의 진행 상태 (S04).
  *
  * 원문의 `chargingState` 문자열을 그대로 내보내지 않는다. 그 값은 표준이 늘릴 수 있고
  * (`SuspendedEV` 등), 앱·운영 도구가 알아야 하는 것은 **"충전 중인가 · 멈췄나 · 끝났나"**
@@ -36,7 +36,7 @@ enum class ChargingStatus {
 /**
  * 충전 트랜잭션 1건의 조회 결과 — `GET /api/stations/{stationId}/charging-transactions/{transactionId}`.
  *
- * ### 교환 조회와 **다른 자원**이다 (PLAN §5.1)
+ * ### 교환 조회와 **다른 자원**이다
  *
  * 경로부터 다르다. 충전은 스테이션의 슬롯에 매인 것이고 교환은 이용자의 요청에 매인 것이라,
  * 한 자원으로 합치면 *"교환이 끝났는데 충전은 계속된다"* 를 표현할 수 없다. [swapId] 같은
@@ -45,7 +45,7 @@ enum class ChargingStatus {
  * @param slotId 어느 슬롯(EVSE)의 충전인가.
  * @param batterySerialNumber 어느 배터리인가. 교환으로 들어온 배터리면 값이 있고, 부팅
  *   시점부터 꽂혀 있던 배터리는 `null` 이다 — `TransactionEvent` 가 일련번호를 싣지 않아
- *   **CSMS 가 정말로 모른다**. 알고 싶으면 `GetVariables` 로 물어야 한다 (PLAN §4.5).
+ * **CSMS 가 정말로 모른다**. 알고 싶으면 `GetVariables` 로 물어야 한다.
  * @param socPercent 마지막으로 보고된 SoC (S04.FR.04). 계량값을 받지 못했으면 `null` 이다 —
  *   0 으로 채우면 "0% 로 측정됐다"는 거짓이 된다.
  */

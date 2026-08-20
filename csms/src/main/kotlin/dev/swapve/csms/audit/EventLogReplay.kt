@@ -12,16 +12,16 @@ import dev.swapve.swap.SlotState
 import java.time.Instant
 
 /**
- * ★ **이벤트 로그에서 파생 상태를 되살린다** (PLAN §11.1).
+ * ★ **이벤트 로그에서 파생 상태를 되살린다**.
  *
- * §11.1 은 이벤트 로그에 대해 규칙을 딱 하나만 둔다:
+ * 이벤트 로그 은 이벤트 로그에 대해 규칙을 딱 하나만 둔다:
  *
  * > *"파생 상태(교환 트랜잭션 등)는 이 로그에서 계산될 수 있어야 한다. 그게 유일한 규칙이다."*
  *
  * 그 규칙은 산문으로 두면 지켜지는지 알 수 없다. 여기서 **로그 원문만 읽어** 교환·슬롯·충전
  * 상태를 다시 계산하고, 감사가 그 결과를 인메모리 레지스트리와 대조한다. 둘이 어긋나면
  * 그 자체가 감사 실패다 — 레지스트리에만 있고 로그로는 설명되지 않는 상태가 있다는 뜻이고,
- * 그러면 재시작 복구(BACKLOG B02)도 수평 확장(§11.5)도 근거를 잃는다.
+ * 그러면 재시작 복구도 수평 확장(수평 확장 여지)도 근거를 잃는다.
  *
  * ### 레지스트리를 참조하지 않는다
  *
@@ -43,12 +43,12 @@ object EventLogReplay {
     )
 
     /**
-     * 로그에서 되살린 교환 한 건. 상관키는 `(stationId, requestId)` 복합키다 (PLAN §5.3).
+     * 로그에서 되살린 교환 한 건. 상관키는 `(stationId, requestId)` 복합키다.
      *
      * @param authorizedBeforeFirstEvent 첫 교환 사건 이전에 그 토큰의 인가가 로그에 있었는가.
      *   CSMS 는 인가 기록이 없으면 교환을 열지 않는다 (`SwapCoordinator`), 그래서 재구성도
      *   그 규칙을 그대로 따른다 — 없는 인가를 지어내면 대조가 무의미해진다.
-     * @param duplicateEvents 같은 반쪽이 두 번 온 횟수. 멱등 무시 대상이다 (PLAN §5.4 F4).
+     * @param duplicateEvents 같은 반쪽이 두 번 온 횟수. 멱등 무시 대상이다 (F4).
      */
     data class ReplaySwap(
         val stationId: String,
@@ -68,7 +68,7 @@ object EventLogReplay {
     ) {
         val isCompleted: Boolean get() = batteriesIn.isNotEmpty() && batteriesOut.isNotEmpty() && !outTimedOut
 
-        /** 이 교환이 건드린 슬롯 전부 — 입고 슬롯과 출고 슬롯은 다르다 (PLAN §7.1). */
+        /** 이 교환이 건드린 슬롯 전부 — 입고 슬롯과 출고 슬롯은 다르다. */
         val slots: Set<Int> get() = (batteriesIn + batteriesOut).map { it.slotId }.toSet()
     }
 
@@ -85,7 +85,7 @@ object EventLogReplay {
         val socPercent: Double?,
     )
 
-    /** 로그에서 되살린 충전 트랜잭션 (S04). 교환과 **다른 키**다 (PLAN §5.1). */
+    /** 로그에서 되살린 충전 트랜잭션 (S04). 교환과 **다른 키**다. */
     data class ReplayCharging(
         val stationId: String,
         val transactionId: String,
@@ -150,7 +150,7 @@ object EventLogReplay {
      *
      * 인가는 `(stationId, idToken)` 기준으로 성립하고 (M5 `AuthorizationRegistry`), 상관키는
      * 첫 `BatterySwap` 이 실어 오는 `requestId` 에서 확정된다 — S01 의 requestId 는 스테이션이
-     * 발번하기 때문이다 (PLAN §4.4).
+     * 발번하기 때문이다.
      */
     private fun replaySwaps(stationId: String, records: List<OcppEventRecord>): Map<Int, ReplaySwap> {
         val grants = mutableSetOf<String>()
@@ -217,7 +217,7 @@ object EventLogReplay {
                             if (base.batteriesIn.isEmpty()) {
                                 base.copy(batteriesIn = batteries, lastSeq = record.seq, inAt = record.occurredAt)
                             } else {
-                                // 같은 반쪽이 또 왔다 — 멱등 무시 대상이다 (PLAN §5.4 F4).
+                                // 같은 반쪽이 또 왔다 — 멱등 무시 대상이다 (F4).
                                 base.copy(duplicateEvents = base.duplicateEvents + 1, lastSeq = record.seq)
                             }
 
@@ -237,7 +237,7 @@ object EventLogReplay {
             }
         }
 
-        // 인가 없이 온 교환 사건은 CSMS 가 열지 않는다 (PLAN §5.4 F5). 재구성도 그렇게 한다.
+        // 인가 없이 온 교환 사건은 CSMS 가 열지 않는다 (F5). 재구성도 그렇게 한다.
         return swaps.filterValues { it.authorizedBeforeFirstEvent }
     }
 
@@ -249,7 +249,7 @@ object EventLogReplay {
     /**
      * 슬롯 점유 상태 재구성 — `NotifyEvent` 의 `Connector`/`AvailabilityState` 만 읽는다.
      *
-     * **반전은 [AvailabilityState] 한 곳에서만 일어난다** (PLAN §4.2). 감사 코드가 `"Occupied"`
+     * **반전은 [AvailabilityState] 한 곳에서만 일어난다**. 감사 코드가 `"Occupied"`
      * 를 직접 해석하면 CSMS 와 같은 실수를 독립적으로 반복할 수 있으므로, 프로덕션 코드가
      * 지나는 그 문을 그대로 지난다.
      */
@@ -278,7 +278,7 @@ object EventLogReplay {
         return states to observedAt
     }
 
-    /** 충전 트랜잭션 재구성 — `TransactionEvent` 만으로. 교환을 참조하지 않는다 (PLAN §5.1). */
+    /** 충전 트랜잭션 재구성 — `TransactionEvent` 만으로. 교환을 참조하지 않는다. */
     private fun replayCharging(stationId: String, records: List<OcppEventRecord>): Map<String, ReplayCharging> {
         val transactions = LinkedHashMap<String, ReplayCharging>()
 
@@ -321,7 +321,7 @@ object EventLogReplay {
     }
 
     /**
-     * CALL ↔ 응답 짝짓기 — **유실 메시지 0** 을 판정하는 근거다 (PLAN §5.3).
+     * CALL ↔ 응답 짝짓기 — **유실 메시지 0** 을 판정하는 근거다.
      *
      * 짝은 `messageId` 로 맺어지고 **방향이 반대**여야 한다. 우리가 받은 CALL 의 응답은 우리가
      * 보낸 것이고, 우리가 보낸 CALL 의 응답은 상대가 보낸 것이다. 응답이 없는 CALL 이 유실이고,

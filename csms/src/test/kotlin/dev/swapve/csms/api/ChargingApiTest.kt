@@ -20,9 +20,9 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /**
- * 충전 트랜잭션 조회 API (S04, PLAN §10 결정 #2 — **REST 조회까지가 범위**).
+ * 충전 트랜잭션 조회 API (S04).
  *
- * ### 교환 조회와 **다른 자원**임을 고정한다 (PLAN §5.1)
+ * ### 교환 조회와 **다른 자원**임을 고정한다
  *
  * 이 시험이 확인하는 핵심은 필드 하나하나가 아니라 **경로의 소속**이다. 충전은 스테이션의
  * 슬롯에 매인 것이라 `/api/stations/{stationId}/charging-transactions` 아래 있고, 교환이
@@ -76,7 +76,7 @@ class ChargingApiTest {
             assertEquals("ENDED", ended.path("status").asText(), "슬롯 $slotId")
         }
 
-        // — 들어온 배터리의 충전은 그대로 살아 있다 (PLAN §5.1).
+        // — 들어온 배터리의 충전은 그대로 살아 있다.
         ChargingScenario.INSERT_SLOTS.forEach { slotId ->
             val live = assertNotNull(body.firstOrNull { it.path("slotId").asInt() == slotId })
             assertTrue(live.path("status").asText() != "ENDED", "슬롯 $slotId 의 충전이 교환과 함께 닫혔다")

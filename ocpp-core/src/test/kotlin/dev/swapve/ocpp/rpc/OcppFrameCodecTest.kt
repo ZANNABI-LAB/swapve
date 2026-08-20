@@ -77,7 +77,7 @@ class OcppFrameCodecTest {
 
     @Test
     fun `TC_S_103_CSMS 의 BatterySwap CALL 을 왕복한다`() {
-        // PLAN §7.1 step 11 — 배터리 2개 세트가 공식 테스트다
+        // TC_S_103_CSMS step 11 — 배터리 2개 세트가 공식 테스트다
         val text = """[2,"${'$'}wapVe0000001","BatterySwap",""" +
             """{"eventType":"BatteryIn","requestId":42,"idToken":{"idToken":"1234","type":"ISO14443"},""" +
             """"batteryData":[{"evseId":1,"serialNumber":"1234","soC":23,"soH":85},""" +

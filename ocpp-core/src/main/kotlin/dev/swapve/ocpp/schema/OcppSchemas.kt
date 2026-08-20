@@ -3,7 +3,7 @@ package dev.swapve.ocpp.schema
 /**
  * OCA 공식 OCPP 2.1 JSON Schema 원문에 대한 클래스패스 접근자.
  *
- * 스키마는 코드로 옮겨 적지 않는다 (PLAN §6 설계원칙 2). 표준이 바뀌면 `schemas/` 의
+ * 스키마는 코드로 옮겨 적지 않는다 (설계원칙 2). 표준이 바뀌면 `schemas/` 의
  * `.json` 파일만 교체하면 된다.
  *
  * 이름은 OCPP action 이름 + `Request`/`Response` 다. 예: `BatterySwapRequest`.

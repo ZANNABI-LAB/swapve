@@ -5,11 +5,11 @@ import kotlinx.coroutines.sync.withLock
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * 스테이션 단위 직렬화 (PLAN §11.5).
+ * 스테이션 단위 직렬화.
  *
  * ### 키가 `stationId` 다. 세션 객체가 아니다.
  *
- * PLAN §11.5 가 "막히는 전제"로 지목한 것이 `synchronized(session)` 이다. 세션 객체로 락을
+ * 수평 확장을 막는 전제가 `synchronized(session)` 이다. 세션 객체로 락을
  * 잡으면 그 락은 **이 JVM 안에서만** 의미가 있고, 재접속으로 세션이 바뀌면 같은 스테이션인데
  * 다른 락이 된다. `stationId` 로 잡으면 지금은 로컬 락이고, 나중에 분산되면 **그대로
  * 파티셔닝 키**가 된다. 호출부는 한 줄도 바뀌지 않는다.

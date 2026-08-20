@@ -9,8 +9,8 @@ import dev.swapve.swap.SwapRequestId
  *
  * ### 왜 합성 식별자인가
  *
- * 교환은 `(stationId, requestId)` **복합키**로만 유일하다 (PLAN §5.3). `requestId` 는 스테이션
- * 범위에서만 유일하므로 단독으로는 교환을 가리키지 못한다. 그런데 PLAN §3 의 앱 계약은
+ * 교환은 `(stationId, requestId)` **복합키**로만 유일하다. `requestId` 는 스테이션
+ * 범위에서만 유일하므로 단독으로는 교환을 가리키지 못한다. 그런데 앱 계약은
  * `GET /api/swaps/{id}` 한 자리를 약속했다. 둘을 다 지키려면 복합키를 **한 토큰으로 인코딩**해야
  * 한다.
  *
@@ -23,7 +23,7 @@ import dev.swapve.swap.SwapRequestId
  *
  * 구분자를 새로 발명하거나(`__`) 별도의 대리 키를 발번하지 않은 이유가 그것이다. 대리 키를
  * 두면 그것을 어딘가에 저장해야 하고, 그 순간 이벤트 로그에서 재구성할 수 없는 상태가
- * 하나 생긴다 (PLAN §11.1).
+ * 하나 생긴다.
  */
 object SwapIds {
 

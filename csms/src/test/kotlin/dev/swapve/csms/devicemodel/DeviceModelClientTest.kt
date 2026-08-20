@@ -23,14 +23,14 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
- * ★ **디바이스 모델 조회·설정** (PLAN §4.9, S04.FR.05/06/10/12).
+ * ★ **디바이스 모델 조회·설정** (S04.FR.05/06/10/12).
  *
  * 실제 소켓 위에서 돈다. CSMS 가 `GetVariablesRequest`/`SetVariablesRequest` 를 M4 의
  * `StationCommandBus` 로 내보내고, 시뮬레이터가 자기 디바이스 모델로 답한다.
  *
  * ### 여기서 확인하는 것
  *
- * - **S04.FR.12** — `BatteryCartridge.SoC` 로 슬롯의 배터리 충전 상태를 묻는다. PLAN §4.5 가
+ * - **S04.FR.12** — `BatteryCartridge.SoC` 로 슬롯의 배터리 충전 상태를 묻는다. 스펙이
  *   *"CSMS 가 재고를 알고 싶다면"* 의 수단으로 든 바로 그 길이다.
  * - **S04.FR.06/10** — `MaxSoc < TargetSoC` 는 **스테이션이 거부한다.** CSMS 는 그 답을
  *   받아 기록할 뿐이고, 미리 막지 않는다 (판정 주체의 근거는 `DeviceModelVariables` KDoc).
@@ -110,7 +110,7 @@ class DeviceModelClientTest {
     @Test
     fun `변수 두 개로 모델링한 이름은 스테이션이 알지 못한다`() {
         withStation("CS-DM-WRONG-NAME") { stationId ->
-            // Part 2 본문의 축약 표기다. 정본(부록 CSV)에는 없는 변수다 (PLAN §4.9 주의 1).
+            // Part 2 본문의 축약 표기다. 정본(부록 CSV)에는 없는 변수다 (주의 1).
             val wrong = VariableRef(DeviceModelVariables.COMPONENT_BATTERY_SWAP_CTRLR, "BatterySwapInTimeout")
             val answered = assertIs<DeviceModelQuery.Answered>(deviceModel.get(stationId, wrong))
 
@@ -206,7 +206,7 @@ class DeviceModelClientTest {
     /**
      * 부팅까지 마친 스테이션 하나를 띄우고 [block] 을 돌린다.
      *
-     * @return 오간 프레임 원문 전부 (PLAN §11.1 이벤트 로그).
+     * @return 오간 프레임 원문 전부 (이벤트 로그).
      */
     private fun withStation(
         stationId: String,

@@ -20,7 +20,7 @@ application {
 }
 
 /**
- * **JDK 와 station-sim 으로 끝낸다** (PLAN §6 기술선택).
+ * **JDK 와 station-sim 으로 끝낸다** (기술선택).
  *
  * 콘솔은 시험계를 조종하는 화면이지 또 하나의 서버가 아니다. Spring 도 Ktor 도 들이지
  * 않고 HTTP 는 JDK 내장 `com.sun.net.httpserver` 로, 화면은 정적 HTML 한 장으로 끝낸다 —
@@ -53,9 +53,9 @@ val allowedCompileDependencies = setOf(
 
 /** 소스에 나타나면 안 되는 것들. 이유는 값이 아니라 문장으로 남긴다. */
 val forbiddenMainPatterns = mapOf(
-    "org.springframework" to "콘솔은 Spring 을 쓰지 않는다 — HTTP 는 JDK 내장 서버다 (PLAN §6)",
-    "io.ktor" to "콘솔은 Ktor 를 쓰지 않는다 — HTTP 는 JDK 내장 서버다 (PLAN §6)",
-    "io.netty" to "Netty 를 쓰지 않는다 (PLAN §6)",
+    "org.springframework" to "콘솔은 Spring 을 쓰지 않는다 — HTTP 는 JDK 내장 서버다",
+    "io.ktor" to "콘솔은 Ktor 를 쓰지 않는다 — HTTP 는 JDK 내장 서버다",
+    "io.netty" to "Netty 를 쓰지 않는다",
     "okhttp3" to "외부 HTTP 라이브러리를 쓰지 않는다 — JDK 내장을 쓴다",
     "javax.servlet" to "서블릿 컨테이너를 쓰지 않는다 — JDK 내장 HTTP 서버를 쓴다",
     "jakarta.servlet" to "서블릿 컨테이너를 쓰지 않는다 — JDK 내장 HTTP 서버를 쓴다",
@@ -90,7 +90,7 @@ val checkNoForbiddenDependencies by tasks.registering {
             .sorted()
 
         check(offendingModules.isEmpty()) {
-            "sim-console 은 JDK 와 station-sim 으로 끝낸다 (PLAN §6): ${offendingModules.joinToString()}"
+            "sim-console 은 JDK 와 station-sim 으로 끝낸다: ${offendingModules.joinToString()}"
         }
 
         fun scan(files: Iterable<File>, needles: Map<String, String>) = files.sortedBy { it.path }.flatMap { file ->
@@ -104,7 +104,7 @@ val checkNoForbiddenDependencies by tasks.registering {
         val offendingLines = scan(mainSources.files, patterns) + scan(assets.files, assetPatterns)
 
         check(offendingLines.isEmpty()) {
-            "sim-console 이 금지된 것을 참조한다 (PLAN §6):\n" + offendingLines.joinToString("\n")
+            "sim-console 이 금지된 것을 참조한다:\n" + offendingLines.joinToString("\n")
         }
     }
 }

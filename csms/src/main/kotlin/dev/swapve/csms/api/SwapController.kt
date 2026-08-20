@@ -22,7 +22,7 @@ import org.springframework.web.bind.annotation.RestController
 import java.net.URI
 
 /**
- * ★ **표준 S02 의 클라이언트 계약** — 앱이 소비하는 교환 API (PLAN §3, §6).
+ * ★ **표준 S02 의 클라이언트 계약** — 앱이 소비하는 교환 API (설계 원칙).
  *
  * ### 이 API 는 곁다리가 아니다
  *
@@ -33,11 +33,11 @@ import java.net.URI
  * > in the app."*
  *
  * 즉 `앱 → CSMS → RequestBatterySwap → 스테이션` 이 **표준 유즈케이스**다. 앱 구현은 범위
- * 밖이지만 (PLAN §3 — *"구현 제외, 계약은 설계"*), 그 계약은 여기에 있다.
+ * 밖이지만 (*"구현 제외, 계약은 설계"*), 그 계약은 여기에 있다.
  *
  * ### 발신 로직을 다시 구현하지 않는다
  *
- * S02 발신은 **M7 에서 이미 끝났다** (PLAN §0 v3.1 범위 조정 — `TC_S_103_CSMS` 의 1단계가
+ * S02 발신은 **M7 에서 이미 끝났다** (M7 범위 조정 — `TC_S_103_CSMS` 의 1단계가
  * CSMS 의 `RequestBatterySwapRequest` 발신이라 적합성보다 앞설 수 없었다). 이 컨트롤러가
  * 하는 일은 [RemoteSwapStarter.start] 를 **부르고 그 결과를 HTTP 로 옮기는 것**뿐이다.
  * 인가 판정(S02.FR.03)도, 스키마 자기검증도, `StationCommandBus` 발신도 전부 그 아래에 있다.
@@ -65,7 +65,7 @@ class SwapController(
     private val log = LoggerFactory.getLogger(javaClass)
 
     /**
-     * 교환을 시작한다 — `POST /api/swaps` (PLAN §3).
+     * 교환을 시작한다 — `POST /api/swaps`.
      *
      * | 결말 | HTTP | 왜 |
      * |---|---|---|
@@ -93,7 +93,7 @@ class SwapController(
                 request.idToken?.type.orEmpty(),
             )
         } catch (e: IllegalArgumentException) {
-            // 도메인 값 객체의 불변식이다 (PLAN §11.3 — (idToken, type) 값 객체). 여기서
+            // 도메인 값 객체의 불변식이다 ((idToken, type) 값 객체). 여기서
             // 다시 검증하지 않고 그 판정을 그대로 400 으로 옮긴다.
             return badRequest(e.message ?: "idToken 이 올바르지 않다")
         }
@@ -115,7 +115,7 @@ class SwapController(
     }
 
     /**
-     * 교환 진행 상태 — `GET /api/swaps/{id}` (PLAN §3).
+     * 교환 진행 상태 — `GET /api/swaps/{id}`.
      *
      * 없으면 **404** 다. 식별자의 모양이 틀린 경우도 같다 — [SwapIds.parse] KDoc 참조.
      *

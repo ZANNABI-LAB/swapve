@@ -17,7 +17,7 @@ import java.time.Clock
  * M4 세션 계층의 조립 — **공유되는 것들을 싱글턴으로 한 번만 만든다.**
  *
  * 여기 있는 것은 전부 `ocpp-core` 의 클래스다. 그 모듈은 Spring 을 모르고
- * (PLAN §6 설계원칙 1), Spring 은 그 사실을 모른 채로 조립만 한다. 어느 쪽도 서로의 애노테이션을
+ * (설계원칙 1), Spring 은 그 사실을 모른 채로 조립만 한다. 어느 쪽도 서로의 애노테이션을
  * 필요로 하지 않는다는 것이 요점이다 — 그래서 `ocpp-core` 의 `checkNoFrameworkImports` 가
  * 계속 통과한다.
  */
@@ -51,17 +51,17 @@ class OcppInfrastructureConfig {
      * 수신 CALL 멱등 원장.
      *
      * 키가 `(stationId, messageId)` 라서 **재접속으로 세션이 바뀌어도 이어진다.** 그것이
-     * 재전송된 CALL 이 부수효과를 두 번 일으키지 않는 이유다 (PLAN §5.4 F6).
+     * 재전송된 CALL 이 부수효과를 두 번 일으키지 않는 이유다 (F6).
      */
     @Bean
     fun inboundCallLedger(): InboundCallLedger = InboundCallLedger()
 
-    /** per-station 메시지 직렬화. 락 키가 `stationId` 다 — 훗날의 파티셔닝 키와 같다 (PLAN §11.5). */
+    /** per-station 메시지 직렬화. 락 키가 `stationId` 다 — 훗날의 파티셔닝 키와 같다. */
     @Bean
     fun stationSerializer(): StationSerializer = StationSerializer()
 
     /**
-     * 추가 전용 이벤트 로그 (PLAN §11.1).
+     * 추가 전용 이벤트 로그.
      *
      * JDBC 로 영속한다. 파생 상태 복구의 원장은 이 원문 로그다.
      */
@@ -72,7 +72,7 @@ class OcppInfrastructureConfig {
     fun sessionRegistry(): SessionRegistry = SessionRegistry()
 
     /**
-     * 스테이션에 명령을 보내는 **유일한** 통로 (PLAN §11.5).
+     * 스테이션에 명령을 보내는 **유일한** 통로.
      *
      * 상위 계층은 세션 객체를 받지 못하고 언제나 `stationId` 로 지시한다. 분산이 필요해지면
      * 이 빈만 바뀐다.

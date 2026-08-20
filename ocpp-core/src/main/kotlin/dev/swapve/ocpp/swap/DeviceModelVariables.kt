@@ -4,7 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.node.ObjectNode
 
 /**
- * 디바이스 모델 변수 하나를 가리키는 **3요소 식별자** (PLAN §4.9).
+ * 디바이스 모델 변수 하나를 가리키는 **3요소 식별자**.
  *
  * ### ★ 왜 `(component, variable)` 두 개로는 부족한가
  *
@@ -17,14 +17,14 @@ import com.fasterxml.jackson.databind.node.ObjectNode
  * | `BatterySwapCtrlr` | `Timeout` | `Out` | 제공된 배터리 수령 대기 → `BatteryOutTimeout` |
  *
  * **`BatterySwapInTimeout` / `BatterySwapOutTimeout` 이라는 변수 두 개가 아니다.** Part 2
- * 본문의 그 표기는 축약형이고, 정본은 부록 `dm_components_vars.csv` 다 (PLAN §4.9 주의 1).
+ * 본문의 그 표기는 축약형이고, 정본은 부록 `dm_components_vars.csv` 다 (주의 1).
  * 변수 두 개로 모델링하면 스테이션의 실제 디바이스 모델과 어긋나 `GetVariables` 가 영영
  * `UnknownVariable` 을 받는다. 그래서 이 타입에는 **`Timeout` 이라는 이름 하나에
  * [variableInstance] 를 붙이는 길밖에 없다** — 두 개짜리 모델을 만들 자리를 아예 두지 않았다.
  *
  * ### 대소문자는 정본 그대로 쓰되, 비교는 대소문자를 가리지 않는다
  *
- * 정본의 표기가 일관되지 않다 — `TargetSo`**`C`** 인데 `MaxSo`**`c`** 다 (PLAN §4.9 주의 2).
+ * 정본의 표기가 일관되지 않다 — `TargetSo`**`C`** 인데 `MaxSo`**`c`** 다 (주의 2).
  * 우리가 "고쳐서" 보내면 상대가 못 알아듣는다. 그래서 [DeviceModelVariables] 의 상수는
  * 정본 철자를 그대로 들고 있고, 대신 **동일성 판정은 [identity] 로 대소문자를 무시**한다 —
  * 공식 스키마가 `name`/`instance` 를 두고 *"Case Insensitive"* 라고 못박았기 때문이다
@@ -119,7 +119,7 @@ data class VariableRef(
  * `GetVariableStatusEnumType` 과 `SetVariableStatusEnumType` 이 공유하는 값들이다.
  * `SetVariableStatusEnumType` 에만 있는 `RebootRequired` 는 **넣지 않았다** — 재부팅이
  * 필요한 변수를 우리가 하나도 갖고 있지 않은데 값을 만들어 두면, 그걸 언젠가 쓰게 된다
- * (PLAN §11.0).
+ *.
  */
 enum class VariableStatus(val wireValue: String) {
 
@@ -142,7 +142,7 @@ enum class VariableStatus(val wireValue: String) {
  * 변수 하나에 대한 **조회 결과** (`GetVariableResultType`).
  *
  * 스테이션이 만들고 CSMS 가 읽는다. 두 모듈이 같은 타입을 쓰는 것이 요점이다 — 각자
- * 손으로 필드를 꺼내면 인스턴스를 빠뜨린 쪽이 조용히 다른 변수의 답을 읽게 된다 (PLAN §7.2).
+ * 손으로 필드를 꺼내면 인스턴스를 빠뜨린 쪽이 조용히 다른 변수의 답을 읽게 된다.
  *
  * @param value 받아들여지지 않았으면 `null` 이다. 스키마가 그렇게 규정한다 —
  *   *"This field can only be empty when the given status is NOT accepted."*
@@ -204,7 +204,7 @@ data class VariableWrite(
 }
 
 /**
- * 배터리 교환이 쓰는 디바이스 모델 변수 — **정본은 부록 `dm_components_vars.csv`** (PLAN §4.9).
+ * 배터리 교환이 쓰는 디바이스 모델 변수 — **정본은 부록 `dm_components_vars.csv`**.
  *
  * | Component | Variable | Instance | 용도 |
  * |---|---|---|---|
@@ -226,7 +226,7 @@ data class VariableWrite(
  *    (`SetVariablesResponse.json`), 그 값을 채우는 쪽은 스테이션이다. 표준이 판정의 자리를
  *    이미 정해 두었다.
  * 2. **디바이스 모델의 소유자가 스테이션이다.** 재고 판정을 스테이션이 하는 것과 같은
- *    이유다 (PLAN §4.5 — v2 의 "CSMS 가 알아야 한다"는 잘못된 전제였다). CSMS 가 아는
+ * 이유다 (v2 의 "CSMS 가 알아야 한다"는 잘못된 전제였다). CSMS 가 아는
  *    `TargetSoC` 는 **마지막으로 조회한 값**이고, 그 사이 다른 CSMS 나 로컬 설정이 바꿨을 수
  *    있다. 낡은 값에 근거해 미리 거부하면 정상 설정이 막힌다.
  * 3. **거부를 못 보게 되는 것이 더 나쁘다.** CSMS 가 앞에서 걸러 버리면 스테이션이 실제로
@@ -237,7 +237,7 @@ data class VariableWrite(
  * ### ★ `SwapOrder` 는 **정본 목록에 없는데도** 여기 있다
  *
  * `BatterySwapCtrlr.SwapOrder` 는 **부록 CSV(`dm_components_vars.csv`)에 없고 Part 2
- * 본문(S03 Remark, S03.FR.07)에만 있다** (PLAN §4.9 주의 3). 위 표의 다른 변수들과 근거의
+ * 본문(S03 Remark, S03.FR.07)에만 있다** (주의 3). 위 표의 다른 변수들과 근거의
  * 층이 다르다는 뜻이다.
  *
  * 그래도 본문을 따라 [swapOrder] 를 두고 `GetBaseReport(FullInventory)` 보고에 싣는다.
@@ -261,7 +261,7 @@ object DeviceModelVariables {
 
     const val VARIABLE_ID_TOKEN = "IdToken"
 
-    /** **변수 하나**다. `In`/`Out` 은 [INSTANCE_IN]/[INSTANCE_OUT] 인스턴스로 갈린다 (§4.9 주의 1). */
+    /** **변수 하나**다. `In`/`Out` 은 [INSTANCE_IN]/[INSTANCE_OUT] 인스턴스로 갈린다 (디바이스 모델 — 주의 1). */
     const val VARIABLE_TIMEOUT = "Timeout"
 
     const val VARIABLE_AVAILABLE = "Available"
@@ -271,7 +271,7 @@ object DeviceModelVariables {
     /** ⚠️ 부록 CSV 에 없는 변수다. 근거와 그 불일치는 이 객체의 KDoc 을 보라 (§4.9 주의 3). */
     const val VARIABLE_SWAP_ORDER = "SwapOrder"
 
-    /** 인가 후 배터리 삽입 대기. 만료돼도 **CSMS 는 통보받지 못한다** (PLAN §4.7). */
+    /** 인가 후 배터리 삽입 대기. 만료돼도 **CSMS 는 통보받지 못한다**. */
     const val INSTANCE_IN = "In"
 
     /** 제공된 배터리 수령 대기. 만료되면 `BatterySwapRequest(BatteryOutTimeout)` 가 온다 (S03.FR.06). */
@@ -300,7 +300,7 @@ object DeviceModelVariables {
      */
     fun swapOrder() = VariableRef(COMPONENT_BATTERY_SWAP_CTRLR, VARIABLE_SWAP_ORDER)
 
-    /** [evseId] 슬롯에 꽂힌 배터리의 SoC (S04.FR.12, PLAN §4.5 재고 조회 수단). */
+    /** [evseId] 슬롯에 꽂힌 배터리의 SoC (S04.FR.12). */
     fun batterySoC(evseId: Int) = VariableRef(COMPONENT_BATTERY_CARTRIDGE, VARIABLE_SOC, evseId = evseId)
 
     /** [evseId] 슬롯에 꽂힌 배터리의 SoH. */

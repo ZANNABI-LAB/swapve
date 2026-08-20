@@ -12,7 +12,7 @@ import org.springframework.boot.runApplication
  * 항상 열어 두고 붙어 있으므로, 우리가 먼저 접속을 시도하는 코드는 어디에도 없다.
  *
  * Spring 은 이 모듈에서 멈춘다. `ocpp-core` 와 `swap-domain` 은 프레임워크를 모르고
- * (PLAN §6 설계원칙 1), 그 사실을 두 모듈의 `checkNoFrameworkImports` /
+ * (설계원칙 1), 그 사실을 두 모듈의 `checkNoFrameworkImports` /
  * `checkNoExternalDependencies` 가 빌드 때마다 기계 검증한다.
  */
 @SpringBootApplication

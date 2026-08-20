@@ -11,7 +11,7 @@ import kotlin.test.assertTrue
  * 교환 상태머신 시험.
  *
  * 배터리 2개 세트로 시험하는 이유는 공식 적합성 케이스 `TC_S_103_CSMS` 가 그렇게 시험하기
- * 때문이다 (PLAN §7.1). 입고 슬롯(A,B)과 출고 슬롯(C,D)이 다른 것도 그 시퀀스 그대로다.
+ * 때문이다. 입고 슬롯(A,B)과 출고 슬롯(C,D)이 다른 것도 그 시퀀스 그대로다.
  */
 class SwapStateMachineTest {
 
@@ -53,7 +53,7 @@ class SwapStateMachineTest {
 
     @Test
     fun `출고 먼저 순서로도 같은 상태머신이 완료에 도달한다`() {
-        // PLAN §4.6 — 역순도 표준이다. SwapOrder 를 상태머신이 알 필요가 없다.
+        // 역순도 표준이다. SwapOrder 를 상태머신이 알 필요가 없다.
         val state = SwapStateMachine.replay(
             SwapTransaction.Idle,
             listOf(authorized(), batteryOut(t1), batteryIn(t2)),
@@ -76,7 +76,7 @@ class SwapStateMachineTest {
             listOf(authorized(), batteryOut(t1), batteryIn(t2)),
         )
 
-        assertEquals(inFirst, outFirst, "교환 순서가 완료 레코드에 남으면 안 된다 (PLAN §4.6)")
+        assertEquals(inFirst, outFirst, "교환 순서가 완료 레코드에 남으면 안 된다")
     }
 
     @Test
@@ -103,7 +103,7 @@ class SwapStateMachineTest {
 
     @Test
     fun `완료 레코드에서 양쪽 배터리의 일련번호와 SoC 와 SoH 를 모두 읽을 수 있다`() {
-        // PLAN §11.2 — 이걸 버리면 나중에 과금이 스키마 변경 없이는 불가능해진다.
+        // 이걸 버리면 나중에 과금이 스키마 변경 없이는 불가능해진다.
         val completed = assertIs<SwapTransaction.Completed>(
             SwapStateMachine.replay(SwapTransaction.Idle, listOf(authorized(), batteryIn(), batteryOut())),
         )
@@ -134,7 +134,7 @@ class SwapStateMachineTest {
 
     @Test
     fun `같은 상관키로 입고가 재수신되면 멱등 무시되고 장부가 변하지 않는다`() {
-        // PLAN §5.4 F4
+        // F4
         val halfIn = SwapStateMachine.replay(SwapTransaction.Idle, listOf(authorized(), batteryIn()))
 
         val result = SwapStateMachine.transition(halfIn, batteryIn(t2))
@@ -169,7 +169,7 @@ class SwapStateMachineTest {
 
     @Test
     fun `서로 다른 스테이션이 같은 상관 번호를 써도 충돌하지 않는다`() {
-        // PLAN §5.3 — requestId 는 스테이션 범위에서만 유일하다.
+        // requestId 는 스테이션 범위에서만 유일하다.
         val otherKey = SwapKey(StationId("KR-BUSAN-007"), SwapRequestId(42))
 
         assertNotEquals(key, otherKey)
@@ -201,7 +201,7 @@ class SwapStateMachineTest {
 
     @Test
     fun `인가 없이 교환 사건이 오면 이상으로 판정되지만 예외는 나지 않는다`() {
-        // PLAN §5.4 F5 — 응답은 상위 계층이 정상 회신한다.
+        // F5 — 응답은 상위 계층이 정상 회신한다.
         val result = SwapStateMachine.transition(SwapTransaction.Idle, batteryIn())
 
         val anomaly = assertIs<SwapTransition.Anomaly>(result)
@@ -220,7 +220,7 @@ class SwapStateMachineTest {
 
     @Test
     fun `입고 반쪽에서 수령 타임아웃을 받으면 orphan 이 상태에 남는다`() {
-        // PLAN §4.7 S03.FR.06 — CSMS 에 orphan BatteryIn 이 남는다는 사실이 읽혀야 한다.
+        // S03.FR.06 — CSMS 에 orphan BatteryIn 이 남는다는 사실이 읽혀야 한다.
         val halfIn = SwapStateMachine.replay(SwapTransaction.Idle, listOf(authorized(), batteryIn()))
 
         val result = SwapStateMachine.transition(halfIn, SwapEvent.BatteryOutTimeout(key, t2))
@@ -234,7 +234,7 @@ class SwapStateMachineTest {
 
     @Test
     fun `끝난 교환에 사건이 더 오면 멱등 무시된다`() {
-        // PLAN §5.4 F6 — 재접속 후 재전송.
+        // F6 — 재접속 후 재전송.
         val completed = SwapStateMachine.replay(
             SwapTransaction.Idle,
             listOf(authorized(), batteryIn(), batteryOut()),

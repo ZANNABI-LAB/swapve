@@ -12,7 +12,7 @@ import java.time.Clock
 import java.time.ZoneOffset
 
 /**
- * ★ **성공 기준 S4 의 부하 형상** (PLAN §2, §7.3 L3).
+ * ★ **성공 기준 S4 의 부하 형상** (게이트 L3).
  *
  * > *"스테이션 20대 동시 접속 후 불변식 감사 전항목 통과"*
  *
@@ -21,7 +21,7 @@ import java.time.ZoneOffset
  * - **스테이션 20대는 고정**이다. 성공 기준이 그 숫자를 적었고, 그것이 이 시험의 요점이다.
  * - 라운드는 [ROUNDS] 회. 스테이션마다 교환을 여러 건 완주시켜야 "한 번 성공"과 "반복해도
  *   장부가 안 깨진다"가 구분된다. 20 × [ROUNDS] 건이 감사 대상 모집단이다.
- * - **In-Out 과 Out-In 을 섞는다** (PLAN §4.6). 짝수 번째 스테이션이 역순이다.
+ * - **In-Out 과 Out-In 을 섞는다**. 짝수 번째 스테이션이 역순이다.
  *
  * ### 라운드마다 슬롯이 다르다
  *
@@ -33,7 +33,7 @@ import java.time.ZoneOffset
  * ### ★ requestId 는 스테이션이 달라도 같은 값을 쓴다
  *
  * 일부러 그렇게 한다. `requestId` 는 **스테이션 범위에서만 유일**하고 교환의 상관키는
- * `(stationId, requestId)` 복합키다 (PLAN §5.3). 20 대가 같은 `requestId` 로 동시에 교환을
+ * `(stationId, requestId)` 복합키다. 20 대가 같은 `requestId` 로 동시에 교환을
  * 열어도 서로 다른 교환 20 건이어야 하며, 그것이 감사 항목 4 가 확인하는 것이다. 스테이션마다
  * 다른 번호를 주면 이 불변식은 시험되지 않은 채 통과한다.
  *
@@ -62,7 +62,7 @@ object LoadScenario {
     /** 디바이스 모델 `BatterySwapCtrlr.IdToken` — 충전 트랜잭션용 대체 토큰 (S04.FR.02/03). */
     const val CHARGING_TOKEN = "BSS-CENTRAL-0001"
 
-    /** 라운드 하나가 쓰는 슬롯 수 — 입고 2 + 출고 2 (배터리는 세트 단위다, PLAN §10 결정 #6). */
+    /** 라운드 하나가 쓰는 슬롯 수 — 입고 2 + 출고 2 (배터리는 세트 단위다). */
     const val SLOTS_PER_ROUND = 4
 
     fun stationId(index: Int): String = "CS-LOAD-%02d".format(index)
@@ -73,7 +73,7 @@ object LoadScenario {
 
     fun stationIds(runId: String): List<String> = (1..STATION_COUNT).map { stationId(runId, it) }
 
-    /** **순서를 섞는다** (PLAN §4.6). 홀수는 통상 순서, 짝수는 역순이다. */
+    /** **순서를 섞는다**. 홀수는 통상 순서, 짝수는 역순이다. */
     fun order(index: Int): SwapOrder = if (index % 2 == 0) SwapOrder.OUT_IN else SwapOrder.IN_OUT
 
     fun insertSlots(round: Int): List<Int> = listOf(round * SLOTS_PER_ROUND + 1, round * SLOTS_PER_ROUND + 2)

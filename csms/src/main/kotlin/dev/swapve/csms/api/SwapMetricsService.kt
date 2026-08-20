@@ -17,7 +17,7 @@ import java.time.Clock
 import java.time.Duration
 
 /**
- * ★ **성공 기준 S5 의 계산 — 새 저장소를 만들지 않는다** (PLAN §2, §11.1).
+ * ★ **성공 기준 S5 의 계산 — 새 저장소를 만들지 않는다** (이벤트 로그).
  *
  * ### 왜 Micrometer/Actuator 를 쓰지 않는가
  *
@@ -26,12 +26,12 @@ import java.time.Duration
  * 1. **필요한 값이 전부 이미 있는 기록에서 파생 계산된다.** 성공률은
  *    [SwapTransactionRegistry] 의 상태 분포이고, 소요시간은 그 상태에 이미 들어 있는
  *    시각들의 차이이며, 실패 사유는 거부·이상·멱등 기록과 [JdbcOcppEventLog] 의 원문에
- *    있다. PLAN §11.1 이 이벤트 로그에 건 **유일한 규칙**이 *"파생 상태는 이 로그에서 계산될
+ * 있다. 이벤트 로그에 걸린 **유일한 규칙**이 *"파생 상태는 이 로그에서 계산될
  *    수 있어야 한다"* 이고, 지표야말로 그 규칙이 실제로 지켜지는지 확인하는 자리다.
  * 2. **카운터를 따로 두면 진실의 원본이 둘이 된다.** `Counter.increment()` 를 코드 곳곳에
  *    심는 순간, 장부(H2)와 카운터(인메모리)가 재시작·예외·재전송에서 어긋나기 시작한다.
  *    그러면 지표가 시스템을 설명하는 것이 아니라 **지표 자신을 설명해야 하는 대상**이 된다.
- * 3. **소비자가 없다.** PLAN §10 결정 #2 가 대시보드를 제외했다. Micrometer 의 값은
+ * 3. **소비자가 없다.** 대시보드는 범위 밖이다. Micrometer 의 값은
  *    Prometheus 같은 scrape 대상이 있을 때 나오는데, 그 대상이 이 프로젝트에 없다.
  *    S5 가 요구한 것은 **REST 조회**까지다.
  * 4. **의존성이 늘지 않는다.** `spring-boot-starter-actuator` 없이 끝난다.
@@ -84,13 +84,13 @@ class SwapMetricsService(
         )
 
         val failureScenarios = mapOf(
-            // F1 — 배터리 부족. 재고 판정은 스테이션이 한다 (PLAN §4.5, S02.FR.04).
+            // F1 — 배터리 부족. 재고 판정은 스테이션이 한다 (S02.FR.04).
             "F1" to rejections.size,
             // F2 — 수령 타임아웃. orphan BatteryIn 이 남았다 (S03.FR.06).
             "F2" to outTimedOut.size,
-            // F3 — 미등록 배터리. customData 로 거부했다 (PLAN §4.8).
+            // F3 — 미등록 배터리. customData 로 거부했다.
             "F3" to batteryRejections.values.sum(),
-            // F5 — 순서 위반. 응답은 정상 회신됐고 사실만 기록됐다 (PLAN §5.4).
+            // F5 — 순서 위반. 응답은 정상 회신됐고 사실만 기록됐다.
             "F5" to anomalies.size,
         )
 
@@ -136,14 +136,14 @@ class SwapMetricsService(
     /**
      * 인가되지 않은 토큰으로 들어온 시도 (S02.FR.03 포함).
      *
-     * [AuthorizationRegistry] 는 **판정 결과와 무관하게** 시도를 남긴다 (PLAN §11.3 — 미인식
+     * [AuthorizationRegistry] 는 **판정 결과와 무관하게** 시도를 남긴다 (미인식
      * 토큰도 거부하되 기록한다). 그 목록에서 통과하지 못한 것만 센다.
      */
     private fun rejectedAuthorizations(): Int =
         authorizations.attempts().count { it.status != AuthorizationStatus.ACCEPTED }
 
     /**
-     * 두 종류의 거부 사유를 한 표로 모은다 (PLAN §4.9.1).
+     * 두 종류의 거부 사유를 한 표로 모은다.
      *
      * 스테이션이 개시를 거부한 사유(`NoBatteryAvailable`)와 우리가 배터리를 거부한
      * 사유(`BatteryUnknown`)는 **같은 부록 표(`reason_codes.csv`)에서 온다.** 나누어 세면
@@ -160,18 +160,18 @@ class SwapMetricsService(
     }
 
     /**
-     * F3 — **이벤트 로그에서 파생 계산한다** (PLAN §11.1).
+     * F3 — **이벤트 로그에서 파생 계산한다**.
      *
      * ### 왜 새 기록을 만들지 않았나
      *
      * 미등록 배터리 거부는 `OcppMessageRouter` 가 `BatterySwapResponse` 의 `customData` 로
-     * 내보내고 (PLAN §4.8), 그 응답 **원문이 이벤트 로그에 그대로 남아 있다.** 지표를 위해
+     * 내보내고, 그 응답 **원문이 이벤트 로그에 그대로 남아 있다.** 지표를 위해
      * 카운터나 표를 새로 만들기 전에 *"이미 있는 것으로 계산되는지"* 를 먼저 본 결과가 이것이다.
      *
-     * 이 함수가 성립한다는 것 자체가 §11.1 의 규칙이 지켜지고 있다는 실행 가능한 증거다.
+     * 이 함수가 성립한다는 것 자체가 이벤트 로그 의 규칙이 지켜지고 있다는 실행 가능한 증거다.
      * 원문 대신 해석 결과만 남겼다면 여기서 셀 수 있는 것이 없었을 것이다.
      *
-     * @return `reasonCode` 별 건수. 지금은 `BatteryUnknown` 하나지만, 표(§4.9.1)의 다른
+     * @return `reasonCode` 별 건수. 지금은 `BatteryUnknown` 하나지만, 표(배터리 거부 reason code)의 다른
      *   사유를 쓰게 되면 코드 수정 없이 따라온다.
      */
     private fun batteryRejectionReasons(records: List<OcppEventRecord>): Map<String, Int> {
@@ -195,7 +195,7 @@ class SwapMetricsService(
     }
 
     /**
-     * F6 — 같은 `(stationId, messageId)` 로 **두 번 이상 도착한 수신 CALL** (PLAN §5.4 F6).
+     * F6 — 같은 `(stationId, messageId)` 로 **두 번 이상 도착한 수신 CALL** (F6).
      *
      * 세션의 멱등 원장은 재전송을 잡아 저장된 응답을 그대로 내고 상위 계층을 부르지 않으므로,
      * 그 사실은 **어떤 도메인 기록에도 남지 않는다.** 남는 곳은 이벤트 로그뿐이다 —
@@ -230,7 +230,7 @@ class SwapMetricsService(
 
     /**
      * 프레임 원문을 읽는다. **읽지 못해도 예외를 던지지 않는다** — 이벤트 로그에는 디코딩에
-     * 실패한 원문도 그대로 남아 있고 (PLAN §11.1), 지표 조회가 그것 때문에 500 이 되어서는
+     * 실패한 원문도 그대로 남아 있고, 지표 조회가 그것 때문에 500 이 되어서는
      * 안 된다.
      */
     private fun frame(record: OcppEventRecord): JsonNode? = try {
@@ -243,7 +243,7 @@ class SwapMetricsService(
         const val MESSAGE_TYPE_CALL = 2
         const val MESSAGE_TYPE_CALL_RESULT = 3
 
-        /** `statusInfo` 없이 거부된 경우. 표(§4.9.1)의 값이 아니므로 그 자리에 섞지 않는다. */
+        /** `statusInfo` 없이 거부된 경우. 표(배터리 거부 reason code)의 값이 아니므로 그 자리에 섞지 않는다. */
         const val UNSPECIFIED_REASON = "Unspecified"
     }
 }

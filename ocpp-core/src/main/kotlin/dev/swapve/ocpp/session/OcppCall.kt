@@ -8,7 +8,7 @@ import dev.swapve.ocpp.rpc.RpcErrorCode
  * 보내려는(또는 받은) 요청 하나 — `(action, payload)`.
  *
  * **messageId 가 없다.** 발번은 전송 시점에 [dev.swapve.ocpp.rpc.MessageIds] 가 한다
- * (Part 4 §4.1.4, PLAN §11.5 "로컬 카운터 금지"). 호출자가 id 를 만들어 넘기게 두면
+ * (Part 4 §4.1.4). 호출자가 id 를 만들어 넘기게 두면
  * 재접속을 넘나드는 유일성 규칙을 호출자마다 다시 지켜야 한다.
  *
  * 재전송(타임아웃 후 다시 보내기)은 원본과 **같은 messageId 를 써도 된다(MAY)** 는 것이
@@ -68,7 +68,7 @@ sealed interface OcppResult {
     /**
      * 그 스테이션의 연결이 없다.
      *
-     * **예외가 아니라 결과다.** 스테이션은 언제든 끊긴다 (PLAN §11.5).
+     * **예외가 아니라 결과다.** 스테이션은 언제든 끊긴다.
      */
     data class NotConnected(val stationId: String) : OcppResult
 }
@@ -84,7 +84,7 @@ sealed interface InboundResponse {
     /** CALLRESULT 로 답한다. */
     data class Respond(val payload: ObjectNode) : InboundResponse {
         companion object {
-            /** *"Empty response by CSMS to confirm receipt"* — `BatterySwapResponse` 같은 빈 응답 (PLAN §4.3). */
+            /** *"Empty response by CSMS to confirm receipt"* — `BatterySwapResponse` 같은 빈 응답. */
             fun empty(): Respond = Respond(JsonNodeFactory.instance.objectNode())
         }
     }

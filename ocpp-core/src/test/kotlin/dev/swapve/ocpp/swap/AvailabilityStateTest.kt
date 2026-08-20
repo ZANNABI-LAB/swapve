@@ -6,7 +6,7 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
- * ⚠️ **반전 함정을 못박는다** (PLAN §4.2, Part 2 §S Ch.2).
+ * ⚠️ **반전 함정을 못박는다** (Part 2 §S Ch.2).
  *
  * 이 시험이 빨개지면 배터리 장부가 통째로 뒤집힌다. 종단 시험이 같은 것을 확인하지만,
  * 그쪽은 실패했을 때 "교환이 완주하지 못했다"까지만 말해 준다. 원인이 이 한 줄이라는 것을
@@ -36,7 +36,7 @@ class AvailabilityStateTest {
 
     @Test
     fun `Unavailable 은 배터리 유무를 말해 주지 않는다`() {
-        // 모른다는 사실을 false 로 뭉개지 않는다 (PLAN §11.0).
+        // 모른다는 사실을 false 로 뭉개지 않는다.
         assertNull(AvailabilityState.UNAVAILABLE.holdsBattery)
         assertNull(AvailabilityState.holdsBattery("Unavailable"))
     }

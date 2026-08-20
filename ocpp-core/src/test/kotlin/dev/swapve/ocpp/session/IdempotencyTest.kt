@@ -14,7 +14,7 @@ import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 
 /**
- * 멱등 — PLAN §5.4 F4·F6, §8 이 M4 의 핵심 위험으로 지목한 부분.
+ * 멱등 — F4·F6 — M4 의 핵심 위험이었던 부분.
  *
  * *"재접속 시 스테이션이 CALL 을 재전송하면 중복 BatterySwap 이 발생하고, 멱등 처리가 없으면
  * 장부가 깨진다."*
@@ -37,14 +37,14 @@ class IdempotencyTest {
         connection.session.receive(frame)
         advanceUntilIdle()
 
-        assertEquals(1, handlerCalls.get(), "부수효과가 두 번 일어났다 — 장부가 깨진다 (PLAN §5.4 F4)")
+        assertEquals(1, handlerCalls.get(), "부수효과가 두 번 일어났다 — 장부가 깨진다 (F4)")
         assertEquals(2, connection.sent.size, "재전송에는 응답을 다시 보내야 한다")
         assertEquals(connection.sent[0], connection.sent[1], "저장해 둔 응답을 그대로 다시 보내야 한다")
     }
 
     @Test
     fun `연결이 끊겼다 새로 붙은 뒤 재전송돼도 상위 계층은 다시 불리지 않는다`() = runTest {
-        // PLAN §5.4 F6 — 이것이 M4 의 핵심 위험이다.
+        // F6 — 이것이 M4 의 핵심 위험이다.
         val handlerCalls = AtomicInteger()
         val handler: OcppCallHandler = { _, _ ->
             handlerCalls.incrementAndGet()
@@ -71,7 +71,7 @@ class IdempotencyTest {
         after.session.receive(frame)
         advanceUntilIdle()
 
-        assertEquals(1, handlerCalls.get(), "재접속 재전송이 중복 처리됐다 (PLAN §5.4 F6)")
+        assertEquals(1, handlerCalls.get(), "재접속 재전송이 중복 처리됐다 (F6)")
         assertEquals(1, after.sent.size, "새 연결로 응답이 다시 나가야 한다")
         assertEquals(before.sent[0], after.sent[0], "같은 응답이 나가야 한다")
     }
@@ -196,7 +196,7 @@ class IdempotencyTest {
         advanceUntilIdle()
 
         val records = connection.log.of(connection.stationId)
-        assertEquals(4, records.size, "주고받은 네 번이 모두 남아야 한다 (PLAN §11.1)")
+        assertEquals(4, records.size, "주고받은 네 번이 모두 남아야 한다")
         assertEquals(
             listOf(
                 MessageDirection.INBOUND,

@@ -2,7 +2,7 @@
 
 > 5분 데모는 인증을 낮춰 띄웁니다. **기본 운영값은 WebSocket `BASIC` + REST Basic** 입니다.
 > 이 문서는 그 상태로 띄울 때 필요한 것들입니다.
-> 두 자격증명은 **서로 다른 목록**이고, 경계의 전체 그림은 [PLAN §11.4](PLAN.md) 에 있습니다.
+> 두 자격증명은 **서로 다른 목록**이고, 경계의 전체 그림은 보안 프로파일 에 있습니다.
 
 ## 스테이션 인증
 
@@ -63,7 +63,7 @@ curl -u operator:api-password localhost:8080/api/metrics/swaps
 ```
 
 이때도 신원은 사라지지 않습니다 — `StationPrincipal.authMethod` 에 `NONE` 이 남습니다
-([PLAN §11.4](PLAN.md)).
+(보안 프로파일).
 
 ## 막히면 확인할 것
 
@@ -73,5 +73,5 @@ curl -u operator:api-password localhost:8080/api/metrics/swaps
 
 ## 아직 없는 것
 
-mTLS(보안 프로파일 2/3, [BACKLOG B12](../BACKLOG.md)), 자격증명 회전, 속도 제한,
+mTLS(보안 프로파일 2/3, B12), 자격증명 회전, 속도 제한,
 운영용 감사 로그. 자세한 것은 README 의 "무엇이 아닌가" 를 보세요.

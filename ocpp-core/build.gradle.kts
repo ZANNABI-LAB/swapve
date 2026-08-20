@@ -8,19 +8,19 @@ dependencies {
     implementation(libs.tsid.creator)
 
     testImplementation(libs.kotlinx.coroutines.test)
-    // 이벤트 로그만으로 파생 상태를 재구성할 수 있음을 증명하는 데 M3 상태머신을 쓴다 (PLAN §11.1).
+    // 이벤트 로그만으로 파생 상태를 재구성할 수 있음을 증명하는 데 M3 상태머신을 쓴다.
     // 테스트 전용이다 — main 의존 방향은 그대로 ocpp-core → (없음) 이다.
     testImplementation(project(":swap-domain"))
 }
 
 // runTest / advanceUntilIdle / currentTime — 가상 시간 API 는 아직 실험 단계로 표시돼 있다.
-// 테스트 소스에서만 opt-in 한다 (PLAN §7.3 L1: "테스트가 실제 시간을 기다리지 않는다").
+// 테스트 소스에서만 opt-in 한다 (L1: "테스트가 실제 시간을 기다리지 않는다").
 tasks.named<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>("compileTestKotlin") {
     compilerOptions.optIn.add("kotlinx.coroutines.ExperimentalCoroutinesApi")
 }
 
 /**
- * 이 모듈은 프레임워크도 전송도 모른다 (PLAN §6 설계원칙 1).
+ * 이 모듈은 프레임워크도 전송도 모른다 (설계원칙 1).
  *
  * 그리고 **현재 시각을 직접 조회하지 않는다** — 시각과 타임아웃은 주입받는다. 그래야 세션
  * 계층 테스트가 실제로 몇 초를 기다리지 않고 결정적으로 돈다.
@@ -30,7 +30,7 @@ tasks.named<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>("compileTestKotlin"
  */
 val forbiddenMainPatterns = mapOf(
     "org.springframework" to "Spring 을 import 하지 않는다",
-    "io.netty" to "Netty 를 import 하지 않는다 (PLAN §6)",
+    "io.netty" to "Netty 를 import 하지 않는다",
     "javax.servlet" to "서블릿 API 를 import 하지 않는다",
     "jakarta.servlet" to "서블릿 API 를 import 하지 않는다",
     "java.net.http" to "WebSocket/HTTP 클라이언트를 import 하지 않는다",
@@ -57,7 +57,7 @@ val checkNoFrameworkImports by tasks.registering {
         }
 
         check(offenses.isEmpty()) {
-            "ocpp-core 는 프레임워크와 벽시계를 모른다 (PLAN §6):\n" + offenses.joinToString("\n")
+            "ocpp-core 는 프레임워크와 벽시계를 모른다:\n" + offenses.joinToString("\n")
         }
     }
 }

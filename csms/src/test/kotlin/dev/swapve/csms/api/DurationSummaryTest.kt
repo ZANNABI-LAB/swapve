@@ -6,7 +6,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
 /**
- * 소요시간 분포의 순수 계산 (PLAN §2 S5).
+ * 소요시간 분포의 순수 계산 (S5).
  *
  * Spring 도 소켓도 없다. 백분위 같은 계산은 종단 시험에서 눈으로 맞히기 어렵고, 틀려도
  * 그럴듯한 값이 나와 조용히 지나간다 — 그래서 여기서 값 하나하나를 못박는다.

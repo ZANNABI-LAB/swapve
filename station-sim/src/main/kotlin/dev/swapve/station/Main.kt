@@ -11,7 +11,7 @@ import kotlinx.coroutines.runBlocking
  * ```
  *
  * 인자는 전부 선택이고 기본값은 `TC_S_103_CSMS` 의 모양을 따른다 — **배터리 2개 세트**,
- * 입고 슬롯과 출고 슬롯이 서로 다르다 (PLAN §7.1).
+ * 입고 슬롯과 출고 슬롯이 서로 다르다.
  */
 object StationSimCli {
 
@@ -56,7 +56,7 @@ object StationSimCli {
                 simulator.connect()
                 if (remoteStart) {
                     // S02 — 개시 주체가 CSMS(앱)다. 인가도 CSMS 가 이미 했으므로 여기서
-                    // Authorize 를 보내지 않는다 (PLAN §4.4).
+                    // Authorize 를 보내지 않는다.
                     simulator.boot()
                     println("S02 대기 중 — CSMS 의 RequestBatterySwap 을 기다린다.")
                     println("  curl -X POST localhost:8080/api/swaps -H 'Content-Type: application/json' \\")
@@ -81,7 +81,7 @@ object StationSimCli {
      *
      * 앞의 `setSize` 개 슬롯은 비어 있고(투입 대상), 그다음 `setSize` 개 슬롯에는 내줄
      * 배터리가 들어 있다. 나머지 슬롯은 비워 둔다. **입고 슬롯과 출고 슬롯이 다르다**는
-     * `TC_S_103_CSMS` 의 전제를 그대로 옮긴 것이다 (PLAN §7.1).
+     * `TC_S_103_CSMS` 의 전제를 그대로 옮긴 것이다.
      */
     private fun buildConfig(options: Map<String, String>): StationSimConfig {
         val slotCount = options.int("slots", 4)

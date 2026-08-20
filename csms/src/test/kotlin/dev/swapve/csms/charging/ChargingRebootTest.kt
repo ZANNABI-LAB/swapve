@@ -22,7 +22,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /**
- * ★ **S04.FR.11 — 스테이션 재부팅** (PLAN §4.10).
+ * ★ **S04.FR.11 — 스테이션 재부팅**.
  *
  * > *"스테이션 재부팅 시, 배터리가 들어 있는 모든 EVSE 에 대해 트랜잭션을 새로 시작한다."*
  *

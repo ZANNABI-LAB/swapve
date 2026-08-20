@@ -59,7 +59,7 @@ object StationIdentity {
         validate(decoded)?.let { return Outcome.Rejected(it) }
 
         // MVP 는 경로에서만 얻는다. 그래서 authMethod 가 NONE 이다 — 확인한 적이 없다는
-        // 사실 자체를 값으로 남긴다 (PLAN §11.4).
+        // 사실 자체를 값으로 남긴다.
         return Outcome.Identified(StationPrincipal(decoded, AuthMethod.NONE))
     }
 

@@ -30,7 +30,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /**
- * ★ **교환 REST API — 표준 S02 의 클라이언트 계약** (PLAN §3, §2 S5, M8).
+ * ★ **교환 REST API — 표준 S02 의 클라이언트 계약** (§2 S5, M8).
  *
  * ### 목으로 때우지 않는다
  *
@@ -63,7 +63,7 @@ class SwapApiTest {
      * ★ **POST /api/swaps 가 실제로 `RequestBatterySwapRequest` 를 스테이션으로 내보낸다.**
      *
      * 발신 로직은 M7 의 `RemoteSwapStarter` 에 이미 있고 M8 이 새로 만들지 않았다
-     * (PLAN §0 v3.1). 그래도 이 시험이 필요한 이유는, **REST 진입점이 그것을 실제로 부르는지**
+     * (v3.1). 그래도 이 시험이 필요한 이유는, **REST 진입점이 그것을 실제로 부르는지**
      * 는 별개의 사실이기 때문이다.
      */
     @Test
@@ -99,7 +99,7 @@ class SwapApiTest {
     /**
      * 스테이션이 `Accepted` 로 답하면 교환이 열리고, **조회로 그 상태가 보인다.**
      *
-     * 응답이 조회 URL 을 알려 준다는 것까지가 계약이다 (PLAN §3) — `Location` 헤더와 본문의
+     * 응답이 조회 URL 을 알려 준다는 것까지가 계약이다 — `Location` 헤더와 본문의
      * `swap.self` 가 같은 값을 가리킨다.
      */
     @Test
@@ -134,9 +134,9 @@ class SwapApiTest {
     }
 
     /**
-     * ★ **배터리가 없는 것은 시스템 장애가 아니다** (PLAN §5.4 F1 = `TC_S_102_CSMS`).
+     * ★ **배터리가 없는 것은 시스템 장애가 아니다** (F1 = `TC_S_102_CSMS`).
      *
-     * 재고 판정은 스테이션이 한다 (PLAN §4.5, S02.FR.04). CSMS 는 그 사유를 받아 **정상
+     * 재고 판정은 스테이션이 한다 (S02.FR.04). CSMS 는 그 사유를 받아 **정상
      * 응답으로** 호출자에게 보여 준다. 5xx 로 답하면 앱이 재시도 대상으로 오해하고, 이용자는
      * *"서버 오류"* 를 본다 — 실제로는 그 스테이션에 배터리가 없다는 정상적인 사실이다.
      */
@@ -205,13 +205,13 @@ class SwapApiTest {
     // ================================================================== 조회
 
     /**
-     * ★ **양쪽 배터리의 `serialNumber`·`soC`·`soH` 를 모두 노출한다** (PLAN §11.2).
+     * ★ **양쪽 배터리의 `serialNumber`·`soC`·`soH` 를 모두 노출한다**.
      *
      * > *"the price can depend, for example, on **the difference between the state of charge
      * > of the old and new batteries**"* (Part 2 S. Ch.1)
      *
      * 과금이 나중에 **이 위의 순수 계산**이 되려면 여기서 버리면 안 된다. 결과만 남기고
-     * SoC 를 버리는 것이 PLAN §11.2 가 지목한 "막히는 전제"다.
+     * SoC 를 버리는 것이 과금을 나중에 막아 버리는 전제다.
      */
     @Test
     fun `GET 이 양쪽 배터리의 serialNumber·soC·soH 를 모두 보여준다`() {
@@ -234,7 +234,7 @@ class SwapApiTest {
                 batteriesOf(swap.path("batteriesOut")),
             )
 
-            // 슬롯도 남는다 — 입고 슬롯과 출고 슬롯은 서로 다르다 (PLAN §7.1).
+            // 슬롯도 남는다 — 입고 슬롯과 출고 슬롯은 서로 다르다.
             assertEquals(
                 ConformanceScenario.INSERT_SLOTS.sorted(),
                 swap.path("batteriesIn").map { it.path("slotId").asInt() }.sorted(),
@@ -244,7 +244,7 @@ class SwapApiTest {
                 swap.path("batteriesOut").map { it.path("slotId").asInt() }.sorted(),
             )
 
-            // 과금 근거의 나머지 절반 — 시작·종료 시각 (PLAN §11.2).
+            // 과금 근거의 나머지 절반 — 시작·종료 시각.
             assertFalse(swap.path("startedAt").isNull, "시작 시각이 없다")
             assertFalse(swap.path("endedAt").isNull, "종료 시각이 없다")
             assertEquals(0L, swap.path("durationMillis").asLong(), "고정 시계에서는 0 이어야 한다")
@@ -252,7 +252,7 @@ class SwapApiTest {
     }
 
     /**
-     * ★ **`OUT_TIMED_OUT` 교환은 장부 불균형이 드러나야 한다** (PLAN §5.3, §5.4 F2).
+     * ★ **`OUT_TIMED_OUT` 교환은 장부 불균형이 드러나야 한다** (실패 시나리오 F2).
      *
      * > **S03.FR.06** — *"CSMS ends up with an **orphan BatteryIn for which a BatteryOut is
      * > missing**."*
@@ -286,7 +286,7 @@ class SwapApiTest {
                 mapOf("1234" to (23.0 to 85.0), "5678" to (45.0 to 87.0)),
                 batteriesOf(imbalance.path("orphanBatteries")),
             )
-            // ★ 채무가 H2 에도 남았다 (PLAN §5.3 — 이것만 영속된다).
+            // ★ 채무가 H2 에도 남았다 (이것만 영속된다).
             assertTrue(imbalance.path("persisted").asBoolean(), "장부가 영속되지 않았다")
         }
     }

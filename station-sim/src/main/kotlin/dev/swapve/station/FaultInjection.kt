@@ -3,7 +3,7 @@ package dev.swapve.station
 /**
  * 시뮬레이터가 지나는 시퀀스 지점. 장애 주입의 좌표계다.
  *
- * 이름은 Part 6 재사용 상태의 단계와 일치시킨다 (PLAN §7.2). 그래야 "어디서 무엇을
+ * 이름은 Part 6 재사용 상태의 단계와 일치시킨다. 그래야 "어디서 무엇을
  * 어긋나게 하는가"를 시나리오 쪽에서 표준 용어로 말할 수 있다.
  */
 enum class SimStep {
@@ -40,7 +40,7 @@ enum class SimStep {
  * 장애 주입 훅.
  *
  * M6 은 호출 지점만 뚫어 두고 [None] 하나로 끝냈다. **M7 이 그 자리를 채운다** — 실패
- * 시나리오 F1~F6 (PLAN §5.4) 이 성공 기준 S3 이기 때문이다.
+ * 시나리오 F1~F6 이 성공 기준 S3 이기 때문이다.
  *
  * ### 여섯 시나리오가 전부 이 훅을 쓰지는 않는다
  *
@@ -51,7 +51,7 @@ enum class SimStep {
  *
  * 훅이 필요한 것은 **시퀀스 한가운데서 무언가 끊기는** 상황이다 — 그게 [failingAt] 이고,
  * F6 의 "교환 도중 연결이 끊겼다"가 그 용도다. 없는 쓰임을 위해 훅을 더 만들지 않는다
- * (PLAN §11.0).
+ *.
  */
 fun interface FaultInjection {
 
@@ -72,7 +72,7 @@ fun interface FaultInjection {
          * [step] 에 도달하면 [SimulatedFault] 를 던져 시퀀스를 끊는다.
          *
          * 교환이 **반쪽으로 남는다.** 그 뒤 재접속해 CALL 을 재전송하는 것이 F6 이고, 그때
-         * 장부가 두 번 늘지 않아야 한다 (PLAN §5.4 F6).
+         * 장부가 두 번 늘지 않아야 한다 (F6).
          */
         fun failingAt(step: SimStep, message: String): FaultInjection = FaultInjection { at, context ->
             if (at == step) throw SimulatedFault("$message (step=$at, station=${context.stationId})")

@@ -45,7 +45,7 @@ sealed interface OcppFrame {
      * 요청 처리 실패. `[4, "<messageId>", "<errorCode>", "<errorDescription>", {<errorDetails>}]`
      *
      * [errorCode]가 [RpcErrorCode] 열거형이 아니라 `String`인 이유:
-     * 표에 없는 값이 와도 **버리지 않고 기록**하기 위해서다 (PLAN §11.0 — 정보를 버리지 않는다).
+     * 표에 없는 값이 와도 **버리지 않고 기록**하기 위해서다 (정보를 버리지 않는다).
      * 해석이 필요하면 [knownErrorCode]를 쓴다.
      */
     data class CallError(

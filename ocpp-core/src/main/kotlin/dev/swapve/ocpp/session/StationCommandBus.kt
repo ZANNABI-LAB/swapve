@@ -3,11 +3,11 @@ package dev.swapve.ocpp.session
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * 스테이션에 명령을 보내는 유일한 통로 (PLAN §11.5).
+ * 스테이션에 명령을 보내는 유일한 통로.
  *
  * ### 왜 이것만 인터페이스인가
  *
- * PLAN §11.0 은 구현체 하나짜리 인터페이스를 금한다. 그런데 §11.5 는 이것을 명시적으로
+ * 이 프로젝트는 구현체 하나짜리 인터페이스를 두지 않는다. 그런데 수평 확장 여지는 이것을 명시적으로
  * 요구한다. 모순이 아니다 — **이건 미래를 위한 추상화가 아니라 "세션 객체를 상위 계층에
  * 흘리지 않는다"는 지금의 위생 규칙**이다. 상위 계층이 `session.send(...)` 를 쓰기 시작하면
  * "세션이 이 JVM 에 있다"는 전제가 코드 전체에 퍼지고, 그 전제는 되돌리기 어렵다.
@@ -28,7 +28,7 @@ interface StationCommandBus {
  * 연결된 세션 목록.
  *
  * [sessionOf] 가 `internal` 인 것이 핵심이다 — **세션 객체는 이 모듈 밖으로 나가지 않는다**
- * (PLAN §11.5). 상위 계층이 볼 수 있는 것은 [StationCommandBus] 와 [isConnected] 뿐이다.
+ *. 상위 계층이 볼 수 있는 것은 [StationCommandBus] 와 [isConnected] 뿐이다.
  *
  * 스레드 안전하다.
  */
@@ -61,7 +61,7 @@ class SessionRegistry {
 /**
  * MVP 구현 — 로컬 세션 레지스트리를 조회해 발신한다. 그게 전부다.
  *
- * Redis 도 메시지 버스도 클러스터 멤버십도 없다 (PLAN §11.5 "지금 하지 않을 것").
+ * Redis 도 메시지 버스도 클러스터 멤버십도 없다 ("지금 하지 않을 것").
  * 분산이 필요해지면 **이 클래스만 바뀐다.** 호출부는 한 줄도 안 바뀐다.
  */
 class LocalStationCommandBus(private val registry: SessionRegistry) : StationCommandBus {

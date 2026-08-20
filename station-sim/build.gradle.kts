@@ -15,7 +15,7 @@ application {
 }
 
 /**
- * **JDK 와 ocpp-core 로 끝낸다** (PLAN §6 기술선택 — 시뮬레이터 의존성 0).
+ * **JDK 와 ocpp-core 로 끝낸다** (기술선택 — 시뮬레이터 의존성 0).
  *
  * 프레이밍·스키마 검증·멱등·직렬화는 `ocpp-core` 를 그대로 쓰고 (§6 원칙 3), 전송은 JDK
  * 내장 WebSocket 을 쓴다. 외부 WebSocket/JSON 라이브러리는 들어올 수 없다.
@@ -47,8 +47,8 @@ val allowedCompileDependencies = setOf(
 
 /** 소스에 나타나면 안 되는 것들. 이유는 값이 아니라 문장으로 남긴다. */
 val forbiddenMainPatterns = mapOf(
-    "org.springframework" to "시뮬레이터는 Spring 을 쓰지 않는다 (PLAN §6)",
-    "io.netty" to "Netty 를 쓰지 않는다 (PLAN §6)",
+    "org.springframework" to "시뮬레이터는 Spring 을 쓰지 않는다",
+    "io.netty" to "Netty 를 쓰지 않는다",
     "okhttp3" to "외부 WebSocket 라이브러리를 쓰지 않는다 — JDK 내장을 쓴다",
     "org.java_websocket" to "외부 WebSocket 라이브러리를 쓰지 않는다 — JDK 내장을 쓴다",
     "jakarta.websocket" to "컨테이너 WebSocket API 를 쓰지 않는다 — JDK 내장을 쓴다",
@@ -75,7 +75,7 @@ val checkNoForbiddenDependencies by tasks.registering {
             .sorted()
 
         check(offendingModules.isEmpty()) {
-            "station-sim 은 JDK 와 ocpp-core 로 끝낸다 (PLAN §6): ${offendingModules.joinToString()}"
+            "station-sim 은 JDK 와 ocpp-core 로 끝낸다: ${offendingModules.joinToString()}"
         }
 
         val offendingLines = mainSources.files.sorted().flatMap { file ->
@@ -87,7 +87,7 @@ val checkNoForbiddenDependencies by tasks.registering {
         }
 
         check(offendingLines.isEmpty()) {
-            "station-sim 이 금지된 라이브러리를 참조한다 (PLAN §6):\n" + offendingLines.joinToString("\n")
+            "station-sim 이 금지된 라이브러리를 참조한다:\n" + offendingLines.joinToString("\n")
         }
     }
 }

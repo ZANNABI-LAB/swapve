@@ -7,15 +7,15 @@ package dev.swapve.ocpp.swap
  *
  * Part 6 의 Tool validation 은 `trigger=Delta`, `component.name="Connector"`,
  * `variable.name="AvailabilityState"`, `triggerReason=CablePluggedIn` 같은 **정확한 문자열**을
- * 요구한다 (PLAN §7.2). 이 값들을 시뮬레이터와 CSMS 가 각자 리터럴로 적으면, 시험은
+ * 요구한다. 이 값들을 시뮬레이터와 CSMS 가 각자 리터럴로 적으면, 시험은
  * "리터럴 A 와 리터럴 B 가 같은가"를 확인할 뿐 계약을 확인하지 못한다. 양쪽이 같은 상수를
  * 참조하게 두면 시험이 **계약 대조**가 되고, 표준이 바뀔 때 고칠 자리도 하나다.
  *
  * 스키마 자체를 대신하지 않는다 — 페이로드가 맞는지는 언제나 공식 스키마가 판정한다
- * (PLAN §6 원칙 2). 여기 있는 것은 스키마가 `enum` 으로 허용하는 값 **중 우리가 고른 것**뿐이다.
+ * (원칙 2). 여기 있는 것은 스키마가 `enum` 으로 허용하는 값 **중 우리가 고른 것**뿐이다.
  *
  * 슬롯 가용성만은 [AvailabilityState] 로 따로 뺐다. 그건 값이 아니라 **반전된 의미**를
- * 다루는 자리라서다 (PLAN §4.2).
+ * 다루는 자리라서다.
  */
 object BatterySwapWire {
 
@@ -30,7 +30,7 @@ object BatterySwapWire {
     const val BATTERY_SWAP = "BatterySwap"
     const val REQUEST_BATTERY_SWAP = "RequestBatterySwap"
 
-    /** 디바이스 모델 조회·설정 (M9, PLAN §4.9). 식별자는 [DeviceModelVariables] 를 보라. */
+    /** 디바이스 모델 조회·설정 (M9). 식별자는 [DeviceModelVariables] 를 보라. */
     const val GET_VARIABLES = "GetVariables"
     const val SET_VARIABLES = "SetVariables"
 
@@ -52,14 +52,14 @@ object BatterySwapWire {
     /** 새 배터리가 **나갔다.** */
     const val BATTERY_OUT = "BatteryOut"
 
-    /** 제공된 배터리를 꺼내가지 않았다 (S03.FR.06, PLAN §4.7). */
+    /** 제공된 배터리를 꺼내가지 않았다 (S03.FR.06). */
     const val BATTERY_OUT_TIMEOUT = "BatteryOutTimeout"
 
     // ------------------------------------------------------------------ 슬롯 상태 보고 (S03.FR.02/04)
 
     /**
      * 슬롯 상태를 싣는 컴포넌트. 슬롯 1개 = EVSE 1개이고 그 안의 커넥터가 상태를 보고한다
-     * (PLAN §4.1/§4.5).
+     * (/§4.5).
      */
     const val COMPONENT_CONNECTOR = "Connector"
 
@@ -105,8 +105,8 @@ object BatterySwapWire {
      *
      * ### ★ 배터리 제거로 트랜잭션이 끝날 때의 triggerReason 이 이것이다
      *
-     * Part 6 `TC_S_103_CSMS` step 13/17 원문이 그렇다. PLAN v3 는 이 자리를
-     * `EVCommunicationLost` 로 **추정**했고 v3.1 이 스펙 원문 대조로 정정했다 (PLAN §0).
+     * Part 6 `TC_S_103_CSMS` step 13/17 원문이 그렇다. 초기 설계는 이 자리를
+     * `EVCommunicationLost` 로 **추정**했고 M7 에서 스펙 원문과 대조해 정정했다.
      * 그 추정값은 스펙 어디에도 근거가 없어 상수 자체를 지웠다 — 남겨 두면 다시 쓰인다.
      *
      * 종료 사건은 세 값을 **각각** 요구한다: 왜 끝났나(`triggerReason`) · 무엇이
@@ -162,7 +162,7 @@ object BatterySwapWire {
     /** `ChargingStateEnumType` — 트랜잭션이 끝난 뒤의 상태 (Part 6 `TC_S_103_CSMS` step 13/17). */
     const val CHARGING_STATE_IDLE = "Idle"
 
-    /** `ReasonEnumType` — 배터리를 빼서 트랜잭션이 끝났다 (PLAN §4.10). */
+    /** `ReasonEnumType` — 배터리를 빼서 트랜잭션이 끝났다. */
     const val STOPPED_REASON_EV_DISCONNECTED = "EVDisconnected"
 
     // ------------------------------------------------------------------ IdTokenType
@@ -229,13 +229,13 @@ object BatterySwapWire {
     /** `VariableCharacteristics.unit` — 초. [UNIT_PERCENT] 과 같은 자리다. */
     const val UNIT_SECONDS = "seconds"
 
-    // ------------------------------------------------------------------ customData 거부 확장 (PLAN §4.8)
+    // ------------------------------------------------------------------ customData 거부 확장
 
     /**
      * `BatterySwapResponse` 로 배터리를 거부할 때 쓰는 벤더 식별자 (Part 2 S03 Error handling).
      *
      * `BatterySwapResponse` 는 *"Empty response by CSMS to confirm receipt"* 이고 **거부할 수
-     * 없다** (PLAN §4.3). OCA 가 그 한계를 위한 공식 우회를 정해 두었다 — 응답에
+     * 없다**. OCA 가 그 한계를 위한 공식 우회를 정해 두었다 — 응답에
      * `customData` 를 실어 `status`/`statusInfo` 를 알린다. 그래도 **응답의 성격은 수신
      * 확인 그대로**이므로 CALLERROR 로 답하지 않는다.
      *
@@ -246,7 +246,7 @@ object BatterySwapWire {
 }
 
 /**
- * 배터리 거부 사유 코드 — 부록 `reason_codes.csv` 가 정본이다 (PLAN §4.9.1).
+ * 배터리 거부 사유 코드 — 부록 `reason_codes.csv` 가 정본이다.
  *
  * 이 여섯 개는 표준이 **사전 정의**한 값이라 우리가 짓는 것이 아니다. 문자열 리터럴로 흩어
  * 놓으면 오타가 조용히 통과한다 — `statusInfo.reasonCode` 는 `maxLength` 만 검사받고 값의
@@ -270,16 +270,16 @@ enum class BatteryRejectionReason(
     /** 배터리가 손상됐다. */
     BATTERY_DAMAGED("BatteryDamaged"),
 
-    /** 우리가 모르는 일련번호다 (PLAN §5.4 F3). */
+    /** 우리가 모르는 일련번호다 (F3). */
     BATTERY_UNKNOWN("BatteryUnknown"),
 
     /** 허용되지 않는 배터리 타입이다. */
     BATTERY_TYPE("BatteryType"),
 
     /**
-     * 교환에 내줄 배터리가 없다 (S02.FR.04, PLAN §5.4 F1).
+     * 교환에 내줄 배터리가 없다 (S02.FR.04).
      *
-     * **재고 판정은 스테이션이 한다** (PLAN §4.5). CSMS 는 이 코드를 만들지 않고 받아 기록만
+     * **재고 판정은 스테이션이 한다**. CSMS 는 이 코드를 만들지 않고 받아 기록만
      * 한다 — Part 6 `TC_S_102_CSMS` 가 그 시나리오다.
      */
     NO_BATTERY_AVAILABLE("NoBatteryAvailable", appliesToRequestBatterySwap = true);

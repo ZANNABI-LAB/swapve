@@ -20,10 +20,10 @@ import java.time.Instant
  * `trigger`·`component.name`·`variable.name`·`triggerReason` 같은 값은 전부
  * [BatterySwapWire] 에서 온다. Part 6 Tool validation 이 검사하는 바로 그 값들이라,
  * 시뮬레이터와 CSMS 가 각자 리터럴로 적으면 시험이 계약이 아니라 리터럴을 대조하게 된다
- * (PLAN §7.2).
+ *.
  *
  * 슬롯 가용성만은 [AvailabilityState] 를 지난다 — 값이 아니라 **반전된 의미**를 다루기
- * 때문이다 (PLAN §4.2). 이 파일 어디에도 `"Occupied"` 라는 리터럴은 없다.
+ * 때문이다. 이 파일 어디에도 `"Occupied"` 라는 리터럴은 없다.
  */
 internal object SimPayloads {
 
@@ -52,7 +52,7 @@ internal object SimPayloads {
      * 슬롯 점유 상태 보고 (S03.FR.02/04).
      *
      * `StatusNotificationRequest` 가 아니라 `NotifyEventRequest` 를 쓴다 — 전자는 2.1 에서
-     * **deprecated** 다 (Part 2 S03 Remark, PLAN §4.5).
+     * **deprecated** 다 (Part 2 S03 Remark).
      *
      * @param holdsBattery 슬롯에 배터리가 있는가. **있으면 `Occupied` 가 나간다** — 직관과
      *   반대이므로 변환을 [AvailabilityState] 에 맡긴다.
@@ -93,7 +93,7 @@ internal object SimPayloads {
     }
 
     /**
-     * 충전 트랜잭션 사건 (S04). **교환 트랜잭션과 별개다** (PLAN §5.1).
+     * 충전 트랜잭션 사건 (S04). **교환 트랜잭션과 별개다**.
      *
      * @param chargingState 상태가 바뀌었을 때만 싣는다. 종료 사건에서는 대신
      *   [stoppedReason] 을 싣는다.
@@ -156,7 +156,7 @@ internal object SimPayloads {
     }
 
     /**
-     * `GetVariablesResponse` (S04.FR.12, PLAN §4.5).
+     * `GetVariablesResponse` (S04.FR.12).
      *
      * 항목 하나하나가 **어느 변수에 대한 답인지를 다시 싣는다** — 스키마가
      * `component`/`variable` 을 필수로 두기 때문이다. 그 인코딩은 [VariableRef.writeTo] 한
@@ -286,7 +286,7 @@ internal object SimPayloads {
      *
      * `supportsMonitoring = false` 로 고정한다. 변수 감시(`SetVariableMonitoring`)를 하나도
      * 구현하지 않았으므로, 지원한다고 보고하면 CSMS 가 걸 수 있다고 믿는 감시를 우리가
-     * 받지 못한다 (PLAN §11.0 — 없는 기능을 있는 척하지 않는다).
+     * 받지 못한다 (없는 기능을 있는 척하지 않는다).
      */
     private fun ObjectNode.characteristics(ref: VariableRef) {
         putObject("variableCharacteristics").apply {
@@ -332,7 +332,7 @@ internal object SimPayloads {
     }
 
     /**
-     * 교환 사건 (PLAN §4.3).
+     * 교환 사건.
      *
      * [batteries] 는 **투입/반출된 배터리마다** 한 항목이고, 항목마다 `evseId`·
      * `serialNumber`·`soC`·`soH` 네 필드가 전부 있어야 한다 (Part 6 Tool validation).
@@ -366,7 +366,7 @@ internal object SimPayloads {
     /**
      * S02 원격 개시에 대한 스테이션의 답 (`RequestBatterySwapResponse`).
      *
-     * ### 재고 판정은 스테이션이 한다 (PLAN §4.5)
+     * ### 재고 판정은 스테이션이 한다
      *
      * **S02.FR.04**: 배터리가 부족하면 **Charging Station 이** `Rejected` +
      * `statusInfo.reasonCode = "NoBatteryAvailable"` 로 답한다. CSMS 는 재고를 몰라도 된다 —

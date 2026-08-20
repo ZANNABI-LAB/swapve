@@ -41,7 +41,7 @@ import kotlin.time.toKotlinDuration
  *
  * [InboundCallLedger] · [StationSerializer] · [OcppPayloadValidator] · [OcppEventSink] 는
  * **전 연결이 공유하는 싱글턴 빈**이다. 앞의 둘은 키가 `stationId` 라서 재접속으로 세션이
- * 바뀌어도 이어져야 하고 (PLAN §5.4 F6), 검증기는 스키마 181 개를 캐시하므로 연결마다 새로
+ * 바뀌어도 이어져야 하고 (F6), 검증기는 스키마 181 개를 캐시하므로 연결마다 새로
  * 만들면 그만큼 다시 파싱한다. 연결마다 새로 만드는 것은 [OcppSession] 하나뿐이다.
  *
  * ### 수신 순서와 교착
@@ -98,7 +98,7 @@ class OcppWebSocketHandler(
                 // 송신은 블로킹 I/O 다. 코루틴 기본 디스패처의 스레드를 붙잡지 않게 옮긴다.
                 withContext(Dispatchers.IO) { transport.sendMessage(TextMessage(text)) }
             },
-            // 핸들러는 stationId 문자열이 아니라 StationPrincipal 을 받는다 (PLAN §11.4).
+            // 핸들러는 stationId 문자열이 아니라 StationPrincipal 을 받는다.
             onCall = { _, call -> router.handle(principal, call) },
             eventSink = eventSink,
             ledger = ledger,
@@ -113,7 +113,7 @@ class OcppWebSocketHandler(
 
         // 같은 스테이션의 이전 연결이 남아 있으면 그 세션을 깨운다. 기다리던 CALL 들이
         // NotConnected 로 돌아간다. 멱등 원장은 건드리지 않는다 — 재전송이 오면 저장된 응답을
-        // 그대로 다시 보내야 한다 (PLAN §5.4 F6).
+        // 그대로 다시 보내야 한다 (F6).
         sessions.register(ocppSession)?.let { previous ->
             log.info("같은 스테이션의 이전 세션을 대체한다: station={}", principal.stationId)
             previous.close()

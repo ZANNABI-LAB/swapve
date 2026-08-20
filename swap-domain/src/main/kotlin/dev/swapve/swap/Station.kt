@@ -3,8 +3,8 @@ package dev.swapve.swap
 /**
  * 교환 스테이션 — 슬롯의 집합과 소유자.
  *
- * [operatorId] 는 값이 항상 하나여도 둔다 (PLAN §11.3). 재고 판정은 스테이션이 하므로
- * (PLAN §4.5) CSMS 는 이 모델로 재고를 계산하지 않는다 — 관측된 슬롯 상태를 담아 둘 뿐이다.
+ * [operatorId] 는 값이 항상 하나여도 둔다. 재고 판정은 스테이션이 하므로
+ * CSMS 는 이 모델로 재고를 계산하지 않는다 — 관측된 슬롯 상태를 담아 둘 뿐이다.
  */
 data class Station(
     val id: StationId,

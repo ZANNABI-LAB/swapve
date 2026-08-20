@@ -26,7 +26,7 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
- * ★ **S04 충전 트랜잭션의 생명주기** (PLAN §4.10, §10 결정 #8 — 수신·기록만).
+ * ★ **S04 충전 트랜잭션의 생명주기** (확정 결정 결정 #8 — 수신·기록만).
  *
  * 다섯 계기가 순서대로 일어나고, CSMS 가 그것을 기록한다:
  *
@@ -133,7 +133,7 @@ class ChargingLifecycleTest {
         assertEquals(BatterySwapWire.TRIGGER_REASON_ENERGY_LIMIT_REACHED, suspend.triggerReason)
         assertEquals(BatterySwapWire.CHARGING_STATE_SUSPENDED_EVSE, suspend.chargingState)
 
-        // ★ 여기가 핵심이다 — 멈춘 것은 에너지 흐름이지 트랜잭션이 아니다 (PLAN §4.10 표 4행).
+        // ★ 여기가 핵심이다 — 멈춘 것은 에너지 흐름이지 트랜잭션이 아니다 (표 4행).
         assertTrue(transaction.isSuspended, "SuspendedEVSE 로 읽히지 않는다")
         assertTrue(!transaction.isEnded, "상한 도달로 트랜잭션이 종료됐다 — 종료는 배터리를 뺄 때다")
         assertNull(suspend.stoppedReason, "멈춤에는 stoppedReason 이 없다 — 끝난 것이 아니기 때문이다")
@@ -153,7 +153,7 @@ class ChargingLifecycleTest {
             )
             val ended = transaction.events.last()
 
-            // ★ v3.1 정정값 그대로다 (PLAN §0). 셋 다 enum 으로는 유효해서 스키마가 잡지 못한다.
+            // ★ v3.1 정정값 그대로다. 셋 다 enum 으로는 유효해서 스키마가 잡지 못한다.
             assertEquals(BatterySwapWire.TX_ENDED, ended.eventType)
             assertEquals(BatterySwapWire.TRIGGER_REASON_ENERGY_LIMIT_REACHED, ended.triggerReason, "왜 끝났나")
             assertEquals(BatterySwapWire.STOPPED_REASON_EV_DISCONNECTED, ended.stoppedReason, "무엇이 끊겼나")
@@ -162,13 +162,13 @@ class ChargingLifecycleTest {
         }
     }
 
-    // ------------------------------------------------------------------ ★★ PLAN §5.1 — 두 생명주기의 독립
+    // ------------------------------------------------------------------ ★★ 두 생명주기의 독립
 
     @Test
     fun `교환이 Completed 가 된 뒤에도 들어온 배터리의 충전은 계속된다`() {
         val run = runLifecycle("CS-CHG-INDEPENDENT", chargeToLimit = true, removeBatteries = true)
 
-        // 교환은 끝났다 — 들어온 수 = 나간 수 (PLAN §5.3).
+        // 교환은 끝났다 — 들어온 수 = 나간 수.
         val swap = assertNotNull(swaps.find(StationId(run.stationId), run.requestId), "교환이 열리지 않았다")
         val completed = assertIs<SwapTransaction.Completed>(swap, "교환이 완료되지 않았다: $swap")
         assertEquals(2, completed.batteriesIn.size)
@@ -179,7 +179,7 @@ class ChargingLifecycleTest {
             val charging = assertNotNull(run.chargingAt(slotId), "슬롯 $slotId 의 충전이 없다")
             assertTrue(
                 !charging.isEnded,
-                "교환이 끝났다고 충전 트랜잭션까지 닫혔다 — 두 생명주기가 합쳐졌다는 뜻이다 (PLAN §5.1)",
+                "교환이 끝났다고 충전 트랜잭션까지 닫혔다 — 두 생명주기가 합쳐졌다는 뜻이다",
             )
         }
 

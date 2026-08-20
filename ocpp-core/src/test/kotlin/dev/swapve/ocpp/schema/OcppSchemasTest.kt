@@ -20,7 +20,7 @@ class OcppSchemasTest {
 
     @Test
     fun `Battery Swap 기능 블록 메시지 4종이 모두 존재한다`() {
-        // PLAN §4.3 — 2.1 이 신설한 전용 메시지
+        // 2.1 이 신설한 전용 메시지
         listOf(
             "BatterySwapRequest",
             "BatterySwapResponse",
@@ -34,7 +34,7 @@ class OcppSchemasTest {
         val schema = OcppSchemas.read("BatterySwapRequest")
 
         assertContains(schema, "\"\$id\": \"urn:OCPP:Cp:2:2025:1:BatterySwapRequest\"")
-        // PLAN §4.3 — eventType 의 세 값. BatteryOutTimeout 이 §4.7 의 핵심.
+        // eventType 의 세 값. BatteryOutTimeout 이 §4.7 의 핵심.
         assertContains(schema, "BatteryOutTimeout")
         assertContains(schema, "Creative Commons Attribution-NoDerivatives")
     }

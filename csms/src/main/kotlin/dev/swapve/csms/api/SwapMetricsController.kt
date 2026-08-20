@@ -4,11 +4,11 @@ import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.RestController
 
 /**
- * ★ **성공 기준 S5** — *"교환 성공률·소요시간·실패 사유가 REST 로 조회"* (PLAN §2).
+ * ★ **성공 기준 S5** — *"교환 성공률·소요시간·실패 사유가 REST 로 조회"*.
  *
  * ### 여기까지다 — 대시보드는 만들지 않는다
  *
- * PLAN §10 **결정 #2** 가 명시적으로 제외했다. 이 엔드포인트가 JSON 을 내는 것으로 S5 는
+ * 대시보드는 범위에서 명시적으로 제외했다. 이 엔드포인트가 JSON 을 내는 것으로 S5 는
  * 충족되고, 그것을 그리는 일은 이 프로젝트의 범위가 아니다. HTML 도 JS 도 차트도 없다.
  *
  * 계산은 전부 [SwapMetricsService] 가 한다 — **기존 기록에서 파생 계산**하며 지표를 위한

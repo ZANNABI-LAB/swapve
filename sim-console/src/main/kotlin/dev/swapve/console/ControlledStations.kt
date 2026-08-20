@@ -49,7 +49,7 @@ enum class SwapProgress {
 }
 
 /**
- * 화면의 장애 주입 버튼 여섯 개 (PLAN §5.4).
+ * 화면의 장애 주입 버튼 여섯 개.
  *
  * ### 재현 수단이 두 갈래다 — 그게 이 열거형이 하는 일의 절반이다
  *
@@ -61,7 +61,7 @@ enum class SwapProgress {
  * 그러면 "구성으로 재현되는 시나리오"와 "시퀀스로 재현되는 시나리오"가 호출자에게 같은
  * 모양이 된다 — 버튼 하나가 곧 요청 하나다.
  *
- * @param title PLAN §5.4 표의 이름. 화면에 **그대로** 적힌다 — 버튼만 있고 뜻을 모르면
+ * @param title 실패 시나리오 표의 이름. 화면에 **그대로** 적힌다 — 버튼만 있고 뜻을 모르면
  *   데모가 되지 않는다.
  * @param expectation 걸었을 때 무엇이 일어나는가. 같은 표의 "정의된 처리"다.
  */
@@ -351,7 +351,7 @@ class ControlledStation(val spec: StationSpec) : AutoCloseable {
      * 시퀀스 한가운데서 끊는 훅이 필요한 시나리오는 F6 하나뿐이다.
      *
      * 나머지는 구성이나 진입점으로 재현되므로 훅을 걸지 않는다 — 없는 쓰임을 위해 훅을
-     * 더 만들지 않는다 (PLAN §11.0).
+     * 더 만들지 않는다.
      */
     private fun faultInjection(fault: FaultScenario?): FaultInjection = when (fault) {
         FaultScenario.F6 -> FaultInjection.failingAt(SimStep.BATTERY_OUT, "교환 도중 연결이 끊겼다")
@@ -412,7 +412,7 @@ class ControlledStation(val spec: StationSpec) : AutoCloseable {
      *
      * `awaitRemoteStart()` 를 기다리지 않는다. 그 자리는 **받아들인 경우에만** 깨어나는데
      * (거부는 교환을 열지 않는다), F1 이 보고 싶은 것이 바로 그 거부다. 그래서 우리가
-     * 내보낸 `RequestBatterySwapResponse` 를 이벤트 로그에서 직접 읽는다 (PLAN §11.1 —
+     * 내보낸 `RequestBatterySwapResponse` 를 이벤트 로그에서 직접 읽는다 (
      * 파생 상태는 로그에서 재구성한다).
      */
     private suspend fun awaitRemoteOutcome(simulator: StationSimulator) {
@@ -443,7 +443,7 @@ class ControlledStation(val spec: StationSpec) : AutoCloseable {
         )
     }
 
-    /** F3 — 응답에 붙어 온 customData 거부 (PLAN §4.8). 없으면 `null` 이다. */
+    /** F3 — 응답에 붙어 온 customData 거부. 없으면 `null` 이다. */
     private fun rejectionNote(simulator: StationSimulator): String? =
         simulator.eventLog.of(spec.stationId)
             .filter { it.direction == MessageDirection.INBOUND && it.action == BatterySwapWire.BATTERY_SWAP }

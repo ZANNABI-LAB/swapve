@@ -12,7 +12,7 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
- * [StationCommandBus] — 상위 계층이 스테이션에 닿는 유일한 통로 (PLAN §11.5).
+ * [StationCommandBus] — 상위 계층이 스테이션에 닿는 유일한 통로.
  *
  * 여기 어디에도 세션 객체가 나오지 않는다. **항상 `stationId` 로 지시한다.**
  */

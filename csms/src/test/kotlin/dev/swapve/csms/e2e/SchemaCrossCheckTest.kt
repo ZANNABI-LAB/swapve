@@ -20,7 +20,7 @@ import org.springframework.context.annotation.Import
 import kotlin.test.assertTrue
 
 /**
- * ★ **S1 의 나머지 절반** — 오간 **모든 메시지가 공식 스키마 검증을 통과한다** (PLAN §2).
+ * ★ **S1 의 나머지 절반** — 오간 **모든 메시지가 공식 스키마 검증을 통과한다**.
  *
  * 양쪽 이벤트 로그의 원문을 전부 다시 꺼내 공식 스키마에 건다. 검사 대상이 우리가 만든
  * 객체가 아니라 **실제로 소켓을 지난 바이트**라는 것이 요점이다.

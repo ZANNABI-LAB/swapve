@@ -22,9 +22,9 @@ import kotlin.test.assertTrue
 
 /**
  * 시뮬레이터가 보내는 메시지가 **Part 6 스테이션 측 Tool validation** 을 통과하는지 본다
- * (PLAN §7.2 — 시험 대상이 Charging Station 인 케이스가 곧 시뮬레이터의 명세다).
+ * (시험 대상이 Charging Station 인 케이스가 곧 시뮬레이터의 명세다).
  *
- * 검사 대상은 시뮬레이터가 남긴 이벤트 로그의 **원문**이다 (PLAN §11.1). 내부 상태가 아니라
+ * 검사 대상은 시뮬레이터가 남긴 이벤트 로그의 **원문**이다. 내부 상태가 아니라
  * 실제로 전선 위로 나간 바이트를 본다는 것이 요점이다.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
@@ -73,11 +73,11 @@ class ProtocolContractTest {
             "type=$type",
         )
 
-        // deprecated 된 StatusNotification 은 쓰지 않는다 (PLAN §4.5).
+        // deprecated 된 StatusNotification 은 쓰지 않는다.
         assertTrue(sent.none { it.action == "StatusNotification" })
     }
 
-    // ------------------------------------------------------------------ ⚠️ 반전 함정 (PLAN §4.2)
+    // ------------------------------------------------------------------ ⚠️ 반전 함정
 
     @ParameterizedTest(name = "{0} — 넣으면 Occupied, 빼면 Available 을 보고한다")
     @EnumSource(SwapOrder::class)

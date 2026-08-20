@@ -7,7 +7,7 @@ import dev.swapve.ocpp.swap.VariableStatus
 import dev.swapve.ocpp.swap.VariableWrite
 
 /**
- * 스테이션이 들고 있는 디바이스 모델 (PLAN §4.9, S04).
+ * 스테이션이 들고 있는 디바이스 모델 (S04).
  *
  * ### ★ 제약 판정은 여기서 한다 — 스테이션이 디바이스 모델의 소유자다
  *
@@ -27,7 +27,7 @@ import dev.swapve.ocpp.swap.VariableWrite
  * ### 타임아웃은 변수 하나 + 인스턴스다
  *
  * `Timeout` 을 **인스턴스 없이** 조회하면 `UnknownVariable` 이다. 어느 타임아웃인지 정해지지
- * 않았기 때문이다 (PLAN §4.9 주의 1). 이 동작이 "변수 2개로 잘못 모델링하지 않았다"를
+ * 않았기 때문이다 (주의 1). 이 동작이 "변수 2개로 잘못 모델링하지 않았다"를
  * 실행되는 검사로 만든다.
  *
  * 스레드 안전하다 — 세션이 수신 코루틴에서 부른다.
@@ -293,7 +293,7 @@ class SimDeviceModel(
         additionalInfo = "이 스테이션이 갖지 않은 컴포넌트다: ${ref.component}",
     )
 
-    /** `Timeout` 을 인스턴스 없이 물었을 때 그 사실을 말해 준다 (PLAN §4.9 주의 1). */
+    /** `Timeout` 을 인스턴스 없이 물었을 때 그 사실을 말해 준다 (주의 1). */
     private fun unknownVariableHint(ref: VariableRef): String =
         if (ref.variable.equals(DeviceModelVariables.VARIABLE_TIMEOUT, ignoreCase = true) &&
             ref.variableInstance == null

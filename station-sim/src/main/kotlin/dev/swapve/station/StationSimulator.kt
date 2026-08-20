@@ -31,11 +31,11 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * 배터리 교환 스테이션 시뮬레이터 — IoT 쪽 역할 (PLAN §6).
+ * 배터리 교환 스테이션 시뮬레이터 — IoT 쪽 역할.
  *
  * ### 이것은 시뮬레이터가 아니라 명세의 실행본이다
  *
- * 함수 하나하나가 Part 6 의 **스테이션 측 재사용 상태**에 대응한다 (PLAN §7.2). 시험 대상이
+ * 함수 하나하나가 Part 6 의 **스테이션 측 재사용 상태**에 대응한다. 시험 대상이
  * Charging Station 인 케이스가 곧 시뮬레이터의 명세이기 때문이다.
  *
  * | Part 6 재사용 상태 | 함수 |
@@ -46,7 +46,7 @@ import kotlin.time.Duration.Companion.seconds
  * | `EnergyTransferStartedBatterySwapping` | [reportChargingStarted] |
  * | `EVDisconnectedBatterySwapping` | [removeBatteries] |
  *
- * M9 가 S04 를 완성하며 셋이 더 붙었다 (PLAN §4.10):
+ * M9 가 S04 를 완성하며 셋이 더 붙었다:
  *
  * | 요구 | 함수 |
  * |---|---|
@@ -55,19 +55,19 @@ import kotlin.time.Duration.Companion.seconds
  * | **S04.FR.05/06/10/12** 디바이스 모델 조회·설정 | [SimDeviceModel] (`GetVariables`/`SetVariables` 응답) |
  *
  * [runSwap] 이 이들을 `SwapOrder` 에 따라 엮는다. **두 순서 모두 같은 상태 집합을 지나되
- * 진입 순서만 다르다** — Part 6 의 진입 조건을 그대로 옮기면 PLAN §4.6 의 양방향이 저절로
+ * 진입 순서만 다르다** — Part 6 의 진입 조건을 그대로 옮기면 양방향 교환 순서가 저절로
  * 검증된다.
  *
  * ### 프로토콜을 다시 구현하지 않는다
  *
  * 프레이밍·스키마 검증·멱등·per-station 직렬화는 전부 `ocpp-core` 의 [OcppSession] 이 한다.
- * **CSMS 와 같은 모듈을 공유하는 것이 요점이다** (PLAN §6 원칙 3) — 인코딩이 어긋나면 양쪽
+ * **CSMS 와 같은 모듈을 공유하는 것이 요점이다** (원칙 3) — 인코딩이 어긋나면 양쪽
  * 중 한쪽이 아니라 시험 전체가 즉시 빨개진다.
  *
  * ### 도메인 어휘로 상태를 들고, 경계에서만 바꾼다
  *
  * 슬롯 상태는 [SlotState] 로 들고 있다가 나갈 때만 `Available`/`Occupied` 로 바꾼다
- * (PLAN §4.2, §6 원칙 4). 그 변환은 `ocpp-core` 의 `AvailabilityState` 한 군데에만 있다.
+ * (§6 원칙 4). 그 변환은 `ocpp-core` 의 `AvailabilityState` 한 군데에만 있다.
  *
  * ### 실제 시간을 쓰지 않는다
  *
@@ -78,7 +78,7 @@ class StationSimulator(
     val config: StationSimConfig,
     private val clock: Clock = Clock.systemUTC(),
     private val faults: FaultInjection = FaultInjection.None,
-    /** 오간 메시지 원문이 전부 남는다 (PLAN §11.1). 시험이 이 로그를 읽어 계약을 확인한다. */
+    /** 오간 메시지 원문이 전부 남는다. 시험이 이 로그를 읽어 계약을 확인한다. */
     val eventLog: InMemoryOcppEventLog = InMemoryOcppEventLog(),
     private val validator: OcppPayloadValidator = OcppPayloadValidator(),
 ) : AutoCloseable {
@@ -106,7 +106,7 @@ class StationSimulator(
         config.slots.associate { it.slotId to SimSlot(it, it.battery) }
 
     /**
-     * 이 스테이션의 디바이스 모델 (PLAN §4.9).
+     * 이 스테이션의 디바이스 모델.
      *
      * `BatteryCartridge.SoC`/`SoH` 를 여기 저장하지 않고 [slots] 에서 파생하도록 넘긴다 —
      * 배터리가 바뀌면 답도 따라 바뀌어야 하기 때문이다 (S04.FR.12).
@@ -197,12 +197,12 @@ class StationSimulator(
      *
      * 그 슬롯의 충전은 **이 시나리오 이전에** 시작됐다. 트랜잭션 식별자만 이어받고 `Started`
      * 는 보내지 않으므로, CSMS 는 나중에 **시작을 본 적 없는 트랜잭션의 종료**를 받게 된다.
-     * `TC_S_103_CSMS` 의 tx `…-1`/`…-2` 가 정확히 그것이다 (PLAN §7.1 읽을 것 5).
+     * `TC_S_103_CSMS` 의 tx `…-1`/`…-2` 가 정확히 그것이다 (읽을 것 5).
      */
     suspend fun boot() = bootSequence(afterReboot = false)
 
     /**
-     * ★ **S04.FR.11 — 재부팅** (PLAN §4.10).
+     * ★ **S04.FR.11 — 재부팅**.
      *
      * > *"스테이션 재부팅 시, 배터리가 들어 있는 모든 EVSE 에 대해 트랜잭션을 새로 시작한다."*
      *
@@ -282,7 +282,7 @@ class StationSimulator(
     // ------------------------------------------------------------------ AuthorizedBatterySwapping
 
     /**
-     * S01 로컬 인가 (Part 6 `AuthorizedBatterySwapping` 방식 A, PLAN §4.4).
+     * S01 로컬 인가 (Part 6 `AuthorizedBatterySwapping` 방식 A).
      *
      * **requestId 는 여기서 스테이션이 정한다.** CSMS 는 `AuthorizeRequest` 만으로는 그 값을
      * 알 수 없고, 이어지는 `BatterySwapRequest` 가 실어 올 때 비로소 교환을 연다 — CSMS 쪽
@@ -313,7 +313,7 @@ class StationSimulator(
      * 5. `BatterySwapRequest(BatteryIn)` → 6. `BatterySwapResponse`
      *
      * 마지막 `BatterySwap` 하나가 **투입된 배터리 전부**를 싣는다 — 배터리는 세트 단위다
-     * (PLAN §10 결정 #6).
+     * (결정 #6).
      */
     suspend fun insertBatteries() {
         val inserted = config.insertSlots.zip(config.incomingBatteries)
@@ -370,7 +370,7 @@ class StationSimulator(
     // ------------------------------------------------------------------ 충전 진행 (S04.FR.04)
 
     /**
-     * ★ **SoC 주기 보고 한 번** (S04.FR.04, PLAN §4.10).
+     * ★ **SoC 주기 보고 한 번** (S04.FR.04).
      *
      * 슬롯의 배터리 SoC 를 [byPercent] 만큼 올리고 `TransactionEvent(Updated)` 에 measurand
      * `SoC` 를 실어 보낸다. 상한은 `BatterySwapCtrlr.MaxSoc` 이다 (S04.FR.06).
@@ -457,7 +457,7 @@ class StationSimulator(
     /**
      * 상한 도달 — `Updated(EnergyLimitReached, SuspendedEVSE)`.
      *
-     * **트랜잭션은 유지된다** (PLAN §4.10 표의 4행). 닫으면 나중에 반출될 때 종료할 대상이
+     * **트랜잭션은 유지된다** (표의 4행). 닫으면 나중에 반출될 때 종료할 대상이
      * 없어 장부가 허공에서 끝난다.
      */
     private suspend fun suspendCharging(slot: SimSlot) {
@@ -542,7 +542,7 @@ class StationSimulator(
      *   `EVDisconnected`)
      *
      * 두 순서 모두 같은 상태 집합을 지난다. CSMS 의 상태머신은 어느 쪽인지 알 필요가 없고,
-     * 알아서도 안 된다 (PLAN §4.6 — 순서 불가지론).
+     * 알아서도 안 된다 (순서 불가지론).
      */
     suspend fun runSwap() {
         authorize()
@@ -581,7 +581,7 @@ class StationSimulator(
      * 원격 개시로 시작하는 교환 1건 (`TC_S_103_CSMS` step 2 이후).
      *
      * S01 의 [runSwap] 과 달리 **[authorize] 를 부르지 않는다.** 인가는 CSMS 가 이미 했고,
-     * 스테이션은 그 결과를 `Accepted` 로 답한 것으로 끝났다 (PLAN §4.4 S02).
+     * 스테이션은 그 결과를 `Accepted` 로 답한 것으로 끝났다 (S02).
      */
     suspend fun runRemoteSwap() {
         awaitRemoteStart()
@@ -598,10 +598,10 @@ class StationSimulator(
         }
     }
 
-    // ------------------------------------------------------------------ 실패 시나리오 (PLAN §5.4)
+    // ------------------------------------------------------------------ 실패 시나리오
 
     /**
-     * F2 — 제공된 배터리를 이용자가 **꺼내가지 않았다** (S03.FR.06, PLAN §4.7).
+     * F2 — 제공된 배터리를 이용자가 **꺼내가지 않았다** (S03.FR.06).
      *
      * `BatterySwapRequest(BatteryOutTimeout)` 하나를 보낸다. 슬롯 상태도 충전 트랜잭션도
      * 건드리지 않는다 — **배터리는 아직 스테이션 안에 있다.**
@@ -694,7 +694,7 @@ class StationSimulator(
         ) { text -> session.receive(text) }
     }
 
-    /** 우리가 마지막으로 내보낸 `BatterySwap` CALL 의 기록. 원문이 그대로 남아 있다 (PLAN §11.1). */
+    /** 우리가 마지막으로 내보낸 `BatterySwap` CALL 의 기록. 원문이 그대로 남아 있다. */
     private fun lastOutboundBatterySwap(): OcppEventRecord =
         eventLog.of(config.stationId)
             .lastOrNull {
@@ -710,7 +710,7 @@ class StationSimulator(
     /** 슬롯에 든 배터리. 없으면 `null`. */
     fun batteryAt(slotId: Int): SimBattery? = slotOf(slotId).battery
 
-    /** 슬롯에서 도는 충전 트랜잭션 식별자. 교환 트랜잭션과 무관하다 (PLAN §5.1). */
+    /** 슬롯에서 도는 충전 트랜잭션 식별자. 교환 트랜잭션과 무관하다. */
     fun chargingTransactionAt(slotId: Int): String? = slotOf(slotId).transactionId
 
     // ------------------------------------------------------------------ 내부
@@ -718,7 +718,7 @@ class StationSimulator(
     /**
      * 슬롯 상태를 알린다 (S03.FR.02/04).
      *
-     * 배터리가 있으면 `Occupied` 가 나간다 — 직관과 반대다 (PLAN §4.2). 그 변환은
+     * 배터리가 있으면 `Occupied` 가 나간다 — 직관과 반대다. 그 변환은
      * [SimPayloads] 를 거쳐 `AvailabilityState` 한 곳에서만 일어난다.
      */
     private suspend fun reportSlotStatus(slot: SimSlot) {
@@ -744,7 +744,7 @@ class StationSimulator(
      */
     private suspend fun startChargingTransaction(slot: SimSlot, transactionId: String? = null) {
         // 식별자가 고정된 슬롯이면 그 값을 쓴다 — 적합성 시험이 스펙 원문의 tx 를 그대로
-        // 쓰기 위한 자리다. 아니면 발번한다 (로컬 카운터 금지, PLAN §11.5).
+        // 쓰기 위한 자리다. 아니면 발번한다 (로컬 카운터 금지).
         val newTransactionId = transactionId ?: slot.config.chargingTransactionId ?: MessageIds.next()
         slot.transactionId = newTransactionId
         slot.txSeqNo = 0
@@ -770,7 +770,7 @@ class StationSimulator(
     /**
      * 충전 트랜잭션을 닫는다 (S04, `TxStopPoint = EVConnected`).
      *
-     * ### ★ 세 값을 각각 싣는다 (M7 정정, PLAN §0 v3.1)
+     * ### ★ 세 값을 각각 싣는다 (M7 에서 스펙 원문과 대조해 정정했다)
      *
      * - `triggerReason = EnergyLimitReached` — 왜 끝났나
      * - `stoppedReason = EVDisconnected` — 무엇이 끊겼나
@@ -845,7 +845,7 @@ class StationSimulator(
     }
 
     /**
-     * `GetVariables` — 디바이스 모델을 읽어 답한다 (S04.FR.12, PLAN §4.5).
+     * `GetVariables` — 디바이스 모델을 읽어 답한다 (S04.FR.12).
      *
      * 항목마다 **독립적으로** 판정한다. 하나가 `UnknownVariable` 이어도 나머지는 정상
      * 응답한다 — 스키마의 `getVariableResult` 가 요청 항목과 1:1 인 배열이고, 전체를 실패로
@@ -903,7 +903,7 @@ class StationSimulator(
      *
      * `ConfigurationInventory` / `SummaryInventory` 는 "설정 가능한 것만" · "요약만" 이라는
      * **다른 목록**이다. 같은 전체 목록을 세 이름으로 답하면 그건 세 종류를 지원하는 것이
-     * 아니라 두 개를 잘못 답하는 것이라, 지원하지 않는다고 말한다 (PLAN §11.0).
+     * 아니라 두 개를 잘못 답하는 것이라, 지원하지 않는다고 말한다.
      */
     private fun getBaseReport(payload: ObjectNode): InboundResponse {
         val reportBase = payload.path("reportBase").asText()
@@ -953,7 +953,7 @@ class StationSimulator(
     /**
      * S02 원격 개시 요청을 판정한다 (Part 6 `AuthorizedBatterySwapping` 방식 B).
      *
-     * ### ★ 재고 판정은 여기서 한다 (PLAN §4.5)
+     * ### ★ 재고 판정은 여기서 한다
      *
      * **S02.FR.04**: 배터리가 부족하면 **스테이션이** `Rejected` +
      * `statusInfo.reasonCode = NoBatteryAvailable` 로 답한다. CSMS 는 재고를 모른다.

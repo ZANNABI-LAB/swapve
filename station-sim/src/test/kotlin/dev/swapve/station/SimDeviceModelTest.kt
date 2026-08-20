@@ -12,12 +12,12 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
- * 디바이스 모델의 계약 (PLAN §4.9, S04).
+ * 디바이스 모델의 계약 (S04).
  *
  * ### 이 시험이 지키는 것은 **틀리기 쉬운 세 가지**다
  *
  * 1. **타임아웃은 변수 하나 + 인스턴스다.** `BatterySwapInTimeout`/`BatterySwapOutTimeout`
- *    이라는 변수 두 개가 아니다 (§4.9 주의 1).
+ *    이라는 변수 두 개가 아니다 (디바이스 모델 — 주의 1).
  * 2. **대소문자가 일관되지 않다** — `TargetSoC` vs `MaxSoc` (§4.9 주의 2). 정본 그대로 써야
  *    한다. "고쳐서" 보내면 상대가 못 알아듣는다.
  * 3. **`MaxSoc ≥ TargetSoC` 는 스테이션이 지킨다** (S04.FR.06/10). 판정 주체의 근거는
@@ -62,7 +62,7 @@ class SimDeviceModelTest {
 
     @Test
     fun `변수 두 개로 모델링한 이름은 존재하지 않는다`() {
-        // Part 2 본문의 축약 표기다. 정본(부록 CSV)에는 이런 변수가 없다 (§4.9 주의 1).
+        // Part 2 본문의 축약 표기다. 정본(부록 CSV)에는 이런 변수가 없다 (디바이스 모델 — 주의 1).
         listOf("BatterySwapInTimeout", "BatterySwapOutTimeout").forEach { wrongName ->
             val reading = model().read(
                 VariableRef(DeviceModelVariables.COMPONENT_BATTERY_SWAP_CTRLR, wrongName),
@@ -202,7 +202,7 @@ class SimDeviceModelTest {
     fun `모르는 컴포넌트는 UnknownComponent 다`() {
         val reading = model().read(VariableRef("SmartChargingCtrlr", "Enabled"))
 
-        // 스마트차징은 범위 밖이다 (PLAN §10 결정 #8). 없는 것을 있는 척하지 않는다.
+        // 스마트차징은 범위 밖이다 (결정 #8). 없는 것을 있는 척하지 않는다.
         assertEquals(VariableStatus.UNKNOWN_COMPONENT, reading.status)
     }
 
@@ -230,7 +230,7 @@ class SimDeviceModelTest {
 
     @Test
     fun `설정된 변수는 정확히 이 일곱 개다`() {
-        // 목록이 늘어나면 이 시험이 먼저 그 사실을 알린다 (PLAN §4.9 표).
+        // 목록이 늘어나면 이 시험이 먼저 그 사실을 알린다 (표).
         val model = model()
         assertEquals(SETTINGS.size, model.fullInventory().count { it.ref.evseId == null })
         SETTINGS.forEach { ref ->
@@ -242,7 +242,7 @@ class SimDeviceModelTest {
      * `SwapOrder` 는 **설정이 아니라 기계의 성질**이다 (S03.FR.07).
      *
      * 부록 CSV 에 없고 Part 2 본문에만 있는 변수라, 보고에 실리는지와 설정을 거부하는지를
-     * 함께 못박아 둔다 (PLAN §4.9 주의 3).
+     * 함께 못박아 둔다 (주의 3).
      */
     @Test
     fun `SwapOrder 는 보고되지만 설정할 수 없다`() {

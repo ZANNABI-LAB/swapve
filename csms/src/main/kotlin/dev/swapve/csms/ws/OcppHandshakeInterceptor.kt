@@ -30,7 +30,7 @@ import org.springframework.web.socket.server.HandshakeInterceptor
  * 여기서는 결과를 HTTP 상태로 옮길 뿐이다. 판정 자체는 순수 함수라 서버 없이 시험된다.
  *
  * 통과하면 [StationPrincipal] 을 세션 속성에 넣는다. **핸들러는 경로를 다시 파싱하지 않는다** —
- * 신원이 정해지는 곳은 핸드셰이크 한 곳뿐이어야 한다 (PLAN §11.4).
+ * 신원이 정해지는 곳은 핸드셰이크 한 곳뿐이어야 한다.
  */
 @Component
 class OcppHandshakeInterceptor(private val properties: CsmsProperties) : HandshakeInterceptor {

@@ -26,14 +26,14 @@ import java.time.Instant
  *
  * M5 의 [AuthorizationRegistry] KDoc 이 이미 결론을 내려 두었다. S01 에서 CSMS 는
  * `AuthorizeRequest` 를 처리하는 시점에 **requestId 를 알 방법이 없다** — 그 값은 스테이션이
- * 발번해 나중에 `BatterySwapRequest` 로 실어 온다 (PLAN §4.4). 그래서 M5 는 인가를
+ * 발번해 나중에 `BatterySwapRequest` 로 실어 온다. 그래서 M5 는 인가를
  * `(stationId, idToken)` 기준 `GrantedAuthorization` 으로 따로 들고 있었다.
  *
  * M6 가 그 결론을 이어받는 자리가 여기다. 첫 `BatterySwap` 이 도착하면
  * [AuthorizationRegistry.grantOf] 로 인가 사실을 꺼내
  * `SwapEvent.Authorized(SwapKey(stationId, requestId), grant.idToken, grant.at)` 를 **먼저**
  * 흘린 뒤 입고/출고 사건을 잇는다. 인가 시각이 `grant.at` 인 것이 요점이다 — 배터리 투입
- * 시각으로 대신하면 과금 근거가 조용히 훼손된다 (PLAN §11.2).
+ * 시각으로 대신하면 과금 근거가 조용히 훼손된다.
  *
  * ### 상태머신을 다시 구현하지 않는다
  *
@@ -42,7 +42,7 @@ import java.time.Instant
  *
  * ### 거부하지 않는다
  *
- * `BatterySwapResponse` 는 *"Empty response by CSMS to confirm receipt"* 다 (PLAN §4.3).
+ * `BatterySwapResponse` 는 *"Empty response by CSMS to confirm receipt"* 다.
  * 인가가 없어도, 순서가 어긋나도(F5), 중복이어도(F4) **응답은 정상 회신**이고 사실만 기록에
  * 남는다. `customData` 로 배터리를 거부하는 확장(§4.8)은 **M7** 이므로 여기 없다.
  */
@@ -84,7 +84,7 @@ class SwapCoordinator(
     }
 
     /**
-     * S02 — CSMS 가 개시한 교환을 연다 (PLAN §4.4).
+     * S02 — CSMS 가 개시한 교환을 연다.
      *
      * S01 과 달리 **여기서는 requestId 를 알고 있다.** CSMS 가 발번했기 때문이다. 그래서
      * `AuthorizeRequest` 경로처럼 첫 `BatterySwap` 을 기다릴 필요 없이 지금 바로
@@ -97,7 +97,7 @@ class SwapCoordinator(
         apply(key, SwapEvent.Authorized(key, idToken, at), at)
 
     /**
-     * S02 개시를 스테이션이 거부했다 (PLAN §5.4 F1 = `TC_S_102_CSMS`).
+     * S02 개시를 스테이션이 거부했다 (F1 = `TC_S_102_CSMS`).
      *
      * **교환을 열지 않는다.** 상태머신에 흘릴 사건 자체가 없다 — 인가가 나지 않았으므로
      * 열렸다가 닫힌 것이 아니라 처음부터 없었다. 사실만 기록에 남는다.
@@ -114,7 +114,7 @@ class SwapCoordinator(
      * 아직 교환이 열리지 않았다면 인가 사실을 찾아 [SwapEvent.Authorized] 를 먼저 흘린다.
      *
      * 인가가 없으면 **아무것도 하지 않는다.** 그러면 이어지는 입고/출고가 [SwapTransaction.Idle]
-     * 에 도착해 상태머신이 `NOT_AUTHORIZED` 이상으로 판정한다 (PLAN §5.4 F5). 없는 인가를
+     * 에 도착해 상태머신이 `NOT_AUTHORIZED` 이상으로 판정한다 (F5). 없는 인가를
      * 여기서 지어내면 그 위반이 영영 보이지 않게 된다.
      */
     private fun ensureAuthorizationApplied(key: SwapKey, idToken: IdToken) {
@@ -126,7 +126,7 @@ class SwapCoordinator(
             return
         }
 
-        // 인가 시각은 `AuthorizeResponse(Accepted)` 를 낸 그 시각이다 (PLAN §11.2).
+        // 인가 시각은 `AuthorizeResponse(Accepted)` 를 낸 그 시각이다.
         apply(key, SwapEvent.Authorized(key, grant.idToken, grant.at), grant.at)
     }
 
@@ -136,7 +136,7 @@ class SwapCoordinator(
         transactions.store(key, transition.state)
 
         when (transition) {
-            // 장부 불균형에 도달했다면 **영속시킨다** (PLAN §5.3, §5.4 F2). 이것만 DB 로
+            // 장부 불균형에 도달했다면 **영속시킨다** (실패 시나리오 F2). 이것만 DB 로
             // 가는 이유는 [OutTimedOutLedger] KDoc 에 있다 — 파생 상태가 아니라 채무다.
             is SwapTransition.Advanced ->
                 (transition.state as? SwapTransaction.OutTimedOut)?.let(outTimedOutLedger::save)
@@ -148,7 +148,7 @@ class SwapCoordinator(
 
             is SwapTransition.Anomaly -> {
                 transactions.recordAnomaly(SwapAnomaly(key, transition.reason, transition.description, at))
-                // 응답은 그대로 정상 회신된다 (PLAN §5.4). 기록만 남긴다.
+                // 응답은 그대로 정상 회신된다. 기록만 남긴다.
                 log.warn("교환 이상: key={} reason={} {}", key, transition.reason, transition.description)
             }
         }
@@ -159,7 +159,7 @@ class SwapCoordinator(
     /**
      * `IdTokenType` → 도메인 값 객체.
      *
-     * 로컬 사용자 테이블의 FK 가 아니라 `(idToken, type)` 값 객체다 (PLAN §11.3).
+     * 로컬 사용자 테이블의 FK 가 아니라 `(idToken, type)` 값 객체다.
      */
     private fun idTokenOf(node: JsonNode): IdToken =
         IdToken(node.path("idToken").asText(), node.path("type").asText())
@@ -167,9 +167,9 @@ class SwapCoordinator(
     /**
      * `BatteryDataType` → 도메인 값 객체.
      *
-     * `evseId` 가 곧 슬롯 번호다 (PLAN §4.1). `soC`/`soH` 는 **양쪽 다 보존된다** —
+     * `evseId` 가 곧 슬롯 번호다. `soC`/`soH` 는 **양쪽 다 보존된다** —
      * 교환 완료 시 결과만 남기고 버리면 나중에 과금이 스키마 변경 없이는 불가능해진다
-     * (PLAN §11.2).
+     *.
      */
     private fun batteryDataOf(array: JsonNode): List<BatteryData> = array.map { item ->
         BatteryData(

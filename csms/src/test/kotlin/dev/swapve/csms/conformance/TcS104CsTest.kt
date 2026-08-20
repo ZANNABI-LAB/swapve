@@ -37,7 +37,7 @@ import kotlin.test.assertTrue
  *
  * 여기서 시험받는 것(System under test)은 **Charging Station** 이다. 그래서 역할이 뒤집힌다:
  * **`station-sim` 이 시험 대상을 연기하고, 우리 CSMS 가 시험계(Test System)** 로서 청하고
- * 받아 본다 (PLAN §7.2 — *"시험 대상이 CS 인 케이스가 곧 시뮬레이터의 명세"*).
+ * 받아 본다 (*"시험 대상이 CS 인 케이스가 곧 시뮬레이터의 명세"*).
  *
  * 옆의 두 파일과 정반대이므로 단언을 읽을 때 주의해야 한다. `TcS103CsmsTest` 에서
  * "시뮬레이터가 보낸 것"은 *시험계의 대사*였지만, 여기서는 **시험 대상의 답**이다.
@@ -60,7 +60,7 @@ import kotlin.test.assertTrue
  *    조각이 빠져도 목록은 그럴듯해 보인다 — 값을 대조해야 드러난다. 그 대조를
  *    `GetVariables` 로 한다: **두 경로의 답이 같아야** 보고를 믿을 수 있다.
  * 4. **`BatterySwapCtrlr.SwapOrder` 가 실려 있는가.** 부록 CSV 에 없고 Part 2 본문에만 있는
- *    변수라 빠뜨리기 쉽다 (PLAN §4.9 주의 3, `DeviceModelVariables` KDoc).
+ * 변수라 빠뜨리기 쉽다 (주의 3, `DeviceModelVariables` KDoc).
  */
 @Tag("conformance")
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
@@ -146,7 +146,7 @@ class TcS104CsTest {
      * **S04 의 변수들과 `SwapOrder` 가 전부 실려 있다.**
      *
      * `Timeout` 을 `In`/`Out` **인스턴스로** 확인하는 것이 요점이다 — 변수 두 개로
-     * 모델링했다면 이 단언이 빈다 (PLAN §4.9 주의 1).
+     * 모델링했다면 이 단언이 빈다 (주의 1).
      */
     @Test
     fun `보고에 BatterySwapCtrlr 의 변수들과 BatteryCartridge 의 SoC 가 들어 있다`() {
@@ -158,7 +158,7 @@ class TcS104CsTest {
                 DeviceModelVariables.maxSoc(),
                 DeviceModelVariables.timeoutIn(),
                 DeviceModelVariables.timeoutOut(),
-                // 부록 CSV 에 없고 Part 2 본문에만 있는 변수다 (S03.FR.07, PLAN §4.9 주의 3).
+                // 부록 CSV 에 없고 Part 2 본문에만 있는 변수다 (S03.FR.07).
                 DeviceModelVariables.swapOrder(),
                 // 배터리가 든 슬롯의 카트리지 (S04.FR.12).
                 DeviceModelVariables.batterySoC(ConformanceScenario.EVSE_C),
@@ -217,7 +217,7 @@ class TcS104CsTest {
     }
 
     /**
-     * 대소문자를 무시하고 맞춰 본다 (PLAN §4.9 주의 2).
+     * 대소문자를 무시하고 맞춰 본다 (주의 2).
      *
      * **내보낼 때는 정본 철자, 받아서 맞춰 볼 때는 대소문자 무시**가 규칙이다. 보고에 실려
      * 나간 철자가 정본인지도 함께 확인한다 — 우리가 "고쳐서" 보내면 상대가 못 알아듣는다.

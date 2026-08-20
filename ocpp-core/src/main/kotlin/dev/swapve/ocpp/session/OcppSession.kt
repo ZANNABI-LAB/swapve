@@ -24,8 +24,8 @@ import kotlin.time.Duration.Companion.seconds
  * ### 전송을 하지 않는다
  *
  * 이 클래스는 프레임 한 줄을 문자열로 만들어 [transmit] 에 넘길 뿐이다. WebSocket 도,
- * Spring 도, Netty 도 모른다 (PLAN §6 설계원칙 1). 추상 전송 SPI 를 두지 않고 함수 하나를
- * 받는 이유도 같다 — 구현체 하나짜리 인터페이스는 확장이 아니라 부채다 (PLAN §11.0).
+ * Spring 도, Netty 도 모른다 (설계원칙 1). 추상 전송 SPI 를 두지 않고 함수 하나를
+ * 받는 이유도 같다 — 구현체 하나짜리 인터페이스는 확장이 아니라 부채다.
  *
  * ### 현재 시각을 조회하지 않는다
  *
@@ -45,7 +45,7 @@ import kotlin.time.Duration.Companion.seconds
  * ### 멱등과 직렬화는 세션 밖에 있다
  *
  * [ledger] 와 [serializer] 는 **여러 세션이 공유한다.** 둘 다 키가 `stationId` 라서
- * 재접속으로 세션이 바뀌어도 그대로 이어진다 (PLAN §5.4 F6, §11.5).
+ * 재접속으로 세션이 바뀌어도 그대로 이어진다 (F6, 수평 확장 여지).
  *
  * @param transmit 프레임 한 줄을 내보낸다. 실패하면 예외를 던져도 된다 — 이미 멱등 원장에
  *   기록된 응답은 재접속 후 재전송으로 살아난다.
@@ -132,7 +132,7 @@ class OcppSession(
      * 연결이 끝났다. 응답을 기다리던 CALL 들을 [OcppResult.NotConnected] 로 깨운다.
      *
      * **멱등 원장은 건드리지 않는다.** 재접속 후 재전송이 오면 저장된 응답을 그대로 다시
-     * 보내야 하기 때문이다 (PLAN §5.4 F6).
+     * 보내야 하기 때문이다 (F6).
      */
     fun close() {
         closed = true
@@ -191,7 +191,7 @@ class OcppSession(
         val key = InboundCallKey(stationId, frame.messageId)
 
         when (val claim = ledger.claim(key)) {
-            // 부수효과는 이미 한 번 일어났다. 상위 계층을 다시 부르지 않는다 (PLAN §5.4 F4·F6).
+            // 부수효과는 이미 한 번 일어났다. 상위 계층을 다시 부르지 않는다 (F4·F6).
             is CallClaim.AlreadyAnswered -> emitRaw(claim.responseText, frame.action, frame.messageId)
 
             // Part 4 §4.2.3 — "이미 같은 고유 식별자의 메시지를 처리 중".
@@ -297,7 +297,7 @@ class OcppSession(
     // ------------------------------------------------------------------ 기록과 송출
 
     /**
-     * 수신 원문을 남긴다 (PLAN §11.1).
+     * 수신 원문을 남긴다.
      *
      * 디코딩 **뒤에** 부르는 이유는 action/messageId 를 채우기 위해서다. 원문은 어느 쪽이든
      * 그대로 보존되므로 정보가 버려지지 않는다.
@@ -328,7 +328,7 @@ class OcppSession(
      * 원문 한 줄을 기록하고 내보낸다.
      *
      * 기록이 먼저다. 나갔는데 기록이 없는 것보다, 기록됐는데 못 나간 쪽이 낫다 — 전자는
-     * 로그로 상태를 재구성할 수 없게 만들지만(§11.1), 후자는 재전송으로 수습된다.
+     * 로그로 상태를 재구성할 수 없게 만들지만(이벤트 로그), 후자는 재전송으로 수습된다.
      */
     private suspend fun emitRaw(text: String, action: String?, messageId: String) {
         eventSink.append(stationId, MessageDirection.OUTBOUND, action, messageId, text, clock.instant())

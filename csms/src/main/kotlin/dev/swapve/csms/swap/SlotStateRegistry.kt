@@ -19,7 +19,7 @@ data class ObservedSlotState(
  * ### 여기가 반전을 푸는 자리다
  *
  * `NotifyEventRequest` 는 `Available`/`Occupied` 로 말하고, 그 의미는 직관과 반대다
- * (PLAN §4.2). 도메인은 [SlotState.EMPTY]/[SlotState.HOLDS_BATTERY] 로 말한다. 변환 자체는
+ *. 도메인은 [SlotState.EMPTY]/[SlotState.HOLDS_BATTERY] 로 말한다. 변환 자체는
  * `ocpp-core` 의 `AvailabilityState` 한 곳에만 있고, 이 클래스는 그 결과를 도메인 열거형으로
  * 옮겨 담을 뿐이다 — 여기에는 `"Occupied"` 라는 문자열이 없다.
  *
@@ -30,8 +30,8 @@ data class ObservedSlotState(
  * 말한다. 없는 배터리 정보를 지어내 `Slot` 을 만들면 그 불변식이 거짓말이 된다.
  *
  * 배터리 상세는 이미 다른 곳에 온전히 있다. 교환 트랜잭션이 입고·출고 양쪽의
- * `serialNumber`·`soC`·`soH` 를 보존하기 때문이다 (PLAN §11.2). 그래서 여기서는 **관측한
- * 사실만** 담는다. 정보를 지어내지도, 버리지도 않는다 (PLAN §11.0).
+ * `serialNumber`·`soC`·`soH` 를 보존하기 때문이다. 그래서 여기서는 **관측한
+ * 사실만** 담는다. 정보를 지어내지도, 버리지도 않는다.
  *
  * 스레드 안전하다.
  */
@@ -54,7 +54,7 @@ class SlotStateRegistry {
             .filter { it.key.first == stationId }
             .associate { it.key.second to it.value }
 
-    /** 배터리가 들어 있는 것으로 관측된 슬롯 수. 재고 판정이 아니라 관측 요약이다 (PLAN §4.5). */
+    /** 배터리가 들어 있는 것으로 관측된 슬롯 수. 재고 판정이 아니라 관측 요약이다. */
     fun slotsHoldingBattery(stationId: StationId): Int =
         of(stationId).count { it.value.state == SlotState.HOLDS_BATTERY }
 }

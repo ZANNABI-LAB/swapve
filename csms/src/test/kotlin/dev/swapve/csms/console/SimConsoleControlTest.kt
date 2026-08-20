@@ -49,7 +49,7 @@ import kotlin.test.assertTrue
  * ### 태그가 없다
  *
  * 적합성도 감사도 아니다. `./gradlew build` 의 L1 게이트에서 돌고, `conformanceTest` 와
- * `auditTest` 의 질문에는 손대지 않는다 (PLAN §7.3).
+ * `auditTest` 의 질문에는 손대지 않는다.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @Import(FixedClockConfig::class)
@@ -163,7 +163,7 @@ class SimConsoleControlTest {
      * **F3 — 미등록 배터리.** 구성으로 재현되는 쪽도 도는지 본다.
      *
      * F1 과 갈리는 지점이 여기다: F3 은 교환이 **정상으로 완주하되** 응답에 customData 거부가
-     * 붙는다 (PLAN §4.8, §4.3 — `BatterySwapResponse` 는 거부할 수 없다).
+     * 붙는다 (§4.3 — `BatterySwapResponse` 는 거부할 수 없다).
      */
     @Test
     fun `F3 을 걸면 등록되지 않은 배터리가 customData 로 거부된다`() {

@@ -23,7 +23,7 @@ import java.util.concurrent.Executors
  * ### JDK 내장 서버로 끝낸다
  *
  * `com.sun.net.httpserver.HttpServer` 하나다. Spring 도 Ktor 도 들이지 않는다 —
- * `station-sim` 이 전송에 JDK 내장 WebSocket 을 쓴 것과 같은 취지고 (PLAN §6), 그 사실은
+ * `station-sim` 이 전송에 JDK 내장 WebSocket 을 쓴 것과 같은 취지고, 그 사실은
  * `:sim-console:checkNoForbiddenDependencies` 가 기계로 확인한다.
  *
  * ### 이것은 관제 서버가 아니다

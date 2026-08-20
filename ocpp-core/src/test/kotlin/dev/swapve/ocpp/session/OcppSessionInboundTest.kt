@@ -97,7 +97,7 @@ class OcppSessionInboundTest {
         advanceUntilIdle()
         assertTrue(connection.sent.isEmpty(), "미지의 메시지 타입에 회신하면 안 된다")
 
-        // 원문은 기록에 남는다 (PLAN §11.1).
+        // 원문은 기록에 남는다.
         val logged = connection.log.of(connection.stationId).single()
         assertEquals(MessageDirection.INBOUND, logged.direction)
         assertEquals(OcppFrameCodec.UNREADABLE_MESSAGE_ID, logged.messageId)
@@ -166,7 +166,7 @@ class OcppSessionInboundTest {
         advanceUntilIdle()
 
         val accepted = assertIs<OcppResult.Accepted>(result.await())
-        // PLAN §4.5 S02.FR.04 — 재고 판정은 스테이션이 한다. CSMS 는 그 답을 그대로 받는다.
+        // S02.FR.04 — 재고 판정은 스테이션이 한다. CSMS 는 그 답을 그대로 받는다.
         assertEquals("Rejected", accepted.payload.get("status").textValue())
         assertEquals("NoBatteryAvailable", accepted.payload.get("statusInfo").get("reasonCode").textValue())
     }

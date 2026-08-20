@@ -79,7 +79,7 @@ class OcppEndpointTest {
         assertEquals("SwapVe-Station-1", registration.model)
         assertEquals("PowerUp", registration.bootReason)
         assertEquals(FixedClockConfig.FIXED_NOW, registration.bootedAt)
-        // 값이 항상 하나여도 둔다 (PLAN §11.3).
+        // 값이 항상 하나여도 둔다.
         assertEquals("swapve", registration.operatorId.value)
     }
 
@@ -90,7 +90,7 @@ class OcppEndpointTest {
         }
 
         // 핸들러가 stationId 문자열이 아니라 StationPrincipal 을 받았다는 증거다 —
-        // 문자열만 받았다면 authMethod 를 적을 방법이 없다 (PLAN §11.4).
+        // 문자열만 받았다면 authMethod 를 적을 방법이 없다.
         val registration = assertNotNull(stations.find(StationId("CS-PRINCIPAL")))
         assertEquals(AuthMethod.NONE, registration.authMethod)
     }
@@ -134,7 +134,7 @@ class OcppEndpointTest {
             callResult(client, "a1", "Authorize", authorizePayload("RFID-0001", "ISO14443"))
         }
 
-        // S01 의 requestId 는 스테이션이 발번한다 (PLAN §4.4). 인가 시점의 CSMS 는 그것을
+        // S01 의 requestId 는 스테이션이 발번한다. 인가 시점의 CSMS 는 그것을
         // 모르므로 교환 트랜잭션을 열지 않고 인가 사실만 붙잡아 둔다.
         // 근거는 AuthorizationRegistry KDoc 참조.
         val grant = assertNotNull(
@@ -151,7 +151,7 @@ class OcppEndpointTest {
             val payload = callResult(client, "a1", "Authorize", authorizePayload("RFID-UNKNOWN", "ISO14443"))
 
             // Invalid 가 아니라 Unknown 이다 — 로밍이 붙으면 외부 조회로 뒤집힐 수 있는 판정이다
-            // (PLAN §11.3).
+            //.
             assertEquals("Unknown", payload["idTokenInfo"]["status"].asText())
             assertSchemaValid("Authorize", payload)
         }
@@ -171,7 +171,7 @@ class OcppEndpointTest {
     @Test
     fun `같은 값이라도 type 이 다르면 다른 토큰이다`() {
         connect("CS-AUTH-TYPE").use { client ->
-            // (idToken, type) 값 객체다. 문자열 하나로 다루면 여기서 Accepted 가 나온다 (PLAN §11.3).
+            // (idToken, type) 값 객체다. 문자열 하나로 다루면 여기서 Accepted 가 나온다.
             val payload = callResult(client, "a1", "Authorize", authorizePayload("RFID-0001", "Central"))
 
             assertEquals("Unknown", payload["idTokenInfo"]["status"].asText())
@@ -247,7 +247,7 @@ class OcppEndpointTest {
 
         assertEquals(before + 1, authorizations.attempts().size)
 
-        // 새 연결이다. 그런데 멱등 원장은 stationId 로 이어져 있다 (PLAN §5.4 F6).
+        // 새 연결이다. 그런데 멱등 원장은 stationId 로 이어져 있다 (F6).
         val second = connect(station).use { client ->
             client.send(frame)
             val replayed = client.receive()
@@ -267,7 +267,7 @@ class OcppEndpointTest {
         )
     }
 
-    // ------------------------------------------------------------------ 이벤트 로그 (PLAN §11.1)
+    // ------------------------------------------------------------------ 이벤트 로그
 
     @Test
     fun `오간 메시지가 원문 그대로 이벤트 로그에 남는다`() {

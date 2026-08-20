@@ -13,7 +13,7 @@ dependencies {
     // 보안 프로파일 1 은 BCrypt 해시 검증만 필요하다. starter-security 를 넣으면
     // 필터체인 자동설정이 붙어 WebSocket 핸드셰이크 경계가 두 군데가 된다.
     implementation(libs.spring.security.crypto)
-    // OUT_TIMED_OUT 장부는 영속이 필요하다 (PLAN §5.3 불변식) — 인메모리로 끝내면 장부
+    // OUT_TIMED_OUT 장부는 영속이 필요하다 (불변식) — 인메모리로 끝내면 장부
     // 불균형이 재시작마다 사라진다. JdbcTemplate 하나로 끝내고 JPA·마이그레이션 도구는
     // 넣지 않는다. 스키마는 schema.sql 한 장이다
     implementation(libs.spring.boot.starter.jdbc)
@@ -24,7 +24,7 @@ dependencies {
     annotationProcessor(libs.spring.boot.configuration.processor)
 
     testImplementation(libs.spring.boot.starter.test)
-    // 성공 기준 S1 — 시뮬레이터와 CSMS 를 한 테스트 안에서 **실제 소켓으로** 붙인다 (PLAN §2).
+    // 성공 기준 S1 — 시뮬레이터와 CSMS 를 한 테스트 안에서 **실제 소켓으로** 붙인다.
     // 시험 전용 의존이다. main 의 의존 방향은 그대로 csms → (ocpp-core, swap-domain) 이고,
     // station-sim 은 Spring 을 여전히 모른다.
     testImplementation(project(":station-sim"))
@@ -38,12 +38,12 @@ dependencies {
  * 시험용 H2 는 저장소 루트가 아니라 `build/` 안에 둔다.
  *
  * 운영 설정(`application.yml`)은 `./data/swapve` 를 가리킨다 — 장부는 파일에 남아야 하고
- * (PLAN §5.3), 그건 시험에서도 마찬가지다. 다만 시험이 만든 파일까지 작업 디렉토리에
+ *, 그건 시험에서도 마찬가지다. 다만 시험이 만든 파일까지 작업 디렉토리에
  * 쌓일 이유는 없으므로 시스템 프로퍼티로 덮는다. **인메모리로 바꾸지 않는다** — 그러면
  * "재시작 후에도 남는가"를 시험이 확인할 수 없다.
  *
  * 태스크마다 DB 디렉토리를 나누고 시작할 때 비운다. `SwapMetricsService` 가 이벤트 로그
- * 전체를 스캔해 §11.1 전역 지표를 계산하는 것은 운영에서 맞는 동작이지만, 앞선 시험 실행이
+ * 전체를 스캔해 이벤트 로그 전역 지표를 계산하는 것은 운영에서 맞는 동작이지만, 앞선 시험 실행이
  * 남긴 로그까지 다음 실행이 같이 세면 그것은 시험 격리의 결함이다. `conformanceTest` 와
  * `auditTest` 를 매번 실제로 돌리는 이유와 같은 논지다.
  */
@@ -70,7 +70,7 @@ tasks.withType<Test>().configureEach {
 }
 
 /**
- * ★ **L2 표준 적합성 게이트의 실체** (PLAN §7.3).
+ * ★ **L2 표준 적합성 게이트의 실체**.
  *
  * 시험 대상(System under test)이 CSMS 인 Part 6 케이스가 여기서 돈다. 시험계(Test System)
  * 역할은 `station-sim` 이 맡는다 — 시뮬레이터가 스펙 시퀀스를 그대로 연기하고, 우리가
@@ -86,7 +86,7 @@ tasks.withType<Test>().configureEach {
  */
 val conformanceTest by tasks.registering(Test::class) {
     group = "verification"
-    description = "TC_S_102_CSMS · TC_S_103_CSMS · TC_S_104_CS 와 실패 시나리오 F1~F6 (PLAN §2 S2·S3)"
+    description = "TC_S_102_CSMS · TC_S_103_CSMS · TC_S_104_CS 와 실패 시나리오 F1~F6 (S2·S3)"
 
     val testSourceSet = sourceSets["test"]
     testClassesDirs = testSourceSet.output.classesDirs
@@ -104,10 +104,10 @@ val conformanceTest by tasks.registering(Test::class) {
 }
 
 /**
- * ★ **L3 부하 + 불변식 감사 게이트의 실체** (PLAN §7.3, 성공 기준 S4).
+ * ★ **L3 부하 + 불변식 감사 게이트의 실체** (성공 기준 S4).
  *
  * 스테이션 20 대를 동시에 붙여 교환을 완주시킨 뒤, **이벤트 로그에서 재구성한 상태**로
- * 불변식을 전수 검사한다 (PLAN §11.1). `conformanceTest` 와 마찬가지로 소스셋을 나누지 않고
+ * 불변식을 전수 검사한다. `conformanceTest` 와 마찬가지로 소스셋을 나누지 않고
  * 태그로만 가른다 — 감사 시험도 `FixedClockConfig` 같은 기존 시험 지원 코드를 그대로 쓴다.
  *
  * `test` 와 `conformanceTest` 어디에도 섞이지 않는다. 세 게이트가 서로 다른 질문에 답하기
@@ -116,7 +116,7 @@ val conformanceTest by tasks.registering(Test::class) {
  */
 val auditTest by tasks.registering(Test::class) {
     group = "verification"
-    description = "스테이션 20대 동시 접속 후 불변식 감사 (PLAN §2 S4)"
+    description = "스테이션 20대 동시 접속 후 불변식 감사 (S4)"
 
     val testSourceSet = sourceSets["test"]
     testClassesDirs = testSourceSet.output.classesDirs
@@ -139,7 +139,7 @@ val auditTest by tasks.registering(Test::class) {
 }
 
 /**
- * **Spring 은 여기서 멈춘다** (PLAN §6 설계원칙 1).
+ * **Spring 은 여기서 멈춘다** (설계원칙 1).
  *
  * `ocpp-core` 와 `swap-domain` 은 프레임워크를 모르고, 그것을 각 모듈의
  * `checkNoFrameworkImports` / `checkNoExternalDependencies` 가 기계 검증한다.

@@ -3,16 +3,16 @@ package dev.swapve.swap
 import java.time.Instant
 
 /**
- * 교환 트랜잭션 상태머신 (PLAN §5.2).
+ * 교환 트랜잭션 상태머신.
  *
  * `(현재 상태, 사건) -> 전이 결과` 순수 함수 하나다. I/O 도, 전역 상태도, 현재 시각 조회도
  * 없다 — 시각은 사건이 실어 온다. 같은 입력이면 항상 같은 결과다.
  *
- * **순서 불가지론이다** (PLAN §4.6). 입고 먼저와 출고 먼저를 대칭으로 처리하고, 두 경로 모두
+ * **순서 불가지론이다**. 입고 먼저와 출고 먼저를 대칭으로 처리하고, 두 경로 모두
  * 같은 [SwapTransaction.Completed] 에 도달한다. 어느 순서로 동작하는 스테이션인지는 이
  * 상태머신이 알 필요가 없다 — 안다면 그건 잘못된 전제를 코드에 박은 것이다.
  *
- * **배터리는 세트 단위다** (PLAN §10 결정 #6). 입고도 출고도 여러 개를 한 번에 받는다.
+ * **배터리는 세트 단위다** (결정 #6). 입고도 출고도 여러 개를 한 번에 받는다.
  */
 object SwapStateMachine {
 
@@ -90,7 +90,7 @@ object SwapStateMachine {
             completedAt = event.at,
         )
 
-        // F2 수령 타임아웃 — 들어온 배터리가 orphan 으로 남는다 (PLAN §4.7 S03.FR.06).
+        // F2 수령 타임아웃 — 들어온 배터리가 orphan 으로 남는다 (S03.FR.06).
         is SwapEvent.BatteryOutTimeout -> SwapTransition.Advanced(
             SwapTransaction.OutTimedOut(
                 key = state.key,
@@ -125,10 +125,10 @@ object SwapStateMachine {
     }
 
     /**
-     * 두 반쪽을 합쳐 완료한다. 입고 먼저든 출고 먼저든 같은 자리로 모인다 (PLAN §4.6).
+     * 두 반쪽을 합쳐 완료한다. 입고 먼저든 출고 먼저든 같은 자리로 모인다.
      *
      * 수량이 맞지 않으면 [SwapTransaction.Completed] 를 만들지 않는다. "들어온 수 = 나간 수"
-     * 불변식 (PLAN §5.3) 이 구성상 항상 참이 되도록, 불균형은 완료가 아니라 이상으로 뺀다.
+     * 불변식 이 구성상 항상 참이 되도록, 불균형은 완료가 아니라 이상으로 뺀다.
      */
     private fun complete(
         state: SwapTransaction,

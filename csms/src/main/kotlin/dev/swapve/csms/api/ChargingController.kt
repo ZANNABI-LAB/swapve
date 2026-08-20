@@ -10,9 +10,9 @@ import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
 
 /**
- * 충전 트랜잭션 조회 (S04, PLAN §4.10).
+ * 충전 트랜잭션 조회 (S04).
  *
- * ### 왜 교환 API 와 **다른 자원**인가 (PLAN §5.1)
+ * ### 왜 교환 API 와 **다른 자원**인가
  *
  * 들어온 배터리의 충전은 **교환이 끝난 뒤에도 며칠 계속된다.** 그래서 충전은 교환의
  * 하위 자원이 될 수 없다 — `/api/swaps/{id}/charging` 같은 경로를 뚫으면 교환이 완료된
@@ -21,7 +21,7 @@ import org.springframework.web.bind.annotation.RestController
  *
  * ### 왜 지금 만드나
  *
- * PLAN §10 결정 #2 가 **"지표 대시보드는 제외, REST 조회까지만"** 이라고 범위를 그었고,
+ * 범위는 **"지표 대시보드는 제외, REST 조회까지만"** 으로 그어져 있고,
  * §4.5 는 CSMS 가 충전 진행을 알고 싶을 때의 수단으로 `TransactionEvent(Updated)` +
  * measurand `SoC` 를 든다. 그 값이 기록으로만 있고 밖에서 읽을 길이 없으면, "어느 슬롯의
  * 어느 배터리가 얼마나 찼는가"를 확인하려면 시험 코드를 읽어야 한다. 조회 하나가 그 간극을
@@ -32,7 +32,7 @@ import org.springframework.web.bind.annotation.RestController
  * ### 쓰기가 없다
  *
  * 충전 트랜잭션은 스테이션이 만드는 사실이지 CSMS 가 지시하는 것이 아니다. 스마트차징도
- * 요금도 범위 밖이다 (§10 결정 #8). 그래서 이 컨트롤러에는 `POST` 도 `PATCH` 도 없다.
+ * 요금도 범위 밖이다 (확정 결정 결정 #8). 그래서 이 컨트롤러에는 `POST` 도 `PATCH` 도 없다.
  *
  * ### REST Basic 경계를 지난다
  *

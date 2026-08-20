@@ -28,12 +28,12 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /**
- * ★ **성공 기준 S1** (PLAN §2) — 시뮬레이터와 CSMS 가 S03 교환 1건을 완주한다.
+ * ★ **성공 기준 S1** — 시뮬레이터와 CSMS 가 S03 교환 1건을 완주한다.
  *
  * 실제 WebSocket 으로 붙는다. 인프로세스지만 소켓은 진짜이고, 프레임은 M1 코덱 → M2 스키마
  * 검증 → M4 세션(멱등·직렬화) → 라우터 → M3 상태머신 전 경로를 그대로 지난다.
  *
- * **In-Out 과 Out-In 두 순서 모두 완주해야 한다** (PLAN §4.6). 두 순서는 같은 상태 집합을
+ * **In-Out 과 Out-In 두 순서 모두 완주해야 한다**. 두 순서는 같은 상태 집합을
  * 지나되 진입 순서만 다르고, 상태머신은 어느 쪽인지 모른 채 같은 `Completed` 에 도달한다.
  *
  * 시계는 양쪽 다 고정돼 있고 `sleep` 이 없다 — 시험은 결정적이다.
@@ -70,11 +70,11 @@ class SwapEndToEndTest {
         val transaction = assertNotNull(swaps.find(station, requestId), "교환이 열리지 않았다")
         val completed = assertIs<SwapTransaction.Completed>(transaction, "교환이 완료되지 않았다: $transaction")
 
-        // 들어온 수 = 나간 수 (PLAN §5.3 COMPLETED 불변식).
+        // 들어온 수 = 나간 수 (COMPLETED 불변식).
         assertEquals(SwapScenario.INCOMING.size, completed.batteriesIn.size)
         assertEquals(completed.batteriesIn.size, completed.batteriesOut.size)
 
-        // 인가 시각은 `AuthorizeResponse(Accepted)` 를 낸 시각이지 배터리 투입 시각이 아니다 (PLAN §11.2).
+        // 인가 시각은 `AuthorizeResponse(Accepted)` 를 낸 시각이지 배터리 투입 시각이 아니다.
         assertEquals(FixedClockConfig.FIXED_NOW, completed.authorizedAt)
         assertEquals(SwapScenario.AUTHORIZED_TOKEN, completed.idToken)
     }
@@ -88,14 +88,14 @@ class SwapEndToEndTest {
 
         val completed = assertIs<SwapTransaction.Completed>(swaps.find(StationId(stationId), requestId))
 
-        // 들어온 배터리 — 이용자가 가져온 헌 배터리 (PLAN §11.2: 과금은 양쪽 SoC 차이로 계산된다).
+        // 들어온 배터리 — 이용자가 가져온 헌 배터리 (: 과금은 양쪽 SoC 차이로 계산된다).
         val incoming = completed.batteriesIn.sortedBy { it.slotId.value }
         assertEquals(SwapScenario.INSERT_SLOTS, incoming.map { it.slotId.value })
         assertEquals(SwapScenario.INCOMING.map { it.serialNumber }, incoming.map { it.serialNumber })
         assertEquals(SwapScenario.INCOMING.map { it.soC }, incoming.map { it.soC })
         assertEquals(SwapScenario.INCOMING.map { it.soH }, incoming.map { it.soH })
 
-        // 나간 배터리 — 스테이션이 내준 충전된 배터리. **입고 슬롯과 다른 슬롯이다** (PLAN §7.1).
+        // 나간 배터리 — 스테이션이 내준 충전된 배터리. **입고 슬롯과 다른 슬롯이다**.
         val outgoing = completed.batteriesOut.sortedBy { it.slotId.value }
         assertEquals(SwapScenario.DISPENSE_SLOTS, outgoing.map { it.slotId.value })
         outgoing.forEach { battery ->
@@ -124,7 +124,7 @@ class SwapEndToEndTest {
         }
     }
 
-    // ------------------------------------------------------------------ 두 생명주기의 분리 (PLAN §5.1)
+    // ------------------------------------------------------------------ 두 생명주기의 분리
 
     @Test
     fun `교환 트랜잭션과 충전 트랜잭션이 별개로 기록된다`() {
@@ -142,7 +142,7 @@ class SwapEndToEndTest {
 
         // 내준 배터리의 충전은 **끝났고**, 새로 들어온 배터리의 충전은 **계속 돈다.**
         // 교환이 이미 Completed 인데도 그렇다 — 그게 두 생명주기가 독립이라는 뜻이다
-        // (PLAN §5.1: *"들어온 배터리의 충전은 교환이 끝난 뒤에도 며칠 계속된다"*).
+        // (: *"들어온 배터리의 충전은 교환이 끝난 뒤에도 며칠 계속된다"*).
         assertIs<SwapTransaction.Completed>(swaps.find(station, requestId))
         assertEquals(2, charging.count { it.isEnded })
         assertEquals(2, charging.count { !it.isEnded })
@@ -157,7 +157,7 @@ class SwapEndToEndTest {
         }
     }
 
-    // ------------------------------------------------------------------ 이벤트 로그 (PLAN §11.1)
+    // ------------------------------------------------------------------ 이벤트 로그
 
     @Test
     fun `이벤트 로그에 교환 전체가 원문으로 남는다`() {

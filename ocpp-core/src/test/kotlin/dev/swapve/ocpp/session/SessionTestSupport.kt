@@ -66,9 +66,9 @@ fun payloadOf(text: String): ObjectNode = mapper.readTree(text).let {
     (if (it.get(0).intValue() == 3) it.get(2) else it.get(3)) as ObjectNode
 }
 
-// ------------------------------------------------------------------ 페이로드 (PLAN §7.1 TC_S_103_CSMS)
+// ------------------------------------------------------------------ 페이로드 (TC_S_103_CSMS)
 
-/** 배터리 2 개 세트가 공식 시험이다 (PLAN §10 결정 #6). */
+/** 배터리 2 개 세트가 공식 시험이다 (결정 #6). */
 fun batterySwapPayload(
     requestId: Int,
     eventType: String,
@@ -103,7 +103,7 @@ fun requestBatterySwapPayload(requestId: Int = 1234): ObjectNode = obj(
 
 fun requestBatterySwapAccepted(): ObjectNode = obj("""{"status": "Accepted"}""")
 
-/** PLAN §4.5 S02.FR.04 — 재고 판정은 스테이션이 한다. */
+/** S02.FR.04 — 재고 판정은 스테이션이 한다. */
 fun requestBatterySwapRejected(): ObjectNode = obj(
     """{"status": "Rejected", "statusInfo": {"reasonCode": "NoBatteryAvailable"}}""",
 )
@@ -114,7 +114,7 @@ fun requestBatterySwapRejected(): ObjectNode = obj(
  * 연결 하나를 흉내 낸다.
  *
  * [ledger] · [serializer] · [log] 를 밖에서 받는 이유는 **재접속을 표현하기 위해서**다.
- * 세션은 새로 만들되 이 셋은 그대로 넘기면 그게 F6 상황이다 (PLAN §5.4).
+ * 세션은 새로 만들되 이 셋은 그대로 넘기면 그게 F6 상황이다.
  */
 class TestConnection(
     val stationId: String = "ST-1",

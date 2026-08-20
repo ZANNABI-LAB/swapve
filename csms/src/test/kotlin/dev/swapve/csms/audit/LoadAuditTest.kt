@@ -26,7 +26,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
- * ★★ **성공 기준 S4 — 부하 뒤의 불변식 감사** (PLAN §2, §7.3 L3 게이트 `./gradlew auditTest`).
+ * ★★ **성공 기준 S4 — 부하 뒤의 불변식 감사** (게이트 L3 게이트 `./gradlew auditTest`).
  *
  * > *"스테이션 20대 동시 접속 후 불변식 감사 전항목 통과 — 배터리 수량 보존, 슬롯 이중 예약 0,
  * > 유실 메시지 0"*
@@ -39,7 +39,7 @@ import kotlin.test.assertTrue
  * 추정이 아니라 [SessionRegistry] 관측으로 확인한다.
  *
  * 라운드마다 20 대가 각자 교환 1 건을 완주하고, [LoadScenario.ROUNDS] 회 반복한다.
- * 순서는 **In-Out 과 Out-In 이 섞인다** (PLAN §4.6).
+ * 순서는 **In-Out 과 Out-In 이 섞인다**.
  *
  * ### 몇 분씩 걸리지 않는다
  *
@@ -50,7 +50,7 @@ import kotlin.test.assertTrue
  * ### `known-battery-serials` 를 비우는 이유
  *
  * 운영 설정에는 시드 재고 8 개가 들어 있고, 목록이 비어 있지 않으면 CSMS 는 목록 밖 배터리를
- * `customData` 로 거부한다 (F3, PLAN §4.8). 부하는 스테이션·라운드마다 **다른 일련번호**를
+ * `customData` 로 거부한다 (F3). 부하는 스테이션·라운드마다 **다른 일련번호**를
  * 써야 배터리 수량 보존을 의미 있게 셀 수 있으므로, 여기서는 배터리 식별을 끈다. F3 자체는
  * 적합성 게이트(`FailureScenarioTest`)가 이미 시험한다 — 두 관심사를 한 시험에 섞지 않는다.
  */

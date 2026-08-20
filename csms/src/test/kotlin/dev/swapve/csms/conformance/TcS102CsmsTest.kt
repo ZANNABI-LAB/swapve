@@ -31,7 +31,7 @@ import kotlin.test.assertTrue
 /**
  * ★★ **`TC_S_102_CSMS` — Remote Start, 배터리 부족** (Part 6 p.1366, UC S01/S02)
  *
- * **성공 기준 S2** (PLAN §2). 시험 대상(System under test)이 **CSMS** 인 공식 적합성
+ * **성공 기준 S2**. 시험 대상(System under test)이 **CSMS** 인 공식 적합성
  * 케이스다. 시험계(Test System) 역할은 `station-sim` 이 맡는다.
  *
  * ```
@@ -48,7 +48,7 @@ import kotlin.test.assertTrue
  *
  * ### 여기서 확인되는 설계 결정
  *
- * **재고 판정은 스테이션이 한다** (PLAN §4.5, S02.FR.04). CSMS 는 재고를 모른 채 요청을
+ * **재고 판정은 스테이션이 한다** (S02.FR.04). CSMS 는 재고를 모른 채 요청을
  * 보내고, 거부 사유를 받아 기록한다. v2 의 *"CSMS 가 재고를 알아야 한다"* 는 잘못된
  * 전제였고, 이 케이스가 그것을 실증한다.
  */
@@ -88,7 +88,7 @@ class TcS102CsmsTest {
             assertEquals(BatteryRejectionReason.NO_BATTERY_AVAILABLE.wireValue, rejected.rejection.reasonCode)
             assertEquals(BatteryRejectionReason.NO_BATTERY_AVAILABLE, rejected.rejection.reason)
 
-            // CSMS 가 기록했다 (PLAN §5.4 F1).
+            // CSMS 가 기록했다 (F1).
             val recorded = assertNotNull(
                 swaps.rejections().lastOrNull { it.key.stationId.value == stationId },
                 "거부가 기록되지 않았다",

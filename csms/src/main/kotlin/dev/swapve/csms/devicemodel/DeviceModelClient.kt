@@ -84,11 +84,11 @@ sealed interface DeviceModelReportRequest {
 }
 
 /**
- * 스테이션의 디바이스 모델을 조회·설정한다 (PLAN §4.9, M9).
+ * 스테이션의 디바이스 모델을 조회·설정한다 (M9).
  *
  * ### 왜 CSMS 에 이것이 필요한가
  *
- * **재고 판정은 스테이션이 한다** (PLAN §4.5, S02.FR.04). CSMS 는 몰라도 된다. 다만 알고
+ * **재고 판정은 스테이션이 한다** (S02.FR.04). CSMS 는 몰라도 된다. 다만 알고
  * 싶을 때 표준이 정한 수단이 있고, 그 중 하나가 `BatteryCartridge` 의 `SoC` 를
  * `GetVariablesRequest` 로 묻는 것이다 (**S04.FR.12**). 여기가 그 수단이다.
  *
@@ -105,14 +105,14 @@ sealed interface DeviceModelReportRequest {
  *
  * 그래서 이 클래스는 보내고, 답을 받고, 그대로 돌려준다. 거부를 감추지 않는다.
  *
- * ### 세션 객체를 만지지 않는다 (PLAN §11.5)
+ * ### 세션 객체를 만지지 않는다
  *
  * 발신은 M4 의 [StationCommandBus] 로만 한다. 이 클래스는 `stationId` 만 알고, 그 스테이션의
  * 세션이 이 JVM 에 있는지조차 모른다 — `RemoteSwapStarter` 와 같은 규칙이다.
  *
  * ### REST 로 노출하지 않는다
  *
- * 소비자가 없다 (PLAN §11.0). 앱은 스테이션의 설정 변수를 만지지 않고, 운영 도구는 아직
+ * 소비자가 없다. 앱은 스테이션의 설정 변수를 만지지 않고, 운영 도구는 아직
  * 없다. 필요해지면 이 클래스를 부르는 얇은 컨트롤러 하나가 생길 자리다.
  */
 @Component
@@ -127,7 +127,7 @@ class DeviceModelClient(
      * 변수를 조회한다 (S04.FR.12).
      *
      * @param refs 조회할 변수들. `Timeout` 은 **인스턴스까지** 정해야 한다 — 그러지 않으면
-     *   스테이션이 `UnknownVariable` 로 답한다 (PLAN §4.9 주의 1).
+     * 스테이션이 `UnknownVariable` 로 답한다 (주의 1).
      */
     suspend fun get(stationId: StationId, refs: List<VariableRef>): DeviceModelQuery {
         require(refs.isNotEmpty()) { "조회할 변수가 없다 (스키마 minItems: 1)" }
@@ -232,7 +232,7 @@ class DeviceModelClient(
     }
 
     /**
-     * 보내기 전에 **우리가 만든 요청을 공식 스키마로 자기 검증**한다 (PLAN §6 설계원칙 2).
+     * 보내기 전에 **우리가 만든 요청을 공식 스키마로 자기 검증**한다 (설계원칙 2).
      *
      * 손으로 필드를 짐작하다 틀리면 스테이션이 아니라 여기서 터진다.
      */

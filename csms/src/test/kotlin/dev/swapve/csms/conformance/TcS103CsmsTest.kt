@@ -34,7 +34,7 @@ import kotlin.test.assertTrue
 /**
  * ★★★ **`TC_S_103_CSMS` — Remote Start, 배터리 충분** (Part 6 p.1366–1369, UC S02·S03·S04)
  *
- * **성공 기준 S2 이자 이 프로젝트의 최종 합격 기준** (PLAN §2, §7.1).
+ * **성공 기준 S2 이자 이 프로젝트의 최종 합격 기준** (적합성).
  *
  * 전제조건: **`BatterySwapCtrlr.Idtoken` 은 설정하지 않는다.** 그래서 충전 트랜잭션이
  * `NoAuthorization` + 빈 문자열로 보고되고, 아래 함정 1 이 발동한다.
@@ -67,7 +67,7 @@ import kotlin.test.assertTrue
  * Step 12/22       BatterySwapResponse        — 회신 사실 자체
  * ```
  *
- * ### 이 케이스가 잡아내는 함정 4가지 (PLAN §7.1)
+ * ### 이 케이스가 잡아내는 함정 4가지
  *
  * 1. **무인가 요청인데 응답에는 `idTokenInfo` 가 있어야 한다.** step 5/9/13/17 은
  *    `idToken.type = NoAuthorization` 에 `idToken.idToken = ""` 다 — 인가 대상이 아니다.
@@ -75,7 +75,7 @@ import kotlin.test.assertTrue
  *    스키마상 `idTokenInfo` 는 **선택 필드**라 **스키마 검증으로는 절대 잡히지 않는다.**
  * 2. **종료 사건은 세 값을 각각 요구한다** — `triggerReason=EnergyLimitReached` ·
  *    `stoppedReason=EVDisconnected` · `chargingState=Idle`. 셋 다 enum 으로는 유효해서
- *    역시 스키마가 잡지 못한다 (PLAN §0 v3.1 정정).
+ * 역시 스키마가 잡지 못한다 (M7 정정).
  * 3. **시작 시점의 `chargingState` 는 `EVConnected` 이지 `Charging` 이 아니다**
  *    (`TxStartPoint = EVConnected`, S04.FR.08).
  * 4. **CSMS 는 자기가 시작을 본 적 없는 트랜잭션의 종료를 받는다.** 반출 배터리의
@@ -117,7 +117,7 @@ class TcS103CsmsTest {
         // step 2 — 스테이션이 받아들였고, 교환이 열렸다.
         val accepted = assertIs<RemoteSwapStart.Accepted>(run.outcome, "개시가 받아들여지지 않았다: ${run.outcome}")
 
-        // step 11 + 21 이 끝나면 교환은 균형 있게 완료된다 (PLAN §5.3 COMPLETED 불변식).
+        // step 11 + 21 이 끝나면 교환은 균형 있게 완료된다 (COMPLETED 불변식).
         val transaction = assertNotNull(swaps.find(StationId(run.stationId), accepted.key.requestId.value))
         val completed = assertIs<SwapTransaction.Completed>(transaction, "교환이 완료되지 않았다: $transaction")
         assertEquals(2, completed.batteriesIn.size, "배터리 2개 세트가 들어와야 한다")
@@ -249,7 +249,7 @@ class TcS103CsmsTest {
             val step = listOf(13, 17)[index]
             val info = event.path("transactionInfo")
 
-            // ★ 함정 2 — PLAN v3 는 이 자리를 EVCommunicationLost 로 추정했다. 스펙이 정본이다.
+            // ★ 함정 2 — 초기 설계는 이 자리를 EVCommunicationLost 로 추정했다. 스펙이 정본이다.
             assertEquals(
                 BatterySwapWire.TRIGGER_REASON_ENERGY_LIMIT_REACHED,
                 event.path("triggerReason").asText(),
@@ -273,7 +273,7 @@ class TcS103CsmsTest {
     }
 
     /**
-     * ★ **함정 4 — CSMS 는 자기가 시작을 본 적 없는 트랜잭션의 종료를 받는다** (PLAN §5.1).
+     * ★ **함정 4 — CSMS 는 자기가 시작을 본 적 없는 트랜잭션의 종료를 받는다**.
      *
      * 반출 배터리의 tx `…-1`/`…-2` 는 이 시나리오 **이전에** 시작됐다. 여기서는 종료만 온다.
      * 교환 생명주기와 충전 생명주기를 한 객체로 합쳤다면 이 지점에서 깨진다.
@@ -302,7 +302,7 @@ class TcS103CsmsTest {
             assertEquals(1, recorded.events.size, "$transactionId 에는 종료 사건 하나만 있다")
         }
 
-        // 교환은 그와 **무관하게** 완료됐다 — 두 생명주기가 독립이라는 뜻이다 (PLAN §5.1).
+        // 교환은 그와 **무관하게** 완료됐다 — 두 생명주기가 독립이라는 뜻이다.
         val accepted = assertIs<RemoteSwapStart.Accepted>(run.outcome)
         assertIs<SwapTransaction.Completed>(swaps.find(station, accepted.key.requestId.value))
     }
@@ -354,7 +354,7 @@ class TcS103CsmsTest {
         assertEquals(2, responses.size, "step 12 와 22 — 두 번 회신해야 한다")
 
         // Tool validation 은 **회신 사실 자체**만 요구한다. 빈 응답이 정상이다
-        // (PLAN §4.3 — "Empty response by CSMS to confirm receipt").
+        // ("Empty response by CSMS to confirm receipt").
         responses.forEachIndexed { index, record ->
             val step = listOf(12, 22)[index]
             assertTrue(record.resultPayload().isObject, "step $step — 응답이 객체가 아니다")

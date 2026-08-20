@@ -49,7 +49,7 @@ class StationSimConfigTest {
 
     @Test
     fun `들어온 수와 나간 수가 맞아야 한다`() {
-        // PLAN §5.3 COMPLETED 불변식을 시나리오 단계에서 미리 막는다.
+        // COMPLETED 불변식을 시나리오 단계에서 미리 막는다.
         assertFailsWith<IllegalArgumentException> {
             config(
                 insertSlots = listOf(1, 2),

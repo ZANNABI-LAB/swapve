@@ -25,7 +25,7 @@ sealed interface PayloadValidation {
      * 스키마를 통과하지 못했다. 호출자는 [errorCode]/[errorDescription] 으로 CALLERROR 를
      * 회신할 수 있다 (Part 4 §4.3).
      *
-     * [violations] 는 **발견된 위반 전량**을 보존한다 (PLAN §11.0 — 정보를 버리지 않는다).
+     * [violations] 는 **발견된 위반 전량**을 보존한다 (정보를 버리지 않는다).
      * [errorCode]/[errorDescription] 은 그중 대표 하나로 정해진 회신용 값일 뿐이다.
      * 스키마 자체가 없어 검증조차 못 한 경우(= 모르는 action)에는 [schemaName] 이 요청된
      * 이름이고 [violations] 는 비어 있다.

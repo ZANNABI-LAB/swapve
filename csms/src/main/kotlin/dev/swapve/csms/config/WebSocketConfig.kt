@@ -55,7 +55,7 @@ class WebSocketConfig(
             .addInterceptors(handshakeInterceptor)
             .setHandshakeHandler(ocppHandshakeHandler())
             // 스테이션은 브라우저가 아니라서 Origin 을 보내지 않는다. 보내더라도 그것으로
-            // 신원을 판단하지 않는다 — 신원은 StationPrincipal 하나로만 정해진다 (PLAN §11.4).
+            // 신원을 판단하지 않는다 — 신원은 StationPrincipal 하나로만 정해진다.
             .setAllowedOriginPatterns("*")
     }
 

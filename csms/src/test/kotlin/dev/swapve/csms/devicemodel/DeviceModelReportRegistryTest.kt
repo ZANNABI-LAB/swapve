@@ -16,7 +16,7 @@ import kotlin.test.assertTrue
  *
  * 조각이 다 온 경우는 `TcS104CsTest` 가 실제 소켓 위에서 확인한다. 이 시험이 맡는 것은
  * **그렇지 않은 경우** — 조각이 빠지거나 순서가 어긋났을 때다. 그런 일은 실제 연결에서
- * 만들어 내기 어렵지만, 조용히 삼키면 "일부인 줄 모르는 전부"가 남는다 (PLAN §5.3
+ * 만들어 내기 어렵지만, 조용히 삼키면 "일부인 줄 모르는 전부"가 남는다 (
  * *"유실 메시지 0"*).
  */
 class DeviceModelReportRegistryTest {
@@ -77,7 +77,7 @@ class DeviceModelReportRegistryTest {
         assertNull(registry.find(stationId, requestId + 1), "청한 적 없는 보고가 있다")
     }
 
-    /** 이름 비교는 대소문자를 가리지 않는다 (PLAN §4.9 주의 2). */
+    /** 이름 비교는 대소문자를 가리지 않는다 (주의 2). */
     @Test
     fun `대소문자가 달라도 같은 변수로 찾힌다`() {
         val registry = DeviceModelReportRegistry()

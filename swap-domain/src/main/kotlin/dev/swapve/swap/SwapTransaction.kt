@@ -3,7 +3,7 @@ package dev.swapve.swap
 import java.time.Instant
 
 /**
- * 교환 트랜잭션의 상태 (PLAN §5.2).
+ * 교환 트랜잭션의 상태.
  *
  * ```
  *                 ┌──────┐
@@ -23,15 +23,15 @@ import java.time.Instant
  *      └─────────┘ └─────────────┘ └─────────┘
  * ```
  *
- * **순서 불가지론이다** (PLAN §4.6). 입고 먼저가 통상이지만 역순도 표준이고, 두 경로 모두
+ * **순서 불가지론이다**. 입고 먼저가 통상이지만 역순도 표준이고, 두 경로 모두
  * [Completed] 에 도달한다. 어느 순서였는지는 상태 자체에 남지 않는다 — 그건 스테이션 설정이지
  * 교환의 성질이 아니다.
  *
  * 반쪽이 열린 상태를 [HalfIn] / [HalfOut] 두 타입으로 나눈 것은 "반쪽 교환이 정확히 1개
- * 열려 있다"는 불변식 (PLAN §5.3) 을 타입으로 못박기 위해서다 — 입고와 출고가 동시에 열린
+ * 열려 있다"는 불변식 을 타입으로 못박기 위해서다 — 입고와 출고가 동시에 열린
  * 상태는 표현할 수 없다.
  *
- * 반납 타임아웃에 해당하는 만료 상태는 **없다.** CSMS 는 그 상황을 통보받지 못한다 (PLAN §4.7).
+ * 반납 타임아웃에 해당하는 만료 상태는 **없다.** CSMS 는 그 상황을 통보받지 못한다.
  */
 sealed interface SwapTransaction {
 
@@ -42,7 +42,7 @@ sealed interface SwapTransaction {
      * 인가가 났고 상관키가 확정됐다.
      *
      * 이 상태에서 배터리를 넣지 않은 채 시간이 지나면 스테이션이 자체 종료하고 CSMS 는
-     * 아무 통보도 받지 못한다 (PLAN §4.7). CSMS 측 정리 타이머는 **표준 동작이 아니라
+     * 아무 통보도 받지 못한다. CSMS 측 정리 타이머는 **표준 동작이 아니라
      * 운영 편의**이고, 상태머신 밖(상위 계층)의 일이다.
      */
     data class Authorized(
@@ -81,10 +81,10 @@ sealed interface SwapTransaction {
      * 교환이 균형 있게 끝났다.
      *
      * 양쪽 배터리의 일련번호·[BatteryData.soC]·[BatteryData.soH] 를 **둘 다 보존한다**
-     * (PLAN §11.2). [startedAt] / [completedAt] 도 남긴다. 요금 계산은 여기서 하지 않는다 —
+     *. [startedAt] / [completedAt] 도 남긴다. 요금 계산은 여기서 하지 않는다 —
      * 나중에 이 레코드 위의 순수 계산으로 붙는다.
      *
-     * "들어온 배터리 수 = 나간 배터리 수" 불변식 (PLAN §5.3) 을 생성자에서 막는다.
+     * "들어온 배터리 수 = 나간 배터리 수" 불변식 을 생성자에서 막는다.
      * 수량이 안 맞는 [Completed] 는 존재할 수 없다.
      */
     data class Completed(
@@ -108,7 +108,7 @@ sealed interface SwapTransaction {
     }
 
     /**
-     * 제공된 배터리를 이용자가 꺼내가지 않아 교환이 반쪽으로 끝났다 (PLAN §4.7 S03.FR.06).
+     * 제공된 배터리를 이용자가 꺼내가지 않아 교환이 반쪽으로 끝났다 (S03.FR.06).
      *
      * > *"Situation needs to be reported, because CSMS ends up with an **orphan BatteryIn for
      * > which a BatteryOut is missing**."*

@@ -30,7 +30,7 @@ object OcppDateTime {
      *
      * 예외를 던지지 않는다. 스키마가 `format: date-time` 을 통과시켰어도 오프셋 표기나
      * 소수부가 우리 파서와 어긋날 수 있고, 그때 **메시지 전체를 실패로 만들 이유는 없다** —
-     * 원문은 이벤트 로그에 그대로 남아 있으므로 (PLAN §11.1) 정보가 사라지지도 않는다.
+     * 원문은 이벤트 로그에 그대로 남아 있으므로 정보가 사라지지도 않는다.
      * 호출자는 읽지 못한 시각 자리에 자기 시계를 쓰면 된다.
      */
     fun parse(text: String): Instant? = runCatching { Instant.parse(text) }.getOrNull()

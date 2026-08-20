@@ -20,14 +20,14 @@ import java.util.concurrent.CompletionStage
 /**
  * 스테이션 쪽 WebSocket 전송 — **JDK 내장 [java.net.http.WebSocket] 만 쓴다.**
  *
- * 외부 WebSocket 라이브러리를 넣지 않는다 (PLAN §6 기술선택 — 시뮬레이터 의존성 0).
+ * 외부 WebSocket 라이브러리를 넣지 않는다 (기술선택 — 시뮬레이터 의존성 0).
  * 그 사실은 산문이 아니라 `:station-sim:checkNoForbiddenDependencies` 가 기계로 확인한다.
  *
  * ### 프로토콜을 모른다
  *
  * 이 클래스가 아는 것은 "텍스트 한 줄을 보낸다 / 텍스트 한 줄이 왔다" 두 가지뿐이다.
  * 프레이밍(M1)·스키마 검증(M2)·멱등·직렬화(M4)는 전부 `ocpp-core` 의 `OcppSession` 안에서
- * 일어난다 (PLAN §6 원칙 3 — 시뮬레이터와 CSMS 가 같은 `ocpp-core` 를 공유한다).
+ * 일어난다 (원칙 3 — 시뮬레이터와 CSMS 가 같은 `ocpp-core` 를 공유한다).
  *
  * ### 순서와 교착
  *
