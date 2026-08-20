@@ -44,6 +44,17 @@ csms:
     stations:
       # - station-id: CS001
       #   password-hash: "$2a$10$replace-with-bcrypt-hash"
+  api:
+    security:
+      # REST API 는 기본으로 닫는다. users 가 비어 있으면 기동은 하지만 /api/* 는 모두 401 이다.
+      enabled: true
+      realm: swapve-api
+      # OCPP 스테이션 자격증명(csms.security.stations)과 분리된 앱/운영자 API 계정이다.
+      # 해시 생성 예:
+      #   Kotlin: BCryptPasswordEncoder(10).encode("api-password")
+      users:
+        # - username: operator
+        #   password-hash: "$2a$10$replace-with-bcrypt-hash"
   heartbeat-interval: 300s
   # 값이 항상 하나여도 둔다 (PLAN §11.3 로밍).
   operator-id: swapve

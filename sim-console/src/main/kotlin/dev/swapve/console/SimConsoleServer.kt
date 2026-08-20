@@ -9,9 +9,12 @@ import com.sun.net.httpserver.HttpExchange
 import com.sun.net.httpserver.HttpServer
 import dev.swapve.station.SwapOrder
 import dev.swapve.swap.IdToken
+import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.URLDecoder
+import java.security.MessageDigest
 import java.nio.charset.StandardCharsets
+import java.util.Base64
 import java.util.concurrent.Executors
 
 /**
@@ -25,23 +28,32 @@ import java.util.concurrent.Executors
  *
  * ### 이것은 관제 서버가 아니다
  *
- * 여기 있는 것은 **시험계를 조종하는 손잡이**뿐이다. 인증도 없고, 교환 이력도 지표도 없다 —
- * 그건 CSMS 의 REST API 가 하는 일이고 (docs/API.md), 콘솔이 그것을 흉내내면 두 벌의
- * 진실이 생긴다. 콘솔은 CSMS 를 향해 아무것도 부르지 않는다.
+ * 여기 있는 것은 **시험계를 조종하는 손잡이**뿐이다. 교환 이력도 지표도 없다 — 그건 CSMS 의
+ * REST API 가 하는 일이고 (docs/API.md), 콘솔이 그것을 흉내내면 두 벌의 진실이 생긴다.
+ * 콘솔은 CSMS 를 향해 아무것도 부르지 않는다.
  *
  * @param port `0` 이면 빈 포트를 받아 [SimConsoleServer.port] 로 알려준다. 시험이 쓴다.
  */
 class SimConsoleServer(
     private val stations: ControlledStations,
     port: Int = DEFAULT_PORT,
+    bindAddress: String = DEFAULT_BIND_ADDRESS,
+    private val credentials: Credentials? = null,
 ) : AutoCloseable {
 
-    private val http: HttpServer = HttpServer.create(InetSocketAddress(port), BACKLOG)
+    private val address = InetAddress.getByName(bindAddress)
+    private val http: HttpServer
 
     /** 실제로 바인딩된 포트. `0` 으로 띄웠을 때 이 값을 봐야 한다. */
     val port: Int get() = http.address.port
 
+    val bindAddress: InetAddress get() = http.address.address
+
     init {
+        require(address.isLoopbackAddress || credentials != null) {
+            "sim-console 을 loopback 이 아닌 주소($bindAddress)에 바인딩하려면 --user 와 --password 가 필요하다"
+        }
+        http = HttpServer.create(InetSocketAddress(address, port), BACKLOG)
         // 요청 처리는 짧다 — 오래 걸리는 교환 시퀀스는 스테이션마다의 작업 스레드로 넘긴다.
         http.executor = Executors.newFixedThreadPool(HTTP_THREADS) { runnable ->
             Thread(runnable, "sim-console-http").apply { isDaemon = true }
@@ -145,7 +157,11 @@ class SimConsoleServer(
 
     private fun handle(exchange: HttpExchange, route: (HttpExchange) -> Reply) {
         val reply = try {
-            route(exchange)
+            if (!authorized(exchange)) {
+                Reply.unauthorized()
+            } else {
+                route(exchange)
+            }
         } catch (failure: ControlError) {
             Reply(failure.status, node().put("error", failure.message))
         } catch (failure: IllegalArgumentException) {
@@ -157,12 +173,41 @@ class SimConsoleServer(
 
         try {
             exchange.responseHeaders.add("Content-Type", reply.contentType)
+            reply.headers.forEach { (name, value) -> exchange.responseHeaders.add(name, value) }
             exchange.sendResponseHeaders(reply.status, reply.body.size.toLong())
             exchange.responseBody.write(reply.body)
         } finally {
             exchange.close()
         }
     }
+
+    private fun authorized(exchange: HttpExchange): Boolean {
+        val expected = credentials ?: return true
+        val parsed = parseBasic(exchange.requestHeaders.getFirst("Authorization"))
+        val username = parsed?.first.orEmpty()
+        val password = parsed?.second.orEmpty()
+
+        val usernameMatches = constantEquals(username, expected.username)
+        val passwordMatches = constantEquals(password, expected.password)
+        return parsed != null && usernameMatches && passwordMatches
+    }
+
+    private fun parseBasic(authorization: String?): Pair<String, String>? {
+        if (authorization == null) return null
+        val parts = authorization.trim().split(Regex("\\s+"), limit = 2)
+        if (parts.size != 2 || !parts[0].equals("Basic", ignoreCase = true)) return null
+
+        val decoded = runCatching {
+            Base64.getDecoder().decode(parts[1]).toString(StandardCharsets.UTF_8)
+        }.getOrNull() ?: return null
+
+        val separator = decoded.indexOf(':')
+        if (separator < 0) return null
+        return decoded.substring(0, separator) to decoded.substring(separator + 1)
+    }
+
+    private fun constantEquals(left: String, right: String): Boolean =
+        MessageDigest.isEqual(left.toByteArray(StandardCharsets.UTF_8), right.toByteArray(StandardCharsets.UTF_8))
 
     private fun body(exchange: HttpExchange): JsonNode {
         val text = exchange.requestBody.readBytes().toString(StandardCharsets.UTF_8)
@@ -251,17 +296,31 @@ class SimConsoleServer(
         val status: Int,
         val body: ByteArray,
         val contentType: String,
+        val headers: Map<String, String> = emptyMap(),
     ) {
         constructor(status: Int, json: JsonNode) : this(
             status,
             MAPPER.writeValueAsBytes(json),
             "application/json; charset=utf-8",
         )
+
+        companion object {
+            fun unauthorized() = Reply(
+                401,
+                MAPPER.writeValueAsBytes(JsonNodeFactory.instance.objectNode().put("error", "UNAUTHORIZED")),
+                "application/json; charset=utf-8",
+                mapOf("WWW-Authenticate" to "Basic realm=\"sim-console\", charset=\"UTF-8\""),
+            )
+        }
     }
+
+    data class Credentials(val username: String, val password: String)
 
     companion object {
         /** CSMS 의 8080 과 부딪히지 않아야 한다. */
         const val DEFAULT_PORT = 8090
+
+        const val DEFAULT_BIND_ADDRESS = "127.0.0.1"
 
         const val DEFAULT_CSMS_URL = "ws://localhost:8080/ocpp"
 

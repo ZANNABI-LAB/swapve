@@ -3,6 +3,7 @@ package dev.swapve.csms.api
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import dev.swapve.csms.conformance.ConformanceScenario
+import dev.swapve.csms.support.ApiCredentialsInitializer
 import dev.swapve.csms.support.MutableClock
 import dev.swapve.csms.support.MutableClockConfig
 import dev.swapve.ocpp.swap.BatteryRejectionReason
@@ -22,6 +23,7 @@ import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
+import org.springframework.test.context.ContextConfiguration
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
@@ -53,6 +55,7 @@ import kotlin.test.assertTrue
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @Import(MutableClockConfig::class)
+@ContextConfiguration(initializers = [ApiCredentialsInitializer::class])
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class SwapMetricsApiTest {
 

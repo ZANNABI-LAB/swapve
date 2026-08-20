@@ -19,11 +19,13 @@
     {
       "name": "basic-auth",
       "cmd": "./gradlew :csms:cleanTest :csms:test --tests '*BasicAuthTest*'"
+    },
+    {
+      "name": "api-auth",
+      "cmd": "./gradlew :csms:cleanTest :csms:test --tests '*ApiAuthTest*' --tests '*SimConsoleControlTest*'"
     }
   ],
-  "budget": 3,
   "planModel": "claude-opus-5",
   "verifyRepeat": 2,
-  "gateTimeoutMs": 900000,
-  "execAgent": "codex"
+  "gateTimeoutMs": 900000
 }

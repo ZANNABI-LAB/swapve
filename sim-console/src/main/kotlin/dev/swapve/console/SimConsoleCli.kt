@@ -19,8 +19,12 @@ object SimConsoleCli {
 
           --port <n>        콘솔이 뜰 포트. 기본 ${SimConsoleServer.DEFAULT_PORT}
                             (CSMS 의 8080 과 부딪히지 않는 값이어야 한다)
+          --bind <addr>     바인딩 주소. 기본 ${SimConsoleServer.DEFAULT_BIND_ADDRESS}
+                            loopback 이 아니면 --user 와 --password 가 필요하다
           --csms-url <url>  화면에 채워 둘 CSMS 엔드포인트 (스테이션 식별자 제외).
                             기본 ${SimConsoleServer.DEFAULT_CSMS_URL}
+          --user <name>     콘솔 Basic 인증 사용자명
+          --password <pw>   콘솔 Basic 인증 비밀번호
     """.trimIndent()
 
     @JvmStatic
@@ -34,13 +38,25 @@ object SimConsoleCli {
         val port = options["port"]?.let { it.toIntOrNull() ?: error("숫자가 아닌 값: --port $it") }
             ?: SimConsoleServer.DEFAULT_PORT
         val csmsUrl = options["csms-url"] ?: SimConsoleServer.DEFAULT_CSMS_URL
+        val bindAddress = options["bind"] ?: SimConsoleServer.DEFAULT_BIND_ADDRESS
+        val user = options["user"]
+        val password = options["password"]
+        require((user == null) == (password == null)) {
+            "--user 와 --password 는 함께 지정해야 한다\n\n$USAGE"
+        }
+        val credentials = user?.let { SimConsoleServer.Credentials(it, requireNotNull(password)) }
 
-        val server = SimConsoleServer(ControlledStations(csmsUrl), port).start()
+        val server = try {
+            SimConsoleServer(ControlledStations(csmsUrl), port, bindAddress, credentials).start()
+        } catch (failure: IllegalArgumentException) {
+            System.err.println(failure.message)
+            return
+        }
         // 콘솔은 스테이션을 붙들고 있는 프로세스다. 내려갈 때 소켓을 닫아 주지 않으면
         // CSMS 쪽에는 죽은 연결이 남는다.
         Runtime.getRuntime().addShutdownHook(Thread { server.close() })
 
-        println("sim-console → http://localhost:${server.port} (CSMS 기본값 $csmsUrl)")
+        println("sim-console → http://$bindAddress:${server.port} (CSMS 기본값 $csmsUrl)")
         println("브라우저로 열어 스테이션을 붙이십시오. 종료는 Ctrl+C.")
 
         // 서버 스레드는 전부 데몬이다 — 여기서 막지 않으면 JVM 이 곧바로 끝난다.

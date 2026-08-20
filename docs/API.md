@@ -17,17 +17,54 @@
 
 | 없는 것 | 왜 |
 |---|---|
-| **인증·인가 (로그인 · API 키 · JWT · CORS 정책)** | **범위 밖이고 [PLAN §11](PLAN.md) 확장 목록에도 없다.** 누구든 `POST /api/swaps` 로 남의 스테이션에 교환을 걸 수 있다 |
+| 앱 권한 모델 · API 키 · JWT · CORS 정책 | REST 호출자 신원 확인은 Basic 으로 닫았지만, 앱별 권한·토큰 수명·브라우저 정책은 아직 없다 |
 | 요청 속도 제한 · 감사 추적 | 위와 같다 |
 | 지표 대시보드 · UI | [PLAN §10 결정 #2](PLAN.md) — **REST 조회까지가 범위**다 |
 | 다국어(i18n) | [PLAN §10 결정 #3](PLAN.md) — 앱을 구현하지 않으므로 실질 요구가 없다 |
 | 페이징 · 목록 조회 (`GET /api/swaps`) | 소비자가 없다. 없는 소비자를 위해 엔드포인트를 미리 뚫지 않는다 ([PLAN §11.0](PLAN.md)) |
 
-**그대로 인터넷에 노출하면 안 된다.** 숨기지 않고 여기 적어 둔다.
+닫힌 것은 닫힌 것으로 적는다. WebSocket 은 보안 프로파일 1 Basic, 이 REST API 는 별도 Basic,
+`sim-console` 은 loopback 기본 바인딩이다. 남은 것은 B12 mTLS/인증서 관리, 자격증명 회전,
+속도 제한, 운영용 감사, H2 파일 DB 같은 운영 경계다.
 
 > 인가 자체가 없는 것은 아니다. **OCPP 수준의 인가(`idToken`)는 동작한다** — 인가되지 않은
-> 토큰으로는 `RequestBatterySwap` 이 나가지 않는다(S02.FR.03). 없는 것은 **API 호출자**의
-> 신원 확인이다. 둘은 다른 층이다.
+> 토큰으로는 `RequestBatterySwap` 이 나가지 않는다(S02.FR.03). REST Basic 은 **API 호출자**
+> 신원 확인이고, OCPP `idToken` 인가는 교환 대상 토큰 판정이다. 둘은 다른 층이다.
+
+---
+
+## 인증
+
+`/api/*` 는 HTTP Basic 인증을 지난다. `/ocpp/**` WebSocket 핸드셰이크는 이 필터를 지나지
+않고, `csms.security.stations` 의 스테이션 자격증명을 따로 쓴다.
+
+```yaml
+csms:
+  api:
+    security:
+      enabled: true
+      realm: swapve-api
+      users:
+        - username: operator
+          password-hash: "$2a$10$replace-with-bcrypt-hash"
+```
+
+해시는 Spring Security Crypto 의 `BCryptPasswordEncoder(10).encode("api-password")` 같은
+방식으로 만든다. `users` 가 비어 있으면 서버는 뜨지만 `/api/*` 는 전부 401 이다.
+
+```bash
+curl -u operator:api-password localhost:8080/api/metrics/swaps
+```
+
+실패 응답은 사유를 새지 않는다.
+
+```http
+HTTP/1.1 401
+WWW-Authenticate: Basic realm="swapve-api", charset="UTF-8"
+Content-Type: application/json; charset=utf-8
+
+{"error":"UNAUTHORIZED"}
+```
 
 ---
 

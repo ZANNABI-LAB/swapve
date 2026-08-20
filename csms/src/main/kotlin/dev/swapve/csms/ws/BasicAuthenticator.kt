@@ -1,9 +1,8 @@
 package dev.swapve.csms.ws
 
+import dev.swapve.csms.auth.BasicCredentials
 import dev.swapve.csms.config.CsmsProperties
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder
-import java.security.MessageDigest
-import java.util.Base64
 
 /**
  * OCPP 보안 프로파일 1 — HTTP Basic 인증.
@@ -13,28 +12,20 @@ import java.util.Base64
  */
 class BasicAuthenticator(
     credentials: List<CsmsProperties.StationCredential>,
-    private val passwordEncoder: BCryptPasswordEncoder = BCryptPasswordEncoder(),
+    passwordEncoder: BCryptPasswordEncoder = BCryptPasswordEncoder(),
 ) {
 
-    private val credentials = credentials.toList()
+    private val credentials = BasicCredentials(
+        credentials.map { BasicCredentials.Credential(it.stationId, it.passwordHash) },
+        passwordEncoder,
+    )
 
     fun authenticate(stationId: String, authorization: String?): Result {
-        val parsed = parse(authorization)
-        val username = parsed?.username.orEmpty()
-        val password = parsed?.password.orEmpty()
+        val result = credentials.authenticate(authorization)
+        val usernameMatchesPath = result.parsed != null &&
+            BasicCredentials.constantEquals(result.parsed.username, stationId)
 
-        var selectedHash: String? = null
-        credentials.forEach { credential ->
-            if (constantEquals(credential.stationId, username)) {
-                selectedHash = credential.passwordHash
-            }
-        }
-
-        val usernameMatchesPath = parsed != null && constantEquals(username, stationId)
-        val fallbackHash = credentials.firstOrNull()?.passwordHash ?: DECOY_BCRYPT_HASH
-        val passwordMatches = passwordEncoder.matches(password, selectedHash ?: fallbackHash)
-
-        return if (parsed != null && selectedHash != null && usernameMatchesPath && passwordMatches) {
+        return if (result.authenticated && usernameMatchesPath) {
             Result(true, "인증 성공")
         } else {
             Result(false, "등록되지 않았거나 자격증명이 맞지 않는다")
@@ -42,31 +33,11 @@ class BasicAuthenticator(
     }
 
     fun parse(authorization: String?): Parsed? {
-        if (authorization == null) return null
-        val parts = authorization.trim().split(Regex("\\s+"), limit = 2)
-        if (parts.size != 2 || !parts[0].equals("Basic", ignoreCase = true)) return null
-
-        val decoded = runCatching {
-            Base64.getDecoder().decode(parts[1]).toString(Charsets.UTF_8)
-        }.getOrNull() ?: return null
-
-        val separator = decoded.indexOf(':')
-        if (separator < 0) return null
-        return Parsed(
-            username = decoded.substring(0, separator),
-            password = decoded.substring(separator + 1),
-        )
+        val parsed = credentials.parse(authorization) ?: return null
+        return Parsed(parsed.username, parsed.password)
     }
-
-    private fun constantEquals(left: String, right: String): Boolean =
-        MessageDigest.isEqual(left.toByteArray(Charsets.UTF_8), right.toByteArray(Charsets.UTF_8))
 
     data class Parsed(val username: String, val password: String)
 
     data class Result(val authenticated: Boolean, val reason: String)
-
-    companion object {
-        // 잘 형성된 bcrypt 해시. 등록되지 않은 username 도 BCrypt 를 정확히 한 번 태우기 위한 디코이다.
-        private const val DECOY_BCRYPT_HASH = "\$2a\$10\$/3xSUn42RCqRPEsU5QmxG.F50C3bcrcOh1Y9g2qjwSwQtIp3N3r9m"
-    }
 }

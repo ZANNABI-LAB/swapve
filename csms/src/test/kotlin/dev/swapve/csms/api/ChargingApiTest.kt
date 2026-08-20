@@ -3,6 +3,7 @@ package dev.swapve.csms.api
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import dev.swapve.csms.charging.ChargingScenario
+import dev.swapve.csms.support.ApiCredentialsInitializer
 import dev.swapve.csms.support.FixedClockConfig
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Test
@@ -13,6 +14,7 @@ import org.springframework.boot.test.web.server.LocalServerPort
 import org.springframework.context.annotation.Import
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
+import org.springframework.test.context.ContextConfiguration
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
@@ -31,6 +33,7 @@ import kotlin.test.assertTrue
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @Import(FixedClockConfig::class)
+@ContextConfiguration(initializers = [ApiCredentialsInitializer::class])
 class ChargingApiTest {
 
     @LocalServerPort

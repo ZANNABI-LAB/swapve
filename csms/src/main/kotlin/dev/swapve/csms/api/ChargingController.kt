@@ -34,10 +34,10 @@ import org.springframework.web.bind.annotation.RestController
  * 충전 트랜잭션은 스테이션이 만드는 사실이지 CSMS 가 지시하는 것이 아니다. 스마트차징도
  * 요금도 범위 밖이다 (§10 결정 #8). 그래서 이 컨트롤러에는 `POST` 도 `PATCH` 도 없다.
  *
- * ### 인증·인가가 없다
+ * ### REST Basic 경계를 지난다
  *
- * `SwapController` 와 같다 — 이 API 는 계약을 보이기 위한 것이지 공개 운영을 위한 것이
- * 아니다. **그대로 인터넷에 노출하면 안 된다** (`docs/API.md` 첫머리).
+ * 호출자 인증은 `ApiBasicAuthFilter` 에서 REST API 경로 공통으로 처리한다. OCPP 스테이션
+ * 자격증명과는 별도 목록이다 (`docs/API.md` 첫머리).
  */
 @RestController
 @RequestMapping("/api/stations/{stationId}/charging-transactions")

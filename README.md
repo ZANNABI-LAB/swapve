@@ -34,8 +34,9 @@ OCPP 2.1이 2025년 1월 **Battery Swap 기능 블록(Block S)** 을 정식 편�
 
 **프로덕션 시스템이 아닙니다.** 없는 것을 먼저 적습니다 — 자세한 내용은 [docs/API.md](docs/API.md).
 
-- ⚠️ **앱/API 인증은 없습니다.** WebSocket 스테이션 연결은 기본 `BASIC` 프로파일을 지원하지만,
-  REST API 와 `sim-console` 은 로컬 데모용으로 열려 있습니다. **그대로 인터넷에 노출하면 안 됩니다.**
+- **닫힌 경계와 남은 경계가 다릅니다.** WebSocket 스테이션 연결은 기본 `BASIC`, REST API 는
+  별도 Basic, `sim-console` 은 loopback 기본 바인딩입니다. 그래도 mTLS(B12), 자격증명 회전,
+  H2 파일 DB, 운영용 감사/속도 제한은 아직 없습니다.
 - **재시작하면 대부분 증발합니다.** 영속되는 것은 `OUT_TIMED_OUT` 장부 하나뿐입니다
   (H2 파일). 나머지는 인메모리이고, 이벤트 로그에서 재구성 가능한 파생 상태입니다.
 - **스마트차징·요금·로밍·수평 확장은 범위 밖입니다** ([PLAN §3](docs/PLAN.md)).
@@ -57,7 +58,8 @@ cd swapve
 터미널 **A** — 관제 서버를 띄웁니다. `Started CsmsApplicationKt` 가 보이면 준비된 것입니다.
 
 ```bash
-./gradlew :csms:bootRun --args="--csms.security.profile=NONE"  # ws://localhost:8080/ocpp/{stationId}
+./gradlew :csms:bootRun \
+  --args="--csms.security.profile=NONE --csms.api.security.enabled=false"
 ```
 
 터미널 **B** — 시뮬레이터가 붙어 **교환 1건을 완주**하고 끝납니다.
@@ -114,7 +116,7 @@ curl -X POST localhost:8080/api/swaps -H 'Content-Type: application/json' \
 위의 절차는 그대로 유효합니다. 터미널 A(CSMS)는 띄워 둔 채로:
 
 ```bash
-# 터미널 B — 시뮬레이터 제어 콘솔. 기본 8090 (CSMS의 8080과 부딪히지 않습니다)
+# 터미널 B — 시뮬레이터 제어 콘솔. 기본 8090, 127.0.0.1 바인딩
 ./gradlew :sim-console:run --args="--port 8090 --csms-url ws://localhost:8080/ocpp"
 ```
 
@@ -132,11 +134,11 @@ curl -X POST localhost:8080/api/swaps -H 'Content-Type: application/json' \
 콘솔은 **시험계를 조종하는 화면**이지 관제 서버가 아닙니다. 교환 이력과 지표는 위의 CSMS
 REST API에 있고, 콘솔은 그것을 흉내내지 않습니다.
 
-**막히면?** 위 5분 절차는 로컬 데모라 `csms.security.profile=NONE` 으로 띄웁니다. 기본 운영값은
-`BASIC` 이므로, 그 상태에서는 아래 "스테이션 인증" 절처럼 station-id 별 비밀번호 해시와
-시뮬레이터 `--password` 가 필요합니다. 인가 토큰은 `csms/src/main/resources/application.yml` 의 `authorized-id-tokens`
+**막히면?** 위 5분 절차는 로컬 데모라 WebSocket 인증과 REST 인증을 둘 다 낮춰 띄웁니다.
+기본 운영값은 WebSocket `BASIC` + REST Basic 이므로, 그 상태에서는 아래 "스테이션 인증" 과
+"REST API 인증" 절처럼 각각의 자격증명이 필요합니다. 인가 토큰은 `authorized-id-tokens`
 목록에 있어야 하고(기본값 `RFID-0001`), 배터리 일련번호는 `known-battery-serials` 에 있어야
-합니다. 목록 밖 배터리는 표준이 정한 방식으로 거부됩니다 ([PLAN §4.8](docs/PLAN.md)).
+합니다.
 
 ## 스테이션 인증
 
@@ -163,12 +165,30 @@ csms:
 인증을 끄는 것은 로컬 실험용입니다:
 
 ```bash
-./gradlew :csms:bootRun --args="--csms.security.profile=NONE"
+./gradlew :csms:bootRun --args="--csms.security.profile=NONE --csms.api.security.enabled=false"
 ```
 
 TLS 를 CSMS 가 직접 끝내려면 `server.ssl.enabled=true` 와 `server.ssl.key-store` 계열 설정을
 채웁니다. 운영 환경에서는 리버스 프록시가 TLS 를 종료하고 내부로 `ws` 를 넘기는 구성도
 가능합니다.
+
+## REST API 인증
+
+`/api/*` 는 기본 Basic 인증입니다. `csms.api.security.users` 가 비어 있으면 서버는 뜨지만
+모든 REST 요청은 401 로 닫힙니다. OCPP 스테이션 자격증명과 별도 목록입니다.
+
+```yaml
+csms:
+  api:
+    security:
+      users:
+        - username: operator
+          password-hash: "$2a$10$..."
+```
+
+```bash
+curl -u operator:api-password localhost:8080/api/metrics/swaps
+```
 
 <details>
 <summary><b>실측 기록</b> — 위 절차를 실제로 따라 해서 잰 시간 (2026-08-18)</summary>
@@ -328,7 +348,7 @@ swapve/
 
 1. **[docs/PLAN.md](docs/PLAN.md)** — 프로토콜 명세(§4), 도메인 설계(§5), 검증 전략(§7).
    스펙 원문 대조로 계획서를 정정한 이력이 §0에 남아 있습니다
-2. **[docs/API.md](docs/API.md)** — 앱이 호출할 REST 계약. **REST 인증이 없다는 사실을 먼저 적었습니다**
+2. **[docs/API.md](docs/API.md)** — 앱이 호출할 REST 계약과 Basic 인증 경계
 3. **[BACKLOG.md](BACKLOG.md)** — 범위 밖으로 밀어낸 것들과 그것을 꺼낼 트리거
 
 | M | 내용 | 상태 |
@@ -370,7 +390,8 @@ swapve/
 - **지표에 Micrometer를 쓰지 않았습니다.** 필요한 값이 전부 기존 기록에서 파생 계산되기
   때문입니다 — 미등록 배터리 거부(F3)와 재접속 재전송(F6)은 지표용 기록이 아예 없고
   **이벤트 로그의 원문**에서 계산됩니다. 카운터를 심으면 진실의 원본이 둘이 됩니다.
-- ⚠️ **REST 인증·인가가 없습니다.** 위 "무엇이 아닌가" 참조. 숨기지 않고 문서 첫머리에 적어 두었습니다.
+- **REST 호출자 인증은 Basic 으로 닫혀 있습니다.** 앱 권한 모델·토큰 회전·속도 제한은 아직
+  운영 범위가 아닙니다.
 
 ---
 

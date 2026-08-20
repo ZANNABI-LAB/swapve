@@ -27,6 +27,8 @@ import java.time.Duration
  *   서로 다른 목적이라 한 값으로 묶지 않는다.
  * @param security WebSocket 보안 프로파일. 기본은 BASIC 이다 — 무인증 서버를 기본으로
  *   띄우면 chargeBoxId 를 아는 누구나 이벤트를 주입할 수 있다.
+ * @param api 앱/운영자가 부르는 REST API 보안 설정. OCPP 스테이션 자격증명과 의도적으로
+ *   분리한다 — 스테이션 비밀번호가 앱 API 키처럼 재사용되면 권한 경계가 흐려진다.
  */
 @ConfigurationProperties(prefix = "csms")
 data class CsmsProperties(
@@ -39,6 +41,7 @@ data class CsmsProperties(
     val callTimeout: Duration = Duration.ofSeconds(30),
     val retention: Retention = Retention(),
     val security: Security = Security(),
+    val api: Api = Api(),
 ) {
 
     /**
@@ -83,6 +86,27 @@ data class CsmsProperties(
     /** 프로파일 1 자격증명. `stationId` 는 URL 경로의 식별자 및 Basic username 과 같아야 한다. */
     data class StationCredential(
         val stationId: String,
+        val passwordHash: String,
+    )
+
+    data class Api(
+        val security: ApiSecurity = ApiSecurity(),
+    )
+
+    /**
+     * REST API Basic 인증 설정.
+     *
+     * [users] 는 [Security.stations] 와 별개다. OCPP 경로의 stationId=username 결속을 REST 에
+     * 가져오면 스테이션 자격증명이 앱/운영자 API 를 여는 비밀번호가 된다.
+     */
+    data class ApiSecurity(
+        val enabled: Boolean = true,
+        val realm: String = "swapve-api",
+        val users: List<ApiCredential> = emptyList(),
+    )
+
+    data class ApiCredential(
+        val username: String,
         val passwordHash: String,
     )
 

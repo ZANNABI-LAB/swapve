@@ -49,11 +49,10 @@ import java.net.URI
  * (M4 [OcppResult] 와 같은 태도). 그래서 이 클래스에 `try/catch` 가 필요한 자리는 **요청
  * 본문 검증 하나뿐**이다.
  *
- * ### 인증·인가가 없다
+ * ### REST Basic 경계를 지난다
  *
- * 로그인도 API 키도 JWT 도 없다. **범위 밖이고 PLAN §11 확장 목록에도 없다** — 이 API 는
- * 표준 S02 의 계약을 보이기 위한 것이지 공개 운영을 위한 것이 아니다. **그대로 인터넷에
- * 노출하면 안 된다.** 이 사실은 `docs/API.md` 첫머리에도 적혀 있다.
+ * 호출자 인증은 `ApiBasicAuthFilter` 에서 REST API 경로 공통으로 처리한다. OCPP 스테이션
+ * 자격증명과는 별도 목록이다. 앱 권한 모델·토큰 회전·속도 제한은 아직 운영 범위가 아니다.
  */
 @RestController
 @RequestMapping("/api/swaps")

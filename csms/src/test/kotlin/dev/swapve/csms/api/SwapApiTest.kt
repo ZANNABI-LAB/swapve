@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import dev.swapve.csms.conformance.ConformanceScenario
 import dev.swapve.csms.conformance.ConformanceScenario.callPayload
 import dev.swapve.csms.conformance.ConformanceScenario.stationReceived
+import dev.swapve.csms.support.ApiCredentialsInitializer
 import dev.swapve.csms.support.FixedClockConfig
 import dev.swapve.ocpp.swap.BatteryRejectionReason
 import dev.swapve.ocpp.swap.BatterySwapWire
@@ -22,6 +23,7 @@ import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
+import org.springframework.test.context.ContextConfiguration
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
@@ -44,6 +46,7 @@ import kotlin.test.assertTrue
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @Import(FixedClockConfig::class)
+@ContextConfiguration(initializers = [ApiCredentialsInitializer::class])
 class SwapApiTest {
 
     @LocalServerPort
