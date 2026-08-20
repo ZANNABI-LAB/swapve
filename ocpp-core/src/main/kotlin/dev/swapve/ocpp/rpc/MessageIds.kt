@@ -1,19 +1,24 @@
 package dev.swapve.ocpp.rpc
 
-import com.github.f4b6a3.tsid.TsidCreator
+import java.util.UUID
 
 /**
- * CALL/SEND 의 messageId 발번.
+ * Issues the `messageId` carried on CALL and SEND frames.
  *
- * Part 4 §4.1.4 — messageId는 **같은 스테이션 식별자에 대해 그 발신자가 이전에 쓴 모든 값과
- * 달라야 한다(MUST). 연결이 끊겼다 다시 붙어도 마찬가지다.**
+ * Part 4 §4.1.4 — a messageId MUST differ from every value this sender has already used toward
+ * the same station identifier, and **reconnecting does not reset that**. A local counter cannot
+ * satisfy it: counters rewind on restart and collide across instances.
  *
- * 그래서 `AtomicInteger` 같은 로컬 카운터를 쓰지 않는다 — 재시작하면 값이 되돌아가고,
- * 인스턴스를 늘리면 충돌한다. TSID는 시간순 정렬이 가능하면서 13자라
- * 36자 한도에 여유가 크다.
+ * A random UUID does, with 122 random bits, and its 36 characters are exactly the limit the
+ * spec allows ([OcppFrameCodec.MAX_MESSAGE_ID_LENGTH]).
  */
 object MessageIds {
 
-    /** Crockford Base32 13자. 사전순 정렬 = 생성순 정렬. */
-    fun next(): String = TsidCreator.getTsid().toString()
+    /**
+     * A fresh messageId.
+     *
+     * **Carries no order.** Ids are for correlating a CALLRESULT back to its CALL, nothing
+     * more — when sequence matters, read `OcppEventRecord.seq`.
+     */
+    fun newId(): String = UUID.randomUUID().toString()
 }

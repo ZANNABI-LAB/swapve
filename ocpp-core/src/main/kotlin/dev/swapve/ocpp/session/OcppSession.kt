@@ -96,7 +96,7 @@ class OcppSession(
         if (closed) return OcppResult.NotConnected(stationId)
 
         return callGate.withLock {
-            val messageId = MessageIds.next()
+            val messageId = MessageIds.newId()
             val waiter = PendingCall(call.action, CompletableDeferred())
             pending[messageId] = waiter
 
@@ -123,7 +123,7 @@ class OcppSession(
      * @return 발번된 messageId. 이벤트 로그와 대조할 때 쓴다.
      */
     suspend fun send(action: String, payload: ObjectNode): String {
-        val messageId = MessageIds.next()
+        val messageId = MessageIds.newId()
         emit(OcppFrame.Send(messageId, action, payload), action)
         return messageId
     }

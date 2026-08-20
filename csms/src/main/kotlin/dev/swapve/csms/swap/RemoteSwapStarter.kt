@@ -100,7 +100,7 @@ class RemoteSwapStarter(
     suspend fun start(
         stationId: StationId,
         idToken: IdToken,
-        requestId: Int = SwapRequestIds.next(),
+        requestId: Int = SwapRequestIds.newId(),
     ): RemoteSwapStart {
         val at = clock.instant()
 

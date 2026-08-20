@@ -5,7 +5,6 @@ dependencies {
     // 세션 계층의 공개 API 가 suspend 함수와 Duration 을 쓴다 (M4)
     api(libs.kotlinx.coroutines.core)
     implementation(libs.json.schema.validator)
-    implementation(libs.tsid.creator)
 
     testImplementation(libs.kotlinx.coroutines.test)
     // 이벤트 로그만으로 파생 상태를 재구성할 수 있음을 증명하는 데 M3 상태머신을 쓴다.

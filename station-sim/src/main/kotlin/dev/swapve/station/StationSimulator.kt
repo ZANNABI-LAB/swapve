@@ -274,7 +274,7 @@ class StationSimulator(
                 slot.txSeqNo = 0
             } else {
                 // 재부팅이면 **새 트랜잭션**이다. 고정 식별자를 이어 쓰지 않는다.
-                startChargingTransaction(slot, transactionId = if (afterReboot) MessageIds.next() else null)
+                startChargingTransaction(slot, transactionId = if (afterReboot) MessageIds.newId() else null)
             }
         }
     }
@@ -745,7 +745,7 @@ class StationSimulator(
     private suspend fun startChargingTransaction(slot: SimSlot, transactionId: String? = null) {
         // 식별자가 고정된 슬롯이면 그 값을 쓴다 — 적합성 시험이 스펙 원문의 tx 를 그대로
         // 쓰기 위한 자리다. 아니면 발번한다 (로컬 카운터 금지).
-        val newTransactionId = transactionId ?: slot.config.chargingTransactionId ?: MessageIds.next()
+        val newTransactionId = transactionId ?: slot.config.chargingTransactionId ?: MessageIds.newId()
         slot.transactionId = newTransactionId
         slot.txSeqNo = 0
         slot.chargingSuspended = false
