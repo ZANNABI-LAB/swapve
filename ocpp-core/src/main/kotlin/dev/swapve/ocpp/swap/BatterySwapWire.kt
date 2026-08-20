@@ -1,25 +1,26 @@
 package dev.swapve.ocpp.swap
 
 /**
- * 배터리 교환이 실제로 쓰는 **전선 위의 어휘** — action 이름과 열거형 값 상수.
+ * The **vocabulary on the wire** that battery swapping actually uses — action names and enum
+ * values.
  *
- * ### 왜 상수로 모으는가
+ * ### Why collect them as constants
  *
- * Part 6 의 Tool validation 은 `trigger=Delta`, `component.name="Connector"`,
- * `variable.name="AvailabilityState"`, `triggerReason=CablePluggedIn` 같은 **정확한 문자열**을
- * 요구한다. 이 값들을 시뮬레이터와 CSMS 가 각자 리터럴로 적으면, 시험은
- * "리터럴 A 와 리터럴 B 가 같은가"를 확인할 뿐 계약을 확인하지 못한다. 양쪽이 같은 상수를
- * 참조하게 두면 시험이 **계약 대조**가 되고, 표준이 바뀔 때 고칠 자리도 하나다.
+ * Part 6 Tool validation demands **exact strings**: `trigger=Delta`,
+ * `component.name="Connector"`, `variable.name="AvailabilityState"`,
+ * `triggerReason=CablePluggedIn`. If a simulator and a CSMS each spell those out as literals, a
+ * test only confirms that literal A equals literal B — never that either matches the contract.
+ * Pointing both at the same constant turns the test into **a comparison against the contract**,
+ * and leaves one place to edit when the standard moves.
  *
- * 스키마 자체를 대신하지 않는다 — 페이로드가 맞는지는 언제나 공식 스키마가 판정한다
- * (원칙 2). 여기 있는 것은 스키마가 `enum` 으로 허용하는 값 **중 우리가 고른 것**뿐이다.
+ * This does not stand in for the schemas. Whether a payload is correct is always decided by the
+ * official schema; what lives here is only **the subset we chose** out of what those schemas
+ * allow.
  *
- * 슬롯 가용성만은 [AvailabilityState] 로 따로 뺐다. 그건 값이 아니라 **반전된 의미**를
- * 다루는 자리라서다.
+ * Slot availability alone is pulled out into [AvailabilityState] — that one is not a value but
+ * **an inverted meaning**.
  */
 object BatterySwapWire {
-
-    // ------------------------------------------------------------------ action (Part 4 §4.1.6)
 
     const val BOOT_NOTIFICATION = "BootNotification"
     const val HEARTBEAT = "Heartbeat"
@@ -30,97 +31,89 @@ object BatterySwapWire {
     const val BATTERY_SWAP = "BatterySwap"
     const val REQUEST_BATTERY_SWAP = "RequestBatterySwap"
 
-    /** 디바이스 모델 조회·설정 (M9). 식별자는 [DeviceModelVariables] 를 보라. */
+    /** Reading and writing the device model. For the identifiers see [DeviceModelVariables]. */
     const val GET_VARIABLES = "GetVariables"
     const val SET_VARIABLES = "SetVariables"
 
     /**
-     * 디바이스 모델 **전체 재고** 보고 (B03, `TC_S_104_CS`).
+     * Reporting the **full inventory** of the device model (`TC_S_104_CS`).
      *
-     * `GetVariables` 는 CSMS 가 **무엇을 물을지 이미 알 때** 쓴다. 전체 목록은 그렇게 얻을 수
-     * 없다 — 모르는 변수를 물을 수는 없기 때문이다. 그래서 방향이 뒤집힌다: CSMS 가
-     * [GET_BASE_REPORT] 로 청하면 스테이션이 [NOTIFY_REPORT] 를 **여러 건으로 나눠** 보낸다.
+     * `GetVariables` is for when the CSMS **already knows what to ask for**. A full listing
+     * cannot be obtained that way — you cannot ask for variables you do not know. So the
+     * direction reverses: the CSMS requests [GET_BASE_REPORT] and the station answers with
+     * [NOTIFY_REPORT], **split across several messages**.
      */
     const val GET_BASE_REPORT = "GetBaseReport"
     const val NOTIFY_REPORT = "NotifyReport"
 
-    // ------------------------------------------------------------------ BatterySwapEventEnumType
-
-    /** 헌 배터리가 **들어왔다.** */
+    /** A depleted battery **came in**. */
     const val BATTERY_IN = "BatteryIn"
 
-    /** 새 배터리가 **나갔다.** */
+    /** A fresh battery **went out**. */
     const val BATTERY_OUT = "BatteryOut"
 
-    /** 제공된 배터리를 꺼내가지 않았다 (S03.FR.06). */
+    /** The offered battery was never collected (S03.FR.06). */
     const val BATTERY_OUT_TIMEOUT = "BatteryOutTimeout"
 
-    // ------------------------------------------------------------------ 슬롯 상태 보고 (S03.FR.02/04)
-
     /**
-     * 슬롯 상태를 싣는 컴포넌트. 슬롯 1개 = EVSE 1개이고 그 안의 커넥터가 상태를 보고한다
-     * (/§4.5).
+     * The component that carries slot state. One slot is one EVSE, and the connector inside it
+     * reports the state.
      */
     const val COMPONENT_CONNECTOR = "Connector"
 
-    /** 슬롯 점유 상태 변수. 값의 의미는 [AvailabilityState] 를 보라 — 직관과 반대다. */
+    /** The slot occupancy variable. For what the values mean see [AvailabilityState] — they invert. */
     const val VARIABLE_AVAILABILITY_STATE = "AvailabilityState"
 
-    /** `EventTriggerEnumType` — 상태가 **바뀌어서** 보내는 알림이다. */
+    /** `EventTriggerEnumType` — sent because the state **changed**. */
     const val TRIGGER_DELTA = "Delta"
 
-    /** `EventNotificationEnumType` — 장비에 하드와이어된 알림. 모니터 설정으로 생긴 것이 아니다. */
+    /** `EventNotificationEnumType` — hard-wired into the device, not created by a monitoring setting. */
     const val NOTIFICATION_HARD_WIRED = "HardWiredNotification"
 
-    // ------------------------------------------------------------------ SecurityEventNotification
-
-    /** 부팅 직후 보고하는 보안 이벤트 (Part 6 `BootedBatterySwapping`). */
+    /** The security event reported right after boot (Part 6 `BootedBatterySwapping`). */
     const val SECURITY_EVENT_STARTUP = "StartupOfTheDevice"
 
-    /** 재시작/리부트. Part 6 는 [SECURITY_EVENT_STARTUP] 과 이 값 둘 중 하나를 허용한다. */
+    /** A restart or reboot. Part 6 accepts either this or [SECURITY_EVENT_STARTUP]. */
     const val SECURITY_EVENT_RESET_OR_REBOOT = "ResetOrReboot"
-
-    // ------------------------------------------------------------------ BootReasonEnumType
 
     const val BOOT_REASON_POWER_UP = "PowerUp"
 
-    /** 스테이션이 스스로 재시작했다. **S04.FR.11** 의 재부팅 경로가 이 사유로 온다. */
+    /** The station restarted itself. The **S04.FR.11** reboot path arrives with this reason. */
     const val BOOT_REASON_LOCAL_RESET = "LocalReset"
-
-    // ------------------------------------------------------------------ TransactionEvent (S04)
 
     /** `TransactionEventEnumType` */
     const val TX_STARTED = "Started"
     const val TX_UPDATED = "Updated"
     const val TX_ENDED = "Ended"
 
-    /** `TriggerReasonEnumType` — 배터리가 슬롯에 꽂혔다. `TxStartPoint = EVConnected` (S04.FR.08). */
+    /** `TriggerReasonEnumType` — a battery was inserted. `TxStartPoint = EVConnected` (S04.FR.08). */
     const val TRIGGER_REASON_CABLE_PLUGGED_IN = "CablePluggedIn"
 
-    /** `TriggerReasonEnumType` — 충전 상태가 바뀌었다. */
+    /** `TriggerReasonEnumType` — the charging state changed. */
     const val TRIGGER_REASON_CHARGING_STATE_CHANGED = "ChargingStateChanged"
 
     /**
-     * `TriggerReasonEnumType` — 충전 한도에 도달했다.
+     * `TriggerReasonEnumType` — a charging limit was reached.
      *
-     * ### ★ 배터리 제거로 트랜잭션이 끝날 때의 triggerReason 이 이것이다
+     * ### ★ This is also the triggerReason when removing a battery ends the transaction
      *
-     * Part 6 `TC_S_103_CSMS` step 13/17 원문이 그렇다. 초기 설계는 이 자리를
-     * `EVCommunicationLost` 로 **추정**했고 M7 에서 스펙 원문과 대조해 정정했다.
-     * 그 추정값은 스펙 어디에도 근거가 없어 상수 자체를 지웠다 — 남겨 두면 다시 쓰인다.
+     * That is what Part 6 `TC_S_103_CSMS` steps 13 and 17 say. An earlier design **guessed**
+     * `EVCommunicationLost` here and was corrected against the text; the guessed constant was
+     * deleted outright, because a constant left lying around gets used again.
      *
-     * 종료 사건은 세 값을 **각각** 요구한다: 왜 끝났나(`triggerReason`) · 무엇이
-     * 끊겼나([STOPPED_REASON_EV_DISCONNECTED]) · 끝난 뒤의 상태([CHARGING_STATE_IDLE]).
-     * 셋 다 enum 으로는 유효한 값이라 **스키마 검증으로는 잡히지 않는다.**
+     * Ending a transaction demands three values **separately**: why it ended (`triggerReason`),
+     * what disconnected ([STOPPED_REASON_EV_DISCONNECTED]), and the state afterwards
+     * ([CHARGING_STATE_IDLE]). All three are valid enum members on their own, so **schema
+     * validation cannot catch a wrong one.**
      */
     const val TRIGGER_REASON_ENERGY_LIMIT_REACHED = "EnergyLimitReached"
 
     /**
-     * `TriggerReasonEnumType` — 주기 계량 보고 (S04.FR.04).
+     * `TriggerReasonEnumType` — a periodic meter report (S04.FR.04).
      *
-     * 충전 중 SoC 를 알리는 `TransactionEvent(Updated)` 의 계기다. 상태가 바뀌어서 보내는
-     * 것이 아니므로 [TRIGGER_REASON_CHARGING_STATE_CHANGED] 를 쓰면 거짓이 된다 —
-     * `chargingState` 는 그대로 `Charging` 이다.
+     * The occasion for the `TransactionEvent(Updated)` that reports SoC while charging. Nothing
+     * changed state, so [TRIGGER_REASON_CHARGING_STATE_CHANGED] would be a false statement here
+     * — `chargingState` is still `Charging`.
      */
     const val TRIGGER_REASON_METER_VALUE_PERIODIC = "MeterValuePeriodic"
 
@@ -129,57 +122,53 @@ object BatterySwapWire {
     const val CHARGING_STATE_CHARGING = "Charging"
 
     /**
-     * `ChargingStateEnumType` — **충전 상한(`MaxSoc`)에 닿아 스테이션이 급전을 멈췄다** (S04.FR.06).
+     * `ChargingStateEnumType` — **the station stopped supplying power on reaching the charging
+     * ceiling (`MaxSoc`)** (S04.FR.06).
      *
-     * ### 트랜잭션은 끝나지 않는다
+     * ### The transaction does not end here
      *
-     * 멈춘 것은 **에너지 흐름**이지 트랜잭션이 아니다. 배터리는 여전히 슬롯에 꽂혀 있고
-     * (`TxStopPoint = EVConnected`, S04.FR.09), 트랜잭션은 그 배터리를 누군가 꺼내갈 때
-     * 비로소 `Ended` 로 닫힌다. 여기서 닫으면 나중에 반출될 때 종료할 트랜잭션이 없어
-     * 장부가 허공에서 끝난다.
+     * What stopped is **the energy flow**, not the transaction. The battery is still in the slot
+     * (`TxStopPoint = EVConnected`, S04.FR.09) and the transaction only closes as `Ended` when
+     * someone takes that battery out. Closing it here would leave nothing to close on removal,
+     * and the ledger would end in mid-air.
      *
-     * `EVSE` 가 멈춘 것이라 `SuspendedEV` 가 아니라 이 값이다 — 배터리가 거부한 것이 아니다.
+     * It is the EVSE that stopped, so this rather than `SuspendedEV` — the battery did not
+     * refuse anything.
      */
     const val CHARGING_STATE_SUSPENDED_EVSE = "SuspendedEVSE"
 
-    // ------------------------------------------------------------------ 계량값 (S04.FR.04)
-
-    /** `MeasurandEnumType` — 배터리 충전 상태. 주기 보고가 싣는 값이다. */
+    /** `MeasurandEnumType` — battery state of charge, the value periodic reports carry. */
     const val MEASURAND_SOC = "SoC"
 
     /**
-     * `SampledValue.unitOfMeasure.unit` — 퍼센트.
+     * `SampledValue.unitOfMeasure.unit` — percent.
      *
-     * 스키마는 이 필드를 열거형이 아니라 문자열로 두고 *"SHALL use a value from the list
-     * Standardized Units of Measurements in Part 2 Appendices"* 라고만 적는다. 즉 오타가
-     * 스키마 검증을 그대로 통과한다 — 상수로 모으는 이유가 그것이다.
+     * The schema leaves this field a plain string rather than an enum, saying only *"SHALL use a
+     * value from the list Standardized Units of Measurements in Part 2 Appendices"*. A typo
+     * therefore passes schema validation untouched — which is exactly why it is a constant.
      */
     const val UNIT_PERCENT = "Percent"
 
-    /** `ReadingContextEnumType` — 주기 표본. 스키마 기본값과 같지만 명시해 둔다. */
+    /** `ReadingContextEnumType` — a periodic sample. Same as the schema default, but stated rather than assumed. */
     const val READING_CONTEXT_SAMPLE_PERIODIC = "Sample.Periodic"
 
-    /** `ChargingStateEnumType` — 트랜잭션이 끝난 뒤의 상태 (Part 6 `TC_S_103_CSMS` step 13/17). */
+    /** `ChargingStateEnumType` — the state after a transaction ends (Part 6 `TC_S_103_CSMS` steps 13/17). */
     const val CHARGING_STATE_IDLE = "Idle"
 
-    /** `ReasonEnumType` — 배터리를 빼서 트랜잭션이 끝났다. */
+    /** `ReasonEnumType` — the transaction ended because the battery was removed. */
     const val STOPPED_REASON_EV_DISCONNECTED = "EVDisconnected"
 
-    // ------------------------------------------------------------------ IdTokenType
-
     /**
-     * 충전 트랜잭션에 쓰는 대체 토큰의 종류 (S04.FR.02/03).
+     * The kind of substitute token a charging transaction uses (S04.FR.02/03).
      *
-     * 교환 스테이션의 충전은 사람이 카드를 대서 시작되지 않는다. 설정된
-     * `BatterySwapCtrlr.IdToken` 을 `Central` 로 싣거나, 아무 토큰도 없다는 뜻으로
-     * [ID_TOKEN_TYPE_NO_AUTHORIZATION] 을 쓴다.
+     * Charging at a swap station is not started by a person presenting a card. Either the
+     * configured `BatterySwapCtrlr.IdToken` travels as `Central`, or
+     * [ID_TOKEN_TYPE_NO_AUTHORIZATION] says there is no token at all.
      */
     const val ID_TOKEN_TYPE_CENTRAL = "Central"
 
-    /** 인가가 없는 트랜잭션. 이때 `idToken.idToken` 은 **빈 문자열**이다 (Part 6 Tool validation). */
+    /** An unauthorized transaction. `idToken.idToken` is then **the empty string** (Part 6 Tool validation). */
     const val ID_TOKEN_TYPE_NO_AUTHORIZATION = "NoAuthorization"
-
-    // ------------------------------------------------------------------ 응답 상태값
 
     /** `RegistrationStatusEnumType` */
     const val REGISTRATION_ACCEPTED = "Accepted"
@@ -187,105 +176,103 @@ object BatterySwapWire {
     /** `AuthorizationStatusEnumType` */
     const val AUTHORIZATION_ACCEPTED = "Accepted"
 
-    /** `GenericStatusEnumType` — `RequestBatterySwapResponse.status` (S02). */
+    /** `GenericStatusEnumType` — the status of `RequestBatterySwapResponse` (S02). */
     const val GENERIC_ACCEPTED = "Accepted"
     const val GENERIC_REJECTED = "Rejected"
 
-    // ------------------------------------------------------------------ 디바이스 모델 보고 (B03)
-
-    /** `ReportBaseEnumType` — 디바이스 모델 **전부**. `TC_S_104_CS` 가 요구하는 값이다. */
+    /** `ReportBaseEnumType` — **the whole** device model. The value `TC_S_104_CS` requires. */
     const val REPORT_BASE_FULL_INVENTORY = "FullInventory"
 
-    /** `GenericDeviceModelStatusEnumType` — `GetBaseReportResponse.status`. */
+    /** `GenericDeviceModelStatusEnumType` — the status of `GetBaseReportResponse`. */
     const val DEVICE_MODEL_ACCEPTED = "Accepted"
 
-    /** 우리가 만들 수 없는 종류의 보고를 청받았다. `Rejected`("못 하겠다")와 다르다. */
+    /** A kind of report we cannot produce was requested. Distinct from `Rejected`, which means "will not". */
     const val DEVICE_MODEL_NOT_SUPPORTED = "NotSupported"
 
     /**
-     * `AttributeEnumType` — **지금 실제로 갖고 있는 값**.
+     * `AttributeEnumType` — **the value actually held right now**.
      *
-     * 한 변수에 `Target`/`MinSet`/`MaxSet` 까지 최대 4개의 속성이 딸릴 수 있다. 받는 쪽이
-     * 아무 속성이나 값으로 읽으면 목표치를 현재치로 오해하므로, 보고할 때도 골라 읽을 때도
-     * 이 상수를 지난다.
+     * One variable can carry up to four attributes, including `Target`, `MinSet` and `MaxSet`. A
+     * receiver that reads whichever attribute comes first would mistake a target for a current
+     * reading, so both reporting and selective reading go through this constant.
      */
     const val ATTRIBUTE_ACTUAL = "Actual"
 
-    /** `MutabilityEnumType` — 관측될 뿐 설정할 수 없다 (`BatteryCartridge`, `SwapOrder`). */
+    /** `MutabilityEnumType` — observed, never set (`BatteryCartridge`, `SwapOrder`). */
     const val MUTABILITY_READ_ONLY = "ReadOnly"
 
-    /** `MutabilityEnumType` — `SetVariables` 로 바꿀 수 있다. */
+    /** `MutabilityEnumType` — changeable through `SetVariables`. */
     const val MUTABILITY_READ_WRITE = "ReadWrite"
 
-    /** `DataEnumType` — `VariableCharacteristics.dataType` (필수 필드). */
+    /** `DataEnumType` — `VariableCharacteristics.dataType`, a required field. */
     const val DATA_TYPE_INTEGER = "integer"
     const val DATA_TYPE_DECIMAL = "decimal"
     const val DATA_TYPE_STRING = "string"
     const val DATA_TYPE_BOOLEAN = "boolean"
 
-    /** 값이 정해진 목록 중 하나다. 이때 `valuesList` 가 **필수**다 (공식 스키마). */
+    /** The value is one of a fixed list. `valuesList` is then **required** (official schema). */
     const val DATA_TYPE_OPTION_LIST = "OptionList"
 
-    /** `VariableCharacteristics.unit` — 초. [UNIT_PERCENT] 과 같은 자리다. */
+    /** `VariableCharacteristics.unit` — seconds. The same position as [UNIT_PERCENT]. */
     const val UNIT_SECONDS = "seconds"
 
-    // ------------------------------------------------------------------ customData 거부 확장
-
     /**
-     * `BatterySwapResponse` 로 배터리를 거부할 때 쓰는 벤더 식별자 (Part 2 S03 Error handling).
+     * The vendor identifier used to refuse a battery through `BatterySwapResponse`
+     * (Part 2 S03 Error handling).
      *
-     * `BatterySwapResponse` 는 *"Empty response by CSMS to confirm receipt"* 이고 **거부할 수
-     * 없다**. OCA 가 그 한계를 위한 공식 우회를 정해 두었다 — 응답에
-     * `customData` 를 실어 `status`/`statusInfo` 를 알린다. 그래도 **응답의 성격은 수신
-     * 확인 그대로**이므로 CALLERROR 로 답하지 않는다.
+     * `BatterySwapResponse` is *"Empty response by CSMS to confirm receipt"* and **cannot carry
+     * a refusal**. OCA defined an official way around that limit: the response carries
+     * `customData` holding `status` and `statusInfo`. The response is still an acknowledgement
+     * in nature, so it is **not** turned into a CALLERROR.
      *
-     * 지원 여부는 디바이스 모델의
-     * `CustomizationCtrlr.CustomImplementationEnabled[이 vendorId] = true` 로 보고한다.
+     * Support is advertised in the device model as
+     * `CustomizationCtrlr.CustomImplementationEnabled[this vendorId] = true`.
      */
     const val VENDOR_ID_BATTERY_SWAP_RESPONSE = "org.openchargealliance.batteryswapresponse"
 }
 
 /**
- * 배터리 거부 사유 코드 — 부록 `reason_codes.csv` 가 정본이다.
+ * Reason codes for refusing a battery — the appendix `reason_codes.csv` is authoritative.
  *
- * 이 여섯 개는 표준이 **사전 정의**한 값이라 우리가 짓는 것이 아니다. 문자열 리터럴로 흩어
- * 놓으면 오타가 조용히 통과한다 — `statusInfo.reasonCode` 는 `maxLength` 만 검사받고 값의
- * 목록은 스키마에 없기 때문이다.
+ * These six are **predefined by the standard**, not invented here. Scattered as string literals
+ * a typo would pass silently: `statusInfo.reasonCode` is only checked against `maxLength`, and
+ * the list of valid values is nowhere in the schema.
  *
- * @param wireValue 전선 위의 값. 열거형 이름이 바뀌어도 이 값은 흔들리지 않는다.
- * @param appliesToRequestBatterySwap `RequestBatterySwapResponse.statusInfo` 에도 쓸 수 있는가.
- *   부록 표에서 그 자리에 나오는 것은 [NO_BATTERY_AVAILABLE] 하나뿐이다 (S02.FR.04).
+ * @param wireValue the value on the wire. Renaming an enum constant does not disturb it.
+ * @param appliesToRequestBatterySwap whether it may also appear in
+ *   `RequestBatterySwapResponse.statusInfo`. In the appendix table only [NO_BATTERY_AVAILABLE]
+ *   appears there (S02.FR.04).
  */
 enum class BatteryRejectionReason(
     val wireValue: String,
     val appliesToRequestBatterySwap: Boolean = false,
 ) {
 
-    /** SoH 가 너무 낮다. */
+    /** State of health is too low. */
     BATTERY_SOH_LOW("BatterySoHLow"),
 
-    /** SoC 값이 부적절하다. */
+    /** The state of charge is unsuitable. */
     BATTERY_SOC("BatterySoC"),
 
-    /** 배터리가 손상됐다. */
+    /** The battery is damaged. */
     BATTERY_DAMAGED("BatteryDamaged"),
 
-    /** 우리가 모르는 일련번호다 (F3). */
+    /** A serial number we do not know. */
     BATTERY_UNKNOWN("BatteryUnknown"),
 
-    /** 허용되지 않는 배터리 타입이다. */
+    /** A battery type that is not allowed. */
     BATTERY_TYPE("BatteryType"),
 
     /**
-     * 교환에 내줄 배터리가 없다 (S02.FR.04).
+     * There is no battery to hand out (S02.FR.04).
      *
-     * **재고 판정은 스테이션이 한다**. CSMS 는 이 코드를 만들지 않고 받아 기록만
-     * 한다 — Part 6 `TC_S_102_CSMS` 가 그 시나리오다.
+     * **Stock is judged by the station.** A CSMS never produces this code — it receives it and
+     * records it. Part 6 `TC_S_102_CSMS` is that scenario.
      */
     NO_BATTERY_AVAILABLE("NoBatteryAvailable", appliesToRequestBatterySwap = true);
 
     companion object {
-        /** 전선 위의 값으로 찾는다. 대소문자를 가리지 않는다 — *"The string is case-insensitive"* (스키마). */
+        /** Looks one up by its wire value, ignoring case — *"The string is case-insensitive"* (schema). */
         fun ofWire(value: String?): BatteryRejectionReason? =
             entries.firstOrNull { it.wireValue.equals(value, ignoreCase = true) }
     }

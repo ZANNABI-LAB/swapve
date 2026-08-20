@@ -1,45 +1,43 @@
 package dev.swapve.ocpp.swap
 
 /**
- * ⚠️ **직관과 반대인 슬롯 가용성** (Part 2 §S Ch.2).
+ * ⚠️ **Slot availability reads the opposite of the intuition** (Part 2 §S Ch.2).
  *
  * > *"An 'Available' slot does **not** contain a battery for swapping, whereas an 'Occupied'
  * > slot **does** have a battery that can be used for swapping."*
  *
- * ### 이 반전 지식은 이 파일에만 있다
+ * ### This inversion is known here and nowhere else
  *
- * **버그 유발 1순위**가 이 반전이다. 도메인은 `EMPTY`/`HOLDS_BATTERY`
- * 로 부르고 (swap-domain `SlotState`), 프로토콜은 `Available`/`Occupied` 로 부른다.
- * **두 어휘 사이의 다리를 두 곳에 두면 언젠가 한쪽만 틀린다** — 시뮬레이터는 배터리를 넣고
- * `Available` 을 보내는데 CSMS 는 그것을 "배터리 있음"으로 읽는 식이다. 그래서 변환의
- * 유일한 지식인 [holdsBattery] / [wireOf] 를 여기 하나로 모은다.
+ * It is the likeliest source of bugs in this area. The domain says `EMPTY`/`HOLDS_BATTERY`
+ * while the protocol says `Available`/`Occupied`, and **a bridge between two vocabularies kept
+ * in two places eventually goes wrong in one of them** — the simulator inserts a battery and
+ * reports `Available`, the CSMS reads that as "has a battery". So [holdsBattery] and [wireOf]
+ * are the only places that hold the knowledge.
  *
- * ### 왜 `ocpp-core` 인가
+ * ### Why this lives in `ocpp-core`
  *
- * `AvailabilityState` 는 **OCPP 디바이스 모델의 어휘**다 (컴포넌트 `Connector` 의 변수).
- * swap-domain 에 두면 도메인에 프로토콜 어휘가 새어 들어가고 (원칙 4), 그렇다고
- * `ocpp-core → swap-domain` 의존을 만들면 층위가 뒤집힌다. 프로토콜 어휘를 프로토콜 모듈에
- * 두고, **도메인 열거형으로 바꾸는 마지막 한 걸음만 각 경계 모듈이 한다** — 그 한 걸음은
- * `Boolean` → 도메인 열거형이라 반전이 끼어들 자리가 없다.
+ * `AvailabilityState` is **device model vocabulary** — a variable of the `Connector` component.
+ * Putting it in the domain module would leak the protocol into the domain; depending on the
+ * domain from here would invert the layering. Protocol vocabulary stays in the protocol module,
+ * and **only the last step to a domain enum is left to the modules at the boundary** — a step
+ * from `Boolean` to an enum, where the inversion has no room to slip back in.
  *
- * [UNAVAILABLE] 은 배터리 유무와 무관하게 "슬롯을 쓸 수 없다"를 뜻하므로 [holdsBattery] 가
- * `null` 이다 — 모른다는 사실을 `false` 로 뭉개지 않는다.
+ * [UNAVAILABLE] says the slot cannot be used at all, whatever it holds, so [holdsBattery] is
+ * `null` there — not knowing is not flattened into `false`.
  */
 enum class AvailabilityState(val wireValue: String) {
 
-    /** 슬롯에 교환용 배터리가 **없다.** */
+    /** The slot holds **no** battery to swap. */
     AVAILABLE("Available"),
 
-    /** 슬롯에 교환에 쓸 수 있는 배터리가 **있다.** */
+    /** The slot **does** hold a battery that can be swapped. */
     OCCUPIED("Occupied"),
 
-    /** 슬롯을 쓸 수 없다. 배터리 유무는 이 값으로 알 수 없다. */
+    /** The slot cannot be used. Says nothing about whether a battery is in it. */
     UNAVAILABLE("Unavailable"),
     ;
 
-    /**
-     * 이 상태가 뜻하는 배터리 유무. [UNAVAILABLE] 이면 `null` — 알 수 없다는 뜻이다.
-     */
+    /** What this state says about holding a battery. `null` for [UNAVAILABLE] — it does not say. */
     val holdsBattery: Boolean?
         get() = when (this) {
             AVAILABLE -> false
@@ -49,20 +47,20 @@ enum class AvailabilityState(val wireValue: String) {
 
     companion object {
 
-        /** 전선 위의 값에서 읽는다. 표에 없는 값이면 `null` — 버리지 않고 호출자가 기록한다. */
+        /** Reads the value off the wire. `null` for anything outside the table — the caller records it rather than dropping it. */
         fun parse(wireValue: String): AvailabilityState? = entries.firstOrNull { it.wireValue == wireValue }
 
         /**
-         * 배터리 유무 → 전선 위의 값. **배터리를 넣으면 [OCCUPIED] 다.**
+         * Holding a battery → the value on the wire. **A battery in the slot is [OCCUPIED].**
          *
-         * 시뮬레이터가 `NotifyEvent.actualValue` 를 만들 때 지나는 유일한 문이다.
+         * The only door a simulator passes through when building `NotifyEvent.actualValue`.
          */
         fun wireOf(holdsBattery: Boolean): String = if (holdsBattery) OCCUPIED.wireValue else AVAILABLE.wireValue
 
         /**
-         * 전선 위의 값 → 배터리 유무. 모르는 값이거나 [UNAVAILABLE] 이면 `null`.
+         * The value on the wire → holding a battery. `null` if unrecognised or [UNAVAILABLE].
          *
-         * CSMS 가 `NotifyEvent.actualValue` 를 읽을 때 지나는 유일한 문이다.
+         * The only door a CSMS passes through when reading `NotifyEvent.actualValue`.
          */
         fun holdsBattery(wireValue: String): Boolean? = parse(wireValue)?.holdsBattery
     }
