@@ -187,7 +187,7 @@ Content-Type: application/json
   "error": "NOT_AUTHORIZED",
   "message": "인가되지 않은 idToken 이라 RequestBatterySwap 을 보내지 않았다 (S02.FR.03)",
   "stationId": "CS001",
-  "idTokenStatus": "Unknown"     // Invalid 가 아니다 — 우리 목록에 없을 뿐이다 (PLAN §11.3)
+  "idTokenStatus": "Unknown"     // Invalid 가 아니다 — 인가 목록에 없을 뿐이다
 }
 ```
 
@@ -277,7 +277,7 @@ Content-Type: application/json
       { "slotId": 1, "serialNumber": "BAT-USED-1", "soC": 23.0, "soH": 85.0 },
       { "slotId": 2, "serialNumber": "BAT-USED-2", "soC": 45.0, "soH": 87.0 }
     ],
-    "persisted": true      // 이 채무가 H2 에도 남았다 (PLAN §5.3 — 이것만 영속된다)
+    "persisted": true      // 이 채무가 H2 에도 남았다 (파생 상태 중 유일하게 영속된다)
   }
 }
 ```

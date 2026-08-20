@@ -157,8 +157,9 @@ Spring context on every build.
 - **What is closed and what is still open differ.** WebSocket defaults to `BASIC`, the REST API has
   its own Basic realm, and `sim-console` binds to loopback. There is no mTLS (B12), no credential
   rotation, no rate limiting, no operational audit trail.
-- **Single instance.** Horizontal scaling is not blocked — `stationId` serialization and TSIDs are
-  already in place (§11.5) — but it is not implemented (B11). Restarts *are* survived:
+- **Single instance.** Horizontal scaling is not blocked — serialization and the idempotency
+  ledger are both keyed by `stationId`, which is the partition key a distributed setup would use —
+  but it is not implemented. Restarts *are* survived:
   raw OCPP messages persist to an event log (H2) and derived registries are rebuilt from that log at
   startup (`EventLogRecovery`). Data outside the retention windows (7 days recovery · 30 days audit)
   is not reconstructable.
