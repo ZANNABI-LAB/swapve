@@ -1,9 +1,9 @@
 server:
   port: 8080
   ssl:
-    # wss/TLS 종료는 설정으로 켜고 끈다 (PLAN §11.4).
-    # 리버스 프록시가 앞단에서 종료해도 무방하다 — 그때는 여기를 false 로 둔다.
-    # 켤 때는 server.ssl.key-store 계열 설정을 함께 채운다.
+    # wss/TLS 종료는 설정으로 켜고 끈다 (PLAN §11.4). 직접 종료하려면 enabled=true 와 함께
+    # key-store / key-store-password / key-store-type 등을 채운다. 리버스 프록시가 앞단에서
+    # TLS 를 끝내고 내부로 ws 를 넘기는 구성도 가능하다 — 그때는 여기를 false 로 둔다.
     enabled: false
 
 spring:
@@ -35,6 +35,15 @@ csms:
   # 실제 연결 URL 은 여기에 "/" + 스테이션 식별자가 붙는다 (Part 4 §3.1.1).
   # 예: ws://localhost:8080/ocpp/CS001
   endpoint-path: /ocpp
+  security:
+    # 운영 기본값은 BASIC 이다. 로컬 실험에서만 NONE 으로 낮춘다.
+    profile: BASIC
+    # 프로파일 1 자격증명. station-id 는 URL 경로 식별자 및 Basic username 과 같아야 한다.
+    # 해시 생성 예:
+    #   Kotlin: BCryptPasswordEncoder(10).encode("station-password")
+    stations:
+      # - station-id: CS001
+      #   password-hash: "$2a$10$replace-with-bcrypt-hash"
   heartbeat-interval: 300s
   # 값이 항상 하나여도 둔다 (PLAN §11.3 로밍).
   operator-id: swapve

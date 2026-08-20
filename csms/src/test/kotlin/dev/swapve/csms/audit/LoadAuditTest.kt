@@ -1,6 +1,7 @@
 package dev.swapve.csms.audit
 
 import dev.swapve.csms.event.JdbcOcppEventLog
+import dev.swapve.csms.support.BasicAuthStations
 import dev.swapve.csms.support.FixedClockConfig
 import dev.swapve.csms.swap.ChargingTransactionRegistry
 import dev.swapve.csms.swap.SlotStateRegistry
@@ -20,6 +21,7 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.test.web.server.LocalServerPort
 import org.springframework.context.annotation.Import
+import org.springframework.test.context.ContextConfiguration
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
@@ -57,6 +59,7 @@ import kotlin.test.assertTrue
     properties = ["csms.known-battery-serials="],
 )
 @Import(FixedClockConfig::class)
+@ContextConfiguration(initializers = [BasicAuthStations::class])
 @Tag("audit")
 class LoadAuditTest {
 
@@ -125,8 +128,8 @@ class LoadAuditTest {
      * @return 부하에 걸린 밀리초. 보고용이지 단언 대상이 아니다.
      */
     private fun runLoad(): Long {
-        val runId = "CS-LOAD-${System.nanoTime()}"
-        runStationIds = LoadScenario.stationIds(runId)
+        val runId = LoadScenario.RUN_ID
+        runStationIds = LoadScenario.RUN_STATION_IDS
         val startedAt = System.nanoTime()
 
         runBlocking {

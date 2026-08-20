@@ -22,6 +22,8 @@ kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-t
 # WebSocket 서버. 버전은 spring-dependency-management 가 BOM 으로 정한다
 spring-boot-starter-websocket = { module = "org.springframework.boot:spring-boot-starter-websocket" }
 spring-boot-starter-test = { module = "org.springframework.boot:spring-boot-starter-test" }
+# BCryptPasswordEncoder 만 쓴다. starter-security 를 넣으면 필터체인 자동설정까지 따라온다.
+spring-security-crypto = { module = "org.springframework.security:spring-security-crypto" }
 # OUT_TIMED_OUT 장부의 영속 (PLAN §5.3 불변식, §6 기술선택). JdbcTemplate 하나면 충분해
 # JPA 는 넣지 않는다 — 테이블 1개짜리 장부에 ORM 은 순비용이다
 spring-boot-starter-jdbc = { module = "org.springframework.boot:spring-boot-starter-jdbc" }

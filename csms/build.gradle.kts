@@ -10,6 +10,9 @@ dependencies {
     implementation(project(":ocpp-core"))
     implementation(project(":swap-domain"))
     implementation(libs.spring.boot.starter.websocket)
+    // 보안 프로파일 1 은 BCrypt 해시 검증만 필요하다. starter-security 를 넣으면
+    // 필터체인 자동설정이 붙어 WebSocket 핸드셰이크 경계가 두 군데가 된다.
+    implementation(libs.spring.security.crypto)
     // OUT_TIMED_OUT 장부는 영속이 필요하다 (PLAN §5.3 불변식) — 인메모리로 끝내면 장부
     // 불균형이 재시작마다 사라진다. JdbcTemplate 하나로 끝내고 JPA·마이그레이션 도구는
     // 넣지 않는다. 스키마는 schema.sql 한 장이다
@@ -54,6 +57,10 @@ tasks.withType<Test>().configureEach {
     )
     systemProperty("csms.recovery.enabled", "false")
     systemProperty("csms.retention.enabled", "false")
+    // 기본 운영값은 BASIC 이지만 test 태스크의 raw 핸드셰이크 시험과 비인증 경로 시험은
+    // 자격증명 목록을 싣지 않는다. 공통 시험 기본값은 NONE 으로 두고, 인증 전용 시험과
+    // 적합성·감사 게이트가 BASIC 을 명시적으로 켠다.
+    systemProperty("csms.security.profile", "NONE")
 
     doFirst {
         if (!h2Directory.deleteRecursively()) {
@@ -89,6 +96,8 @@ val conformanceTest by tasks.registering(Test::class) {
         includeTags("conformance")
     }
 
+    systemProperty("csms.security.profile", "BASIC")
+
     // 적합성은 "지금 코드가 표준을 지키는가"를 묻는다. 앞선 실행이 통과했다는 이유로
     // 건너뛰면 그 질문에 답하지 않은 것이다.
     outputs.upToDateWhen { false }
@@ -116,6 +125,8 @@ val auditTest by tasks.registering(Test::class) {
     useJUnitPlatform {
         includeTags("audit")
     }
+
+    systemProperty("csms.security.profile", "BASIC")
 
     // 감사는 "지금 코드가 동시성 아래서도 불변식을 지키는가"를 묻는다. 앞선 실행이
     // 통과했다는 이유로 건너뛰면 그 질문에 답하지 않은 것이다.

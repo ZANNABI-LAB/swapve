@@ -25,6 +25,8 @@ import java.time.Duration
  * @param callTimeout CSMS 가 보낸 CALL 의 응답 대기 한도 (Part 4 §4.1.1).
  * @param retention 이벤트 로그 보존·복구 창 정책. 감사 원문 보존과 기동 리플레이 비용은
  *   서로 다른 목적이라 한 값으로 묶지 않는다.
+ * @param security WebSocket 보안 프로파일. 기본은 BASIC 이다 — 무인증 서버를 기본으로
+ *   띄우면 chargeBoxId 를 아는 누구나 이벤트를 주입할 수 있다.
  */
 @ConfigurationProperties(prefix = "csms")
 data class CsmsProperties(
@@ -36,6 +38,7 @@ data class CsmsProperties(
     val maxTextMessageSize: Int = 64 * 1024,
     val callTimeout: Duration = Duration.ofSeconds(30),
     val retention: Retention = Retention(),
+    val security: Security = Security(),
 ) {
 
     /**
@@ -65,4 +68,26 @@ data class CsmsProperties(
         val enabled: Boolean = true,
         val sweepInterval: Duration = Duration.ofHours(1),
     )
+
+    /**
+     * OCPP-J WebSocket 보안 설정.
+     *
+     * [profile] 의 기본값은 [SecurityProfile.BASIC] 이다. 개발 편의를 위해 NONE 을 지원하지만,
+     * 기본 운영 설정이 무인증이면 실수 한 번으로 인터넷에 열린 CSMS 가 된다.
+     */
+    data class Security(
+        val profile: SecurityProfile = SecurityProfile.BASIC,
+        val stations: List<StationCredential> = emptyList(),
+    )
+
+    /** 프로파일 1 자격증명. `stationId` 는 URL 경로의 식별자 및 Basic username 과 같아야 한다. */
+    data class StationCredential(
+        val stationId: String,
+        val passwordHash: String,
+    )
+
+    enum class SecurityProfile {
+        NONE,
+        BASIC,
+    }
 }

@@ -1,6 +1,7 @@
 package dev.swapve.csms.audit
 
 import dev.swapve.csms.support.FixedClockConfig
+import dev.swapve.csms.support.TestCredentials
 import dev.swapve.station.SimBattery
 import dev.swapve.station.SlotConfig
 import dev.swapve.station.StationSimConfig
@@ -49,6 +50,11 @@ object LoadScenario {
 
     /** 감사 대상 교환 건수 — 20 × 3. */
     const val EXPECTED_SWAPS = STATION_COUNT * ROUNDS
+
+    /** 감사 게이트 실행마다 고유하지만, Spring context 기동 전에는 확정되는 실행 id. */
+    val RUN_ID = "CS-LOAD-${System.nanoTime()}"
+
+    val RUN_STATION_IDS: List<String> = stationIds(RUN_ID)
 
     /** `application.yml` 의 인가 목록에 있는 토큰. 없는 토큰이면 S01 이 거부된다. */
     val AUTHORIZED_TOKEN = IdToken("RFID-0001", "ISO14443")
@@ -109,6 +115,7 @@ object LoadScenario {
         return StationSimConfig(
             csmsUrl = "ws://localhost:$port/ocpp",
             stationId = runId?.let { stationId(it, index) } ?: stationId(index),
+            password = TestCredentials.PASSWORD,
             slots = slots,
             idToken = AUTHORIZED_TOKEN,
             requestId = requestId(round),

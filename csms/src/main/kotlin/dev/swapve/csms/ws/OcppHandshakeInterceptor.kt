@@ -1,7 +1,9 @@
 package dev.swapve.csms.ws
 
 import dev.swapve.csms.config.CsmsProperties
+import dev.swapve.csms.config.CsmsProperties.SecurityProfile
 import org.slf4j.LoggerFactory
+import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
 import org.springframework.http.server.ServerHttpRequest
 import org.springframework.http.server.ServerHttpResponse
@@ -34,6 +36,7 @@ import org.springframework.web.socket.server.HandshakeInterceptor
 class OcppHandshakeInterceptor(private val properties: CsmsProperties) : HandshakeInterceptor {
 
     private val log = LoggerFactory.getLogger(javaClass)
+    private val basicAuthenticator = BasicAuthenticator(properties.security.stations)
 
     override fun beforeHandshake(
         request: ServerHttpRequest,
@@ -53,7 +56,25 @@ class OcppHandshakeInterceptor(private val properties: CsmsProperties) : Handsha
             }
 
             is StationIdentity.Outcome.Identified -> {
-                attributes[STATION_PRINCIPAL_ATTRIBUTE] = outcome.principal
+                val principal = when (properties.security.profile) {
+                    SecurityProfile.NONE -> outcome.principal
+                    SecurityProfile.BASIC -> {
+                        val result = basicAuthenticator.authenticate(
+                            outcome.principal.stationId,
+                            request.headers.getFirst(HttpHeaders.AUTHORIZATION),
+                        )
+                        if (!result.authenticated) {
+                            log.warn("Basic 인증 실패: station={} reason={}", outcome.principal.stationId, result.reason)
+                            response.headers.add(
+                                HttpHeaders.WWW_AUTHENTICATE,
+                                "Basic realm=\"ocpp\", charset=\"UTF-8\"",
+                            )
+                            return reject(response, HttpStatus.UNAUTHORIZED)
+                        }
+                        outcome.principal.copy(authMethod = AuthMethod.BASIC)
+                    }
+                }
+                attributes[STATION_PRINCIPAL_ATTRIBUTE] = principal
                 true
             }
         }
@@ -80,13 +101,13 @@ class OcppHandshakeInterceptor(private val properties: CsmsProperties) : Handsha
             .any { it.trim().equals(OCPP_SUBPROTOCOL, ignoreCase = true) }
 
     /**
-     * 거절 — 400 으로 답하고 업그레이드를 진행하지 않는다.
+     * 거절 — 기본은 400 으로 답하고 업그레이드를 진행하지 않는다. 인증 실패만 401 을 쓴다.
      *
      * 사유를 본문이나 헤더에 싣지 않는다. 붙지 못한 상대에게 우리 내부 판정 기준을 알려 줄
      * 이유가 없다. 사유는 서버 로그에 남는다.
      */
-    private fun reject(response: ServerHttpResponse): Boolean {
-        response.setStatusCode(HttpStatus.BAD_REQUEST)
+    private fun reject(response: ServerHttpResponse, status: HttpStatus = HttpStatus.BAD_REQUEST): Boolean {
+        response.setStatusCode(status)
         return false
     }
 

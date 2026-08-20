@@ -34,8 +34,8 @@ OCPP 2.1이 2025년 1월 **Battery Swap 기능 블록(Block S)** 을 정식 편�
 
 **프로덕션 시스템이 아닙니다.** 없는 것을 먼저 적습니다 — 자세한 내용은 [docs/API.md](docs/API.md).
 
-- ⚠️ **인증·인가가 없습니다.** 로그인도 API 키도 JWT도 없고, WebSocket은 URL 경로의
-  식별자만으로 스테이션을 받습니다(`authMethod = NONE`). **그대로 인터넷에 노출하면 안 됩니다.**
+- ⚠️ **앱/API 인증은 없습니다.** WebSocket 스테이션 연결은 기본 `BASIC` 프로파일을 지원하지만,
+  REST API 와 `sim-console` 은 로컬 데모용으로 열려 있습니다. **그대로 인터넷에 노출하면 안 됩니다.**
 - **재시작하면 대부분 증발합니다.** 영속되는 것은 `OUT_TIMED_OUT` 장부 하나뿐입니다
   (H2 파일). 나머지는 인메모리이고, 이벤트 로그에서 재구성 가능한 파생 상태입니다.
 - **스마트차징·요금·로밍·수평 확장은 범위 밖입니다** ([PLAN §3](docs/PLAN.md)).
@@ -57,7 +57,7 @@ cd swapve
 터미널 **A** — 관제 서버를 띄웁니다. `Started CsmsApplicationKt` 가 보이면 준비된 것입니다.
 
 ```bash
-./gradlew :csms:bootRun          # ws://localhost:8080/ocpp/{stationId}
+./gradlew :csms:bootRun --args="--csms.security.profile=NONE"  # ws://localhost:8080/ocpp/{stationId}
 ```
 
 터미널 **B** — 시뮬레이터가 붙어 **교환 1건을 완주**하고 끝납니다.
@@ -132,9 +132,43 @@ curl -X POST localhost:8080/api/swaps -H 'Content-Type: application/json' \
 콘솔은 **시험계를 조종하는 화면**이지 관제 서버가 아닙니다. 교환 이력과 지표는 위의 CSMS
 REST API에 있고, 콘솔은 그것을 흉내내지 않습니다.
 
-**막히면?** 인가 토큰은 `csms/src/main/resources/application.yml` 의 `authorized-id-tokens`
+**막히면?** 위 5분 절차는 로컬 데모라 `csms.security.profile=NONE` 으로 띄웁니다. 기본 운영값은
+`BASIC` 이므로, 그 상태에서는 아래 "스테이션 인증" 절처럼 station-id 별 비밀번호 해시와
+시뮬레이터 `--password` 가 필요합니다. 인가 토큰은 `csms/src/main/resources/application.yml` 의 `authorized-id-tokens`
 목록에 있어야 하고(기본값 `RFID-0001`), 배터리 일련번호는 `known-battery-serials` 에 있어야
 합니다. 목록 밖 배터리는 표준이 정한 방식으로 거부됩니다 ([PLAN §4.8](docs/PLAN.md)).
+
+## 스테이션 인증
+
+CSMS WebSocket 은 기본 `csms.security.profile=BASIC` 입니다. 스테이션별 bcrypt 해시를
+설정하고, 스테이션은 Basic username 으로 stationId 를 보냅니다.
+
+```yaml
+csms:
+  security:
+    profile: BASIC
+    stations:
+      - station-id: CS001
+        password-hash: "$2a$10$..."
+```
+
+해시는 Spring Security Crypto 의 `BCryptPasswordEncoder(10).encode("station-password")`
+같은 방식으로 생성합니다. 로컬 시뮬레이터는 의존성을 추가하지 않고 JDK WebSocket 헤더만 씁니다.
+
+```bash
+./gradlew :station-sim:run \
+  --args="--csms-url ws://localhost:8080/ocpp --station-id CS001 --password station-password"
+```
+
+인증을 끄는 것은 로컬 실험용입니다:
+
+```bash
+./gradlew :csms:bootRun --args="--csms.security.profile=NONE"
+```
+
+TLS 를 CSMS 가 직접 끝내려면 `server.ssl.enabled=true` 와 `server.ssl.key-store` 계열 설정을
+채웁니다. 운영 환경에서는 리버스 프록시가 TLS 를 종료하고 내부로 `ws` 를 넘기는 구성도
+가능합니다.
 
 <details>
 <summary><b>실측 기록</b> — 위 절차를 실제로 따라 해서 잰 시간 (2026-08-18)</summary>
@@ -248,7 +282,7 @@ OCPP 2.1 Part 6는 **시험 대상이 CSMS인** Battery Swap 테스트 케이스
 | 항목 | 요구 | 상태 |
 |---|---|---|
 | §3.1.1 연결 URL — 식별자 48자 이하, 콜론 불가, 퍼센트 디코딩 | SHALL | ✅ 핸드셰이크에서 거절 |
-| §3.1.1 신원을 URL에만 의존하지 않기 | RECOMMENDED | ⚠️ `StationPrincipal(authMethod=NONE)` — 자리만 마련 |
+| §3.1.1 신원을 URL에만 의존하지 않기 | RECOMMENDED | ✅ Basic username 과 경로 stationId 이중 확인 |
 | §3.1.2 `Sec-WebSocket-Protocol`로 버전 협상 | SHALL | ✅ `ocpp2.1` 미제시 시 연결 거절 |
 | §3.3 101 응답에 선택한 하나를 실어 회신 | SHALL | ✅ |
 | §3.4 RFC 7692 압축 (`permessage-deflate`) | **SHALL** | ✅ 협상됨 |
@@ -262,9 +296,9 @@ OCPP 2.1 Part 6는 **시험 대상이 CSMS인** Battery Swap 테스트 케이스
 실패합니다.
 
 **§3.1.1 이중 확인에 대한 기록.** 스펙은 연결 URL만으로 스테이션을 식별하지 말라고 권고합니다.
-현재 구현은 경로에서 식별자를 얻지만, 그 사실이 `StationPrincipal.authMethod = NONE`으로
-남습니다. 보안 프로파일 2/3을 붙일 때 바뀌는 것은 이 값 하나이고, 핸들러는 이미 문자열이
-아니라 `StationPrincipal`을 받고 있습니다 ([PLAN §11.4](docs/PLAN.md)).
+현재 기본 구현은 Basic 인증의 username 과 경로 stationId 를 대조하고, 성공한 등록에는
+`StationPrincipal.authMethod = BASIC` 이 남습니다. 로컬 실험용 `NONE` 프로파일도 같은 타입에
+`authMethod = NONE` 으로 남습니다 ([PLAN §11.4](docs/PLAN.md)).
 인증서 발급·CSR·키 저장소는 범위 밖입니다.
 
 ---
@@ -294,7 +328,7 @@ swapve/
 
 1. **[docs/PLAN.md](docs/PLAN.md)** — 프로토콜 명세(§4), 도메인 설계(§5), 검증 전략(§7).
    스펙 원문 대조로 계획서를 정정한 이력이 §0에 남아 있습니다
-2. **[docs/API.md](docs/API.md)** — 앱이 호출할 REST 계약. **없는 것(인증)을 먼저 적었습니다**
+2. **[docs/API.md](docs/API.md)** — 앱이 호출할 REST 계약. **REST 인증이 없다는 사실을 먼저 적었습니다**
 3. **[BACKLOG.md](BACKLOG.md)** — 범위 밖으로 밀어낸 것들과 그것을 꺼낼 트리거
 
 | M | 내용 | 상태 |
@@ -336,7 +370,7 @@ swapve/
 - **지표에 Micrometer를 쓰지 않았습니다.** 필요한 값이 전부 기존 기록에서 파생 계산되기
   때문입니다 — 미등록 배터리 거부(F3)와 재접속 재전송(F6)은 지표용 기록이 아예 없고
   **이벤트 로그의 원문**에서 계산됩니다. 카운터를 심으면 진실의 원본이 둘이 됩니다.
-- ⚠️ **인증·인가가 없습니다.** 위 "무엇이 아닌가" 참조. 숨기지 않고 문서 첫머리에 적어 두었습니다.
+- ⚠️ **REST 인증·인가가 없습니다.** 위 "무엇이 아닌가" 참조. 숨기지 않고 문서 첫머리에 적어 두었습니다.
 
 ---
 

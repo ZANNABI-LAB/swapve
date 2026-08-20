@@ -8,7 +8,9 @@ import dev.swapve.csms.devicemodel.DeviceModelQuery
 import dev.swapve.csms.devicemodel.DeviceModelReport
 import dev.swapve.csms.devicemodel.DeviceModelReportRegistry
 import dev.swapve.csms.devicemodel.DeviceModelReportRequest
+import dev.swapve.csms.support.BasicAuthStations
 import dev.swapve.csms.support.FixedClockConfig
+import dev.swapve.csms.support.TestStations
 import dev.swapve.ocpp.schema.OcppPayloadValidator
 import dev.swapve.ocpp.swap.BatterySwapWire
 import dev.swapve.ocpp.swap.DeviceModelVariables
@@ -22,6 +24,7 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.test.web.server.LocalServerPort
 import org.springframework.context.annotation.Import
+import org.springframework.test.context.ContextConfiguration
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
@@ -62,6 +65,7 @@ import kotlin.test.assertTrue
 @Tag("conformance")
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @Import(FixedClockConfig::class)
+@ContextConfiguration(initializers = [BasicAuthStations::class])
 class TcS104CsTest {
 
     @LocalServerPort
@@ -83,7 +87,7 @@ class TcS104CsTest {
 
     @Test
     fun `TC_S_104_CS — GetBaseReport(FullInventory) 하나에 NotifyReport 가 나뉘어 온다`() {
-        withStation("CS-TC-S-104") { simulator, stationId ->
+        withStation(TestStations.TC_S_104) { simulator, stationId ->
             val report = requestFullInventory(simulator, stationId)
 
             // step 3~n — 한 건으로 끝내지 않았다. 분할이 이 케이스의 본체다.
@@ -101,7 +105,7 @@ class TcS104CsTest {
 
     @Test
     fun `seqNo 는 0 부터 연속이고 마지막 것만 tbc 가 거짓이다`() {
-        withStation("CS-TC-S-104-SEQ") { simulator, stationId ->
+        withStation(TestStations.TC_S_104_SEQ) { simulator, stationId ->
             requestFullInventory(simulator, stationId)
             val notifications = simulator.notifyReports()
 
@@ -125,7 +129,7 @@ class TcS104CsTest {
 
     @Test
     fun `requestId 를 그대로 되돌린다`() {
-        withStation("CS-TC-S-104-REQID") { simulator, stationId ->
+        withStation(TestStations.TC_S_104_REQID) { simulator, stationId ->
             requestFullInventory(simulator, stationId)
 
             simulator.notifyReports().forEach { payload ->
@@ -146,7 +150,7 @@ class TcS104CsTest {
      */
     @Test
     fun `보고에 BatterySwapCtrlr 의 변수들과 BatteryCartridge 의 SoC 가 들어 있다`() {
-        withStation("CS-TC-S-104-VARS") { simulator, stationId ->
+        withStation(TestStations.TC_S_104_VARS) { simulator, stationId ->
             val report = requestFullInventory(simulator, stationId)
 
             listOf(
@@ -179,7 +183,7 @@ class TcS104CsTest {
      */
     @Test
     fun `재조립 결과가 GetVariables 로 물은 실제 값과 일치한다`() {
-        withStation("CS-TC-S-104-VALUES") { simulator, stationId ->
+        withStation(TestStations.TC_S_104_VALUES) { simulator, stationId ->
             val report = requestFullInventory(simulator, stationId)
 
             val refs = report.variables.map { it.ref }
@@ -220,7 +224,7 @@ class TcS104CsTest {
      */
     @Test
     fun `변수 이름은 정본 철자로 실리고 대조는 대소문자를 가리지 않는다`() {
-        withStation("CS-TC-S-104-CASE") { simulator, stationId ->
+        withStation(TestStations.TC_S_104_CASE) { simulator, stationId ->
             val report = requestFullInventory(simulator, stationId)
 
             assertTrue(
@@ -245,7 +249,7 @@ class TcS104CsTest {
     /** 오간 **모든** 메시지가 공식 스키마를 통과하고, 오류 프레임이 하나도 없다. */
     @Test
     fun `오간 모든 메시지가 공식 스키마를 통과하고 오류 프레임이 없다`() {
-        withStation("CS-TC-S-104-SCHEMA") { simulator, stationId ->
+        withStation(TestStations.TC_S_104_SCHEMA) { simulator, stationId ->
             requestFullInventory(simulator, stationId)
 
             val records = simulator.eventLog.of(simulator.config.stationId)

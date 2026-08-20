@@ -162,7 +162,10 @@ class StationSimulator(
     /** CSMS 에 붙는다. `{csmsUrl}/{stationId}` 로 간다 (Part 4 §3.1.1). */
     suspend fun connect() {
         check(transport == null) { "이미 연결돼 있다: ${config.stationId}" }
-        transport = WebSocketTransport.connect(config.connectUrl) { text -> session.receive(text) }
+        transport = WebSocketTransport.connect(
+            url = config.connectUrl,
+            authorization = config.basicAuthorization,
+        ) { text -> session.receive(text) }
     }
 
     val isConnected: Boolean get() = transport?.isOpen == true
@@ -685,7 +688,10 @@ class StationSimulator(
     /** 끊긴 뒤 다시 붙는다. 멱등 원장은 CSMS 쪽에 남아 있으므로 재전송이 그대로 잡힌다. */
     suspend fun reconnect() {
         check(transport == null) { "아직 끊기지 않았다: ${config.stationId}" }
-        transport = WebSocketTransport.connect(config.connectUrl) { text -> session.receive(text) }
+        transport = WebSocketTransport.connect(
+            url = config.connectUrl,
+            authorization = config.basicAuthorization,
+        ) { text -> session.receive(text) }
     }
 
     /** 우리가 마지막으로 내보낸 `BatterySwap` CALL 의 기록. 원문이 그대로 남아 있다 (PLAN §11.1). */

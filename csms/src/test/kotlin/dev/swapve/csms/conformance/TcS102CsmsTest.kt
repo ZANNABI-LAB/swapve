@@ -4,7 +4,9 @@ import dev.swapve.csms.conformance.ConformanceScenario.callPayload
 import dev.swapve.csms.conformance.ConformanceScenario.resultPayload
 import dev.swapve.csms.conformance.ConformanceScenario.stationReceived
 import dev.swapve.csms.conformance.ConformanceScenario.stationSent
+import dev.swapve.csms.support.BasicAuthStations
 import dev.swapve.csms.support.FixedClockConfig
+import dev.swapve.csms.support.TestStations
 import dev.swapve.csms.swap.RemoteSwapStart
 import dev.swapve.csms.swap.RemoteSwapStarter
 import dev.swapve.csms.swap.SwapTransactionRegistry
@@ -20,6 +22,7 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.test.web.server.LocalServerPort
 import org.springframework.context.annotation.Import
+import org.springframework.test.context.ContextConfiguration
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
@@ -52,6 +55,7 @@ import kotlin.test.assertTrue
 @Tag("conformance")
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @Import(FixedClockConfig::class)
+@ContextConfiguration(initializers = [BasicAuthStations::class])
 class TcS102CsmsTest {
 
     @LocalServerPort
@@ -70,7 +74,7 @@ class TcS102CsmsTest {
 
     @Test
     fun `TC_S_102_CSMS — 배터리가 부족하면 Rejected 와 NoBatteryAvailable 을 받아 기록한다`() {
-        val stationId = "CS-TC-S-102"
+        val stationId = TestStations.TC_S_102
         withStation(stationId) { simulator ->
             // Manual Action — CSMS 가 교환을 개시한다.
             // step 1: CSMS → RequestBatterySwapRequest
@@ -107,7 +111,7 @@ class TcS102CsmsTest {
 
     @Test
     fun `Tool validation step 1 — 발신한 RequestBatterySwapRequest 에 requestId 와 valid_idtoken 이 있다`() {
-        val stationId = "CS-TC-S-102-VALIDATION"
+        val stationId = TestStations.TC_S_102_VALIDATION
         withStation(stationId) { simulator ->
             val requestId = 10_299
             runBlocking {
@@ -148,7 +152,7 @@ class TcS102CsmsTest {
      */
     @Test
     fun `S02_FR_03 — 인가되지 않은 idToken 으로는 발신하지 않는다`() {
-        val stationId = "CS-TC-S-102-UNAUTHORIZED"
+        val stationId = TestStations.TC_S_102_UNAUTHORIZED
         withStation(stationId) { simulator ->
             val outcome = runBlocking {
                 remoteSwapStarter.start(

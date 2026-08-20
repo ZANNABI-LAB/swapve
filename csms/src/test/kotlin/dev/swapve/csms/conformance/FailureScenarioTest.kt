@@ -4,7 +4,9 @@ import dev.swapve.csms.conformance.ConformanceScenario.callPayload
 import dev.swapve.csms.conformance.ConformanceScenario.resultPayload
 import dev.swapve.csms.conformance.ConformanceScenario.stationReceived
 import dev.swapve.csms.conformance.ConformanceScenario.stationSent
+import dev.swapve.csms.support.BasicAuthStations
 import dev.swapve.csms.support.FixedClockConfig
+import dev.swapve.csms.support.TestStations
 import dev.swapve.csms.swap.OutTimedOutLedger
 import dev.swapve.csms.swap.RemoteSwapStart
 import dev.swapve.csms.swap.RemoteSwapStarter
@@ -29,6 +31,7 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.test.web.server.LocalServerPort
 import org.springframework.context.annotation.Import
+import org.springframework.test.context.ContextConfiguration
 import org.springframework.jdbc.core.ConnectionCallback
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.jdbc.datasource.DriverManagerDataSource
@@ -58,6 +61,7 @@ import kotlin.test.assertTrue
 @Tag("conformance")
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @Import(FixedClockConfig::class)
+@ContextConfiguration(initializers = [BasicAuthStations::class])
 class FailureScenarioTest {
 
     @LocalServerPort
@@ -89,7 +93,7 @@ class FailureScenarioTest {
      */
     @Test
     fun `F1 — 배터리가 부족하면 스테이션이 거부하고 CSMS 가 기록한다`() {
-        val stationId = "CS-F1-NO-BATTERY"
+        val stationId = TestStations.F1_NO_BATTERY
         val simulator = ConformanceScenario.simulator(
             ConformanceScenario.emptyStationConfig(port, stationId),
         )
@@ -124,7 +128,7 @@ class FailureScenarioTest {
      */
     @Test
     fun `F2 — BatteryOutTimeout 이 OUT_TIMED_OUT 으로 남고 장부 불균형이 영속된다`() {
-        val stationId = "CS-F2-OUT-TIMEOUT"
+        val stationId = TestStations.F2_OUT_TIMEOUT
         val requestId = runSwapUntilBatteryInThen(stationId) { it.reportBatteryOutTimeout() }
         val key = SwapKey(StationId(stationId), SwapRequestId(requestId))
 
@@ -164,7 +168,7 @@ class FailureScenarioTest {
      */
     @Test
     fun `F2 — 장부 불균형이 애플리케이션 커넥션 밖에서도 읽힌다`() {
-        val stationId = "CS-F2-PERSISTENT"
+        val stationId = TestStations.F2_PERSISTENT
         val requestId = runSwapUntilBatteryInThen(stationId) { it.reportBatteryOutTimeout() }
         val key = SwapKey(StationId(stationId), SwapRequestId(requestId))
 
@@ -204,7 +208,7 @@ class FailureScenarioTest {
      */
     @Test
     fun `F3 — 미등록 배터리는 customData 로 거부되고 그 응답이 공식 스키마를 통과한다`() {
-        val stationId = "CS-F3-UNKNOWN-BATTERY"
+        val stationId = TestStations.F3_UNKNOWN_BATTERY
         val simulator = ConformanceScenario.simulator(
             ConformanceScenario.unknownBatteryConfig(port, stationId),
         )
@@ -254,7 +258,7 @@ class FailureScenarioTest {
      */
     @Test
     fun `F4 — 새 messageId 로 온 중복 BatteryIn 을 상태머신이 무시한다`() {
-        val stationId = "CS-F4-DUPLICATE-IN"
+        val stationId = TestStations.F4_DUPLICATE_IN
         val requestId = runSwapUntilBatteryInThen(stationId) { it.resendLastBatterySwap(sameMessageId = false) }
 
         // 상태는 여전히 반쪽이다 — 두 번째 입고가 반영됐다면 배터리가 4개로 늘었을 것이다.
@@ -281,7 +285,7 @@ class FailureScenarioTest {
      */
     @Test
     fun `F5 — 인가 없이 도착한 BatterySwap 은 이상으로 기록되되 정상 회신된다`() {
-        val stationId = "CS-F5-NOT-AUTHORIZED"
+        val stationId = TestStations.F5_NOT_AUTHORIZED
         val requestId = 50_501
         val simulator = ConformanceScenario.simulator(
             ConformanceScenario.config(port, stationId, requestId = requestId),
@@ -339,7 +343,7 @@ class FailureScenarioTest {
      */
     @Test
     fun `F6 — 재접속 후 같은 messageId 로 재전송해도 장부가 두 번 늘지 않는다`() {
-        val stationId = "CS-F6-RECONNECT"
+        val stationId = TestStations.F6_RECONNECT
         val simulator = ConformanceScenario.simulator(
             ConformanceScenario.config(port, stationId),
             faults = FaultInjection.failingAt(SimStep.BATTERY_OUT, "교환 도중 연결이 끊겼다"),

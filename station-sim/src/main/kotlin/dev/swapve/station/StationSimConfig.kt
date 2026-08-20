@@ -107,6 +107,8 @@ data class SlotConfig(
  *
  * @param csmsUrl 스테이션 식별자를 **뺀** 엔드포인트. 실제 연결 URL 은 여기에 `/` +
  *   [stationId] 가 붙는다 (Part 4 §3.1.1). 예: `ws://localhost:8080/ocpp`
+ * @param username Basic 인증 사용자명. `null` 이면 [stationId] 를 쓴다.
+ * @param password Basic 인증 비밀번호. `null` 이면 Authorization 헤더를 보내지 않는다.
  * @param idToken 교환 인가에 쓰는 토큰 (S01).
  * @param chargingIdToken 충전 트랜잭션에 싣는 대체 토큰 — 디바이스 모델의
  *   `BatterySwapCtrlr.IdToken` (S04.FR.02/03). `null` 이면 인가 없는 트랜잭션으로 보고한다:
@@ -129,6 +131,8 @@ data class SlotConfig(
 data class StationSimConfig(
     val csmsUrl: String,
     val stationId: String,
+    val username: String? = null,
+    val password: String? = null,
     val slots: List<SlotConfig>,
     val idToken: IdToken,
     val requestId: Int,
@@ -182,4 +186,7 @@ data class StationSimConfig(
 
     /** 연결 URL — `{csmsUrl}/{stationId}` (Part 4 §3.1.1). */
     val connectUrl: String get() = csmsUrl.trimEnd('/') + "/" + stationId
+
+    /** Basic 인증 헤더를 만들 값. 비밀번호가 없으면 인증 헤더 자체를 보내지 않는다. */
+    val basicAuthorization: String? get() = password?.let { "${username ?: stationId}:$it" }
 }

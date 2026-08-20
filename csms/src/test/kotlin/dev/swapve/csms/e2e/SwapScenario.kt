@@ -1,6 +1,7 @@
 package dev.swapve.csms.e2e
 
 import dev.swapve.csms.support.FixedClockConfig
+import dev.swapve.csms.support.TestCredentials
 import dev.swapve.station.SimBattery
 import dev.swapve.station.SlotConfig
 import dev.swapve.station.StationSimConfig
@@ -52,6 +53,7 @@ object SwapScenario {
     ) = StationSimConfig(
         csmsUrl = "ws://localhost:$port/ocpp",
         stationId = stationId,
+        password = TestCredentials.PASSWORD,
         slots = (1..4).map { slotId -> SlotConfig(slotId = slotId, battery = DISPENSED[slotId]) },
         idToken = AUTHORIZED_TOKEN,
         requestId = requestId,

@@ -3,6 +3,7 @@ package dev.swapve.csms.conformance
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import dev.swapve.csms.support.FixedClockConfig
+import dev.swapve.csms.support.TestCredentials
 import dev.swapve.ocpp.rpc.MessageType
 import dev.swapve.ocpp.schema.OcppPayloadValidator
 import dev.swapve.ocpp.schema.PayloadValidation
@@ -119,6 +120,7 @@ object ConformanceScenario {
     ) = StationSimConfig(
         csmsUrl = "ws://localhost:$port/ocpp",
         stationId = stationId,
+        password = TestCredentials.PASSWORD,
         slots = listOf(
             SlotConfig(EVSE_A, battery = null, connectorId = CONNECTOR_ID, chargingTransactionId = TX_INSERTED_A),
             SlotConfig(EVSE_B, battery = null, connectorId = CONNECTOR_ID, chargingTransactionId = TX_INSERTED_B),
@@ -158,6 +160,7 @@ object ConformanceScenario {
     fun emptyStationConfig(port: Int, stationId: String) = StationSimConfig(
         csmsUrl = "ws://localhost:$port/ocpp",
         stationId = stationId,
+        password = TestCredentials.PASSWORD,
         slots = listOf(
             SlotConfig(EVSE_A, connectorId = CONNECTOR_ID),
             SlotConfig(EVSE_B, connectorId = CONNECTOR_ID),

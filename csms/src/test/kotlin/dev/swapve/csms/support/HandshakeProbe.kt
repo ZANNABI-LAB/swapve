@@ -34,6 +34,7 @@ object HandshakeProbe {
         rawPath: String,
         subprotocols: List<String> = listOf("ocpp2.1"),
         extensions: String? = null,
+        headers: Map<String, String> = emptyMap(),
     ): Response = Socket("localhost", port).use { socket ->
         socket.soTimeout = TIMEOUT_MILLIS
 
@@ -50,6 +51,7 @@ object HandshakeProbe {
             if (extensions != null) {
                 append("Sec-WebSocket-Extensions: $extensions\r\n")
             }
+            headers.forEach { (name, value) -> append("$name: $value\r\n") }
             append("\r\n")
         }
         socket.getOutputStream().write(request.toByteArray(StandardCharsets.ISO_8859_1))

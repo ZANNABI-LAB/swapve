@@ -20,6 +20,8 @@ object StationSimCli {
 
           --csms-url <url>          CSMS 엔드포인트 (스테이션 식별자 제외). 기본 ws://localhost:8080/ocpp
           --station-id <id>         스테이션 식별자. 기본 CS001
+          --username <value>        Basic 인증 사용자명. 기본 station-id
+          --password <value>        Basic 인증 비밀번호. 생략하면 Authorization 헤더를 보내지 않는다
           --slots <n>               슬롯(=EVSE) 수. 기본 4
           --set-size <n>            한 번에 오가는 배터리 수. 기본 2
           --swap-order <In-Out|Out-In>  교환 순서. 기본 In-Out
@@ -106,6 +108,8 @@ object StationSimCli {
         return StationSimConfig(
             csmsUrl = options["csms-url"] ?: "ws://localhost:8080/ocpp",
             stationId = options["station-id"] ?: "CS001",
+            username = options["username"],
+            password = options["password"],
             slots = slots,
             idToken = IdToken(
                 options["id-token"] ?: "RFID-0001",

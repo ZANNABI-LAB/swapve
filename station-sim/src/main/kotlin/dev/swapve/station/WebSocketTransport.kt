@@ -13,6 +13,7 @@ import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.WebSocket
 import java.time.Duration
+import java.util.Base64
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CompletionStage
 
@@ -75,14 +76,26 @@ class WebSocketTransport private constructor(
          * 연결한다.
          *
          * @param url 스테이션 식별자까지 붙은 최종 URL (Part 4 §3.1.1).
+         * @param authorization Basic 인증의 `username:password` 원문. `null` 이면 헤더를 보내지 않는다.
          * @param onText 도착한 텍스트 한 줄을 처리한다. 보통 `OcppSession::receive` 다.
          */
-        suspend fun connect(url: String, onText: suspend (String) -> Unit): WebSocketTransport {
+        suspend fun connect(
+            url: String,
+            authorization: String? = null,
+            onText: suspend (String) -> Unit,
+        ): WebSocketTransport {
             val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-            val webSocket = HttpClient.newHttpClient()
+            val builder = HttpClient.newHttpClient()
                 .newWebSocketBuilder()
                 .subprotocols(SUBPROTOCOL)
                 .connectTimeout(CONNECT_TIMEOUT)
+
+            if (authorization != null) {
+                val encoded = Base64.getEncoder().encodeToString(authorization.toByteArray(Charsets.UTF_8))
+                builder.header("Authorization", "Basic $encoded")
+            }
+
+            val webSocket = builder
                 .buildAsync(URI.create(url), ReassemblingListener(scope, onText))
                 .await()
 

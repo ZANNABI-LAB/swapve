@@ -5,7 +5,9 @@ import dev.swapve.csms.conformance.ConformanceScenario.callPayload
 import dev.swapve.csms.conformance.ConformanceScenario.resultPayload
 import dev.swapve.csms.conformance.ConformanceScenario.stationReceived
 import dev.swapve.csms.conformance.ConformanceScenario.stationSent
+import dev.swapve.csms.support.BasicAuthStations
 import dev.swapve.csms.support.FixedClockConfig
+import dev.swapve.csms.support.TestStations
 import dev.swapve.csms.swap.ChargingTransactionRegistry
 import dev.swapve.csms.swap.RemoteSwapStart
 import dev.swapve.csms.swap.RemoteSwapStarter
@@ -23,6 +25,7 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.test.web.server.LocalServerPort
 import org.springframework.context.annotation.Import
+import org.springframework.test.context.ContextConfiguration
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
@@ -87,6 +90,7 @@ import kotlin.test.assertTrue
 @Tag("conformance")
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @Import(FixedClockConfig::class)
+@ContextConfiguration(initializers = [BasicAuthStations::class])
 class TcS103CsmsTest {
 
     @LocalServerPort
@@ -108,7 +112,7 @@ class TcS103CsmsTest {
 
     @Test
     fun `TC_S_103_CSMS — 22단계 전 시퀀스를 완주한다`() {
-        val run = runSequence("CS-TC-S-103")
+        val run = runSequence(TestStations.TC_S_103)
 
         // step 2 — 스테이션이 받아들였고, 교환이 열렸다.
         val accepted = assertIs<RemoteSwapStart.Accepted>(run.outcome, "개시가 받아들여지지 않았다: ${run.outcome}")
@@ -128,7 +132,7 @@ class TcS103CsmsTest {
 
     @Test
     fun `step 1 — RequestBatterySwapRequest 에 requestId 와 valid_idtoken 이 있다`() {
-        val run = runSequence("CS-TC-S-103-STEP1")
+        val run = runSequence(TestStations.TC_S_103_STEP1)
 
         val request = assertNotNull(
             run.records.stationReceived()
@@ -163,7 +167,7 @@ class TcS103CsmsTest {
      */
     @Test
     fun `step 6·10·14·18 — 무인가 TransactionEvent 에도 응답의 idTokenInfo_status 가 Accepted 다`() {
-        val run = runSequence("CS-TC-S-103-IDTOKENINFO")
+        val run = runSequence(TestStations.TC_S_103_IDTOKENINFO)
 
         val requests = run.records.stationSent().filter { it.action == BatterySwapWire.TRANSACTION_EVENT }
         val responses = run.records.stationReceived().filter { it.action == BatterySwapWire.TRANSACTION_EVENT }
@@ -200,7 +204,7 @@ class TcS103CsmsTest {
 
     @Test
     fun `step 5·9 — 시작 사건은 CablePluggedIn 과 EVConnected 이고 evse_connectorId 가 1 이다`() {
-        val run = runSequence("CS-TC-S-103-STARTED")
+        val run = runSequence(TestStations.TC_S_103_STARTED)
 
         val started = run.transactionEvents().filter {
             it.path("eventType").asText() == BatterySwapWire.TX_STARTED
@@ -234,7 +238,7 @@ class TcS103CsmsTest {
 
     @Test
     fun `step 13·17 — 종료 사건은 EnergyLimitReached · Idle · EVDisconnected 세 값을 각각 싣는다`() {
-        val run = runSequence("CS-TC-S-103-ENDED")
+        val run = runSequence(TestStations.TC_S_103_ENDED)
 
         val ended = run.transactionEvents().filter {
             it.path("eventType").asText() == BatterySwapWire.TX_ENDED
@@ -276,7 +280,7 @@ class TcS103CsmsTest {
      */
     @Test
     fun `시작을 본 적 없는 트랜잭션의 종료를 받아도 깨지지 않는다`() {
-        val run = runSequence("CS-TC-S-103-ORPHAN-TX")
+        val run = runSequence(TestStations.TC_S_103_ORPHAN_TX)
         val station = StationId(run.stationId)
 
         // 이 두 트랜잭션의 Started 는 전선 위에 없었다.
@@ -307,7 +311,7 @@ class TcS103CsmsTest {
 
     @Test
     fun `step 11·21 — 배터리 2개 세트가 스펙 원문의 값으로 오간다`() {
-        val run = runSequence("CS-TC-S-103-BATTERIES")
+        val run = runSequence(TestStations.TC_S_103_BATTERIES)
 
         val swapCalls = run.records.stationSent()
             .filter { it.action == BatterySwapWire.BATTERY_SWAP }
@@ -344,7 +348,7 @@ class TcS103CsmsTest {
 
     @Test
     fun `step 12·22 — BatterySwapResponse 로 회신한다`() {
-        val run = runSequence("CS-TC-S-103-ACK")
+        val run = runSequence(TestStations.TC_S_103_ACK)
 
         val responses = run.records.stationReceived().filter { it.action == BatterySwapWire.BATTERY_SWAP }
         assertEquals(2, responses.size, "step 12 와 22 — 두 번 회신해야 한다")
@@ -372,7 +376,7 @@ class TcS103CsmsTest {
      */
     @Test
     fun `오간 메시지 순서가 스펙 시퀀스와 같다`() {
-        val run = runSequence("CS-TC-S-103-ORDER")
+        val run = runSequence(TestStations.TC_S_103_ORDER)
 
         // 부팅 시퀀스를 지나 step 1 부터 본다.
         val actions = run.records.stationSent().map { it.action }
