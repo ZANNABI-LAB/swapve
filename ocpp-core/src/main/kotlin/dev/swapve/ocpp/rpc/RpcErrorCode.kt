@@ -1,59 +1,63 @@
 package dev.swapve.ocpp.rpc
 
 /**
- * RPC Framework Error Codes (Part 4 §4.3, Table 9).
+ * RPC framework error codes (Part 4 §4.3, Table 9).
  *
- * `CALLERROR` / `CALLRESULTERROR` 의 `errorCode` 는 이 표의 값이어야 한다(MUST).
- * 다만 **수신 시에는 원문 문자열을 보존**한다 — [OcppFrame.CallError.errorCode] 참조.
+ * The `errorCode` of a `CALLERROR` / `CALLRESULTERROR` MUST come from this table. On the
+ * receiving side, though, **the raw string is preserved** — see [OcppFrame.CallError.errorCode].
  */
 enum class RpcErrorCode {
-    /** Action 페이로드의 문법이 틀렸다 */
+    /** The payload of the Action is syntactically incorrect. */
     FormatViolation,
 
-    /** 더 구체적인 코드로 덮이지 않는 그 밖의 오류 */
+    /** Any other error not covered by a more specific code. */
     GenericError,
 
-    /** 수신측 내부 오류로 Action을 처리하지 못했다 */
+    /** An internal error on the receiver kept the Action from being handled. */
     InternalError,
 
     /**
-     * 지원하지 않는 Message Type Number.
+     * An unsupported Message Type Number.
      *
-     * ⚠️ **errata 2026-06 §4.3에서 deprecated.** 2.1부터 미지의 메시지 타입은 조용히 무시한다.
-     * 수신 호환을 위해 열거값은 남기되, **직접 만들어 보내지 않는다.**
+     * ⚠️ **Deprecated by errata 2026-06 §4.3.** From 2.1 an unknown message type is ignored
+     * silently. The constant stays for receive-side compatibility, but **is never sent**.
      */
-    @Deprecated("errata 2026-06 §4.3 — 미지의 메시지 타입은 CALLERROR 없이 무시한다")
+    @Deprecated("errata 2026-06 §4.3 — an unknown message type is ignored, not answered with CALLERROR")
     MessageTypeNotSupported,
 
-    /** 수신측이 모르는 Action */
+    /** The requested Action is not known by the receiver. */
     NotImplemented,
 
-    /** 아는 Action이지만 지원하지 않는다 */
+    /** A known Action, but one the receiver does not support. */
     NotSupported,
 
-    /** 문법은 맞지만 카디널리티 제약 위반 */
+    /** Syntactically correct, but violates a cardinality constraint. */
     OccurrenceConstraintViolation,
 
-    /** 문법은 맞지만 값이 유효하지 않다 */
+    /** Syntactically correct, but carries an invalid value. */
     PropertyConstraintViolation,
 
-    /** 페이로드가 PDU 구조를 따르지 않는다 */
+    /** The payload does not follow the PDU structure. */
     ProtocolError,
 
-    /** RPC 요청 자체가 유효하지 않다. 예: messageId를 읽을 수 없다 */
+    /** The RPC request itself is invalid — an unreadable messageId, for instance. */
     RpcFrameworkError,
 
-    /** 처리 중 보안 문제가 발생했다 */
+    /** A security problem arose while handling the message. */
     SecurityError,
 
-    /** 문법은 맞지만 데이터 타입 제약 위반 */
+    /** Syntactically correct, but violates a data type constraint. */
     TypeConstraintViolation,
     ;
 
     companion object {
         private val byName = entries.associateBy(RpcErrorCode::name)
 
-        /** 표에 없는 문자열이면 `null`. 수신 시 원문을 버리지 않기 위해 예외를 던지지 않는다. */
+        /**
+         * `null` for a string outside the table.
+         *
+         * Does not throw — on receive, an unrecognised code is kept rather than discarded.
+         */
         fun parse(raw: String): RpcErrorCode? = byName[raw]
     }
 }

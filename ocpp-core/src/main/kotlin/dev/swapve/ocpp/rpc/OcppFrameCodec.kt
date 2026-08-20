@@ -6,28 +6,30 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.node.ObjectNode
 
 /**
- * decode 결과.
+ * The outcome of a decode.
  *
- * 코덱은 **판정만 하고 정책은 정하지 않는다.** CALLERROR를 실제로 회신할지, 무엇을 기록할지는
- * 세션 계층(M4)의 몫이다.
+ * The codec **judges but does not decide policy.** Whether a CALLERROR is actually sent, and
+ * what gets recorded, belongs to the session layer.
  */
 sealed interface DecodeOutcome {
 
-    /** 프레임으로 읽혔다. 페이로드가 OCPP 스키마에 맞는지는 아직 모른다 (M2). */
+    /** Read as a frame. Whether the payload matches its OCPP schema is not yet known. */
     data class Decoded(val frame: OcppFrame) : DecodeOutcome
 
     /**
-     * 표에 없는 Message Type Number. **메시지 전체를 무시한다.**
+     * A Message Type Number outside the table. **Ignore the whole message.**
      *
-     * Part 4 §4.1.3 + errata 2026-06 §4.1/§4.3 — 2.1부터 `MessageTypeNotSupported`로
-     * 회신하지 않는다(해당 코드 deprecated). 나중에 OCPP가 타입을 추가해도 깨지지 않기 위한 규칙.
+     * Part 4 §4.1.3 with errata 2026-06 §4.1/§4.3 — from 2.1 this is not answered with
+     * `MessageTypeNotSupported` (that code is deprecated). The rule exists so that a future
+     * OCPP adding a type does not break this receiver.
      */
     data class Ignored(val messageTypeNumber: Int) : DecodeOutcome
 
     /**
-     * RPC 프레임으로 읽을 수 없다. 호출자는 CALLERROR로 회신해야 한다 (Part 4 §4.2.3).
+     * Not readable as an RPC frame. The caller should answer with a CALLERROR (Part 4 §4.2.3).
      *
-     * [messageId]를 읽을 수 없었으면 [OcppFrameCodec.UNREADABLE_MESSAGE_ID] 가 들어온다.
+     * When even the messageId could not be read, [messageId] carries
+     * [OcppFrameCodec.UNREADABLE_MESSAGE_ID].
      */
     data class Malformed(
         val messageId: String,
@@ -37,9 +39,9 @@ sealed interface DecodeOutcome {
 }
 
 /**
- * OCPP-J 프레임 코덱 (Part 4 §4.2).
+ * The OCPP-J frame codec (Part 4 §4.2).
  *
- * WebSocket 텍스트 프레임 ↔ [OcppFrame]. I/O도 세션 상태도 없는 순수 변환이다.
+ * WebSocket text frame ↔ [OcppFrame]. A pure conversion — no I/O, no session state.
  */
 class OcppFrameCodec(private val mapper: ObjectMapper = ObjectMapper()) {
 
@@ -87,8 +89,6 @@ class OcppFrameCodec(private val mapper: ObjectMapper = ObjectMapper()) {
         val root = try {
             mapper.readTree(text)
         } catch (e: JsonProcessingException) {
-            // 잘못된 JSON 원문을 설명에 넣지 않는다 — CALLERROR가 깨진 JSON을 그대로
-            // 실어 나르면 안 된다 (Part 4 §4.2.3).
             return unreadable("message is not valid JSON")
         }
 
@@ -100,7 +100,6 @@ class OcppFrameCodec(private val mapper: ObjectMapper = ObjectMapper()) {
         val messageId = root.get(1).takeIf { it.isTextual }?.textValue()
             ?: return unreadable("messageId is missing or not a string")
         if (messageId.isEmpty() || messageId.length > MAX_MESSAGE_ID_LENGTH) {
-            // 길이 위반 id를 회신에 되쓰면 우리도 §4.1.4를 위반하게 된다. "-1"로 답한다.
             return unreadable("messageId must be 1..$MAX_MESSAGE_ID_LENGTH characters")
         }
 
@@ -171,16 +170,16 @@ class OcppFrameCodec(private val mapper: ObjectMapper = ObjectMapper()) {
 
     private fun requireValidMessageId(messageId: String) =
         require(messageId.isNotEmpty() && messageId.length <= MAX_MESSAGE_ID_LENGTH) {
-            "messageId는 1..$MAX_MESSAGE_ID_LENGTH 자여야 한다 (Part 4 §4.1.4): 길이 ${messageId.length}"
+            "messageId must be 1..$MAX_MESSAGE_ID_LENGTH characters (Part 4 §4.1.4): got ${messageId.length}"
         }
 
     private fun requireValidAction(action: String) =
-        require(action.isNotBlank()) { "action은 비어 있을 수 없다 (Part 4 §4.1.6)" }
+        require(action.isNotBlank()) { "action must not be blank (Part 4 §4.1.6)" }
 
     private fun requireValidError(errorCode: String, errorDescription: String) {
-        require(errorCode.isNotBlank()) { "errorCode는 비어 있을 수 없다 (Part 4 §4.3)" }
+        require(errorCode.isNotBlank()) { "errorCode must not be blank (Part 4 §4.3)" }
         require(errorDescription.length <= MAX_ERROR_DESCRIPTION_LENGTH) {
-            "errorDescription은 최대 ${MAX_ERROR_DESCRIPTION_LENGTH}자다 (Part 4 §4.2.3)"
+            "errorDescription is at most $MAX_ERROR_DESCRIPTION_LENGTH characters (Part 4 §4.2.3)"
         }
     }
 
@@ -191,7 +190,7 @@ class OcppFrameCodec(private val mapper: ObjectMapper = ObjectMapper()) {
         /** Part 4 §4.2.3 Table 7 — `errorDescription: string[255]` */
         const val MAX_ERROR_DESCRIPTION_LENGTH = 255
 
-        /** messageId조차 읽을 수 없을 때 CALLERROR에 실어야 하는 값 (Part 4 §4.2.3) */
+        /** What a CALLERROR must carry when even the messageId was unreadable (Part 4 §4.2.3). */
         const val UNREADABLE_MESSAGE_ID = "-1"
     }
 }
