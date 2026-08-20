@@ -13,33 +13,60 @@
 `csms` · `station-sim` · `sim-console` 은 애플리케이션이고 `java-compat` 은 시험 전용이라
 좌표를 가질 이유가 없다. 설정은 루트 `build.gradle.kts` 의 `publishedModules` 한 곳에 있다.
 
-## ⚠️ 먼저 풀어야 할 것 — 네임스페이스
+## 먼저 풀어야 할 것 — 네임스페이스 (진행 중)
 
-**`io.github.<조직명>` 은 자동 등록되지 않는다.** Central Portal 이 자동으로 주는 것은
-**가입에 쓴 GitHub 계정의 username** 기준 `io.github.<username>` 뿐이다
+**`io.github.zannabi-lab` 을 그대로 쓰기로 했다** (2026-08-20 결정). 그룹 ID 가 저장소 URL 과
+한 줄로 이어지는 값이 응답을 기다리는 비용보다 크다고 봤다.
+
+⚠️ **다만 조직 네임스페이스는 자동 등록되지 않는다.** Portal 이 자동으로 주는 것은 가입에 쓴
+GitHub **username** 기준 `io.github.<username>` 뿐이다
 ([공식 문서](https://central.sonatype.org/register/namespace/)):
 
 > *"Currently, we only support the GitHub username that you used to sign up, so
 > `io.github.<github organization name>` is not available as an automatically registered namespace."*
 
-`ZANNABI-LAB` 은 조직이므로 셋 중 하나를 골라야 한다.
+### 절차
 
-| 경로 | 절차 | 걸리는 시간 |
-|---|---|---|
-| **A. 조직 네임스페이스를 지원에 요청** | Central Support 에 메일. 조직 소유를 확인받는다 | 며칠 (응답 대기) |
-| **B. 개인 username 으로** `io.github.<username>` | 자동. 검증 키와 같은 이름의 **public 저장소**를 만들면 끝 (뒤에 지워도 된다) | 30분 |
-| **C. 보유 도메인으로** `space.deep-thought` | DNS **TXT 레코드**에 검증 키를 넣는다. 조직/개인 구분과 무관하다 | 1시간 (DNS 전파) |
+**1단계 — 먼저 Portal 에서 직접 시도한다.** <https://central.sonatype.com> → *Namespaces* →
+*Add Namespace* 에 `io.github.zannabi-lab` 을 넣는다. 검증 키가 나오면 **`ZANNABI-LAB` 조직에
+그 키와 같은 이름의 public 저장소**를 만들고 *Verify* 를 누른다. 이걸로 통과하면 메일은 필요 없다.
+(검증이 끝나면 그 빈 저장소는 지워도 된다.)
 
-**C 는 이미 가진 것으로 된다** — 블로그 도메인을 쓰고 있으므로 새로 살 것이 없다.
-A 는 그룹 ID 를 안 바꿔도 되지만 남의 응답을 기다려야 한다.
+**2단계 — 막히면 Central Support 에 요청한다.** <central-support@sonatype.com>.
+조직 소유를 확인받는 절차이므로 아래 정보를 처음부터 담는다:
 
-> 그룹 ID 가 바뀌면 고칠 곳은 **`gradle.properties` 한 줄**이다. 경계 검사도 좌표를
-> 하드코딩하지 않고 `rootProject.group` 을 참조하므로 함께 따라온다.
+```
+Subject: Namespace request for io.github.zannabi-lab (GitHub organization)
+
+Hello,
+
+I would like to register the namespace io.github.zannabi-lab.
+
+- GitHub organization: https://github.com/ZANNABI-LAB
+- My GitHub account (organization owner): https://github.com/<username>
+- Portal account email: <가입 메일>
+- Project to publish: https://github.com/ZANNABI-LAB/swapve
+  (Apache-2.0, an OCPP 2.1 Battery Swap library for the JVM)
+
+The Add Namespace flow does not accept an organization name automatically,
+so I am requesting manual verification. I can prove ownership of the
+organization in whatever way you prefer — for example by creating a public
+repository with a verification key under the organization.
+
+Thank you.
+```
+
+**응답을 기다리는 동안 배포 외의 것은 전부 준비해 둘 수 있다** — 아래 GPG 와 리허설이 그것이다.
+
+> 그룹 ID 를 나중에 바꿔야 해도 고칠 곳은 **`gradle.properties` 한 줄**이다. 경계 검사도
+> 좌표를 하드코딩하지 않고 `rootProject.group` 을 참조하므로 함께 따라온다.
+> 대안이었던 것 둘: 개인 username 기준 `io.github.<username>`(자동, 30분) ·
+> 보유 도메인 기준 `space.deep-thought`(DNS TXT, 1시간).
 
 ## 사전 준비
 
 1. **Central Portal 계정** — <https://central.sonatype.com> 에서 GitHub 로 로그인
-2. **네임스페이스 등록** — 위 A/B/C 중 하나
+2. **네임스페이스 등록** — 위 절차 (조직 승인 대기 중)
 3. **GPG 키** — Central 은 모든 아티팩트의 서명을 요구한다
 
    ```bash
