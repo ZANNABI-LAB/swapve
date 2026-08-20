@@ -153,7 +153,7 @@ Content-Type: application/json
   "reasonCode": "NoBatteryAvailable",  // 스테이션이 보낸 원문 (§4.9.1)
   "reason": "NO_BATTERY_AVAILABLE",    // 사전 정의 사유로 해석됐을 때만
   "additionalInfo": null,
-  "rejectedAt": "2026-08-18T09:30:00Z"
+  "rejectedAt": "2026-08-18T09:30:00.000Z"
 }
 ```
 
@@ -205,9 +205,9 @@ Content-Type: application/json
   "status": "COMPLETED",
   "idToken": { "idToken": "RFID-0001", "type": "ISO14443" },
 
-  "authorizedAt": "2026-08-18T09:30:00Z",   // 인가가 난 시각 (배터리 투입 시각이 아니다)
-  "startedAt":    "2026-08-18T09:30:12Z",   // 첫 배터리가 오간 시각
-  "endedAt":      "2026-08-18T09:31:42Z",
+  "authorizedAt": "2026-08-18T09:30:00.000Z",   // 인가가 난 시각 (배터리 투입 시각이 아니다)
+  "startedAt":    "2026-08-18T09:30:12.345Z",   // 첫 배터리가 오간 시각
+  "endedAt":      "2026-08-18T09:31:42.345Z",
   "durationMillis": 90000,                  // 진행 중이면 null
 
   "batteriesIn": [
@@ -305,7 +305,7 @@ Content-Type: application/json
 ```jsonc
 // 200 OK
 {
-  "generatedAt": "2026-08-18T09:30:00Z",
+  "generatedAt": "2026-08-18T09:30:00.000Z",
 
   "swaps": {
     "attempted": 7,        // 스테이션에 실제로 도달한 개시 (열린 교환 + 거부된 개시)
@@ -416,8 +416,8 @@ F6 은 **세션의 멱등 원장**이 상위 계층을 부르지도 않고 저�
     "batterySerialNumber": "BAT-USED-1",  // 어느 배터리인가 (모르면 null — 아래)
     "status": "SUSPENDED",                // CONNECTED | CHARGING | SUSPENDED | ENDED | UNKNOWN
     "socPercent": 50.0,                   // 마지막으로 보고된 SoC (S04.FR.04). 없으면 null
-    "startedAt": "2026-08-18T09:30:00Z",
-    "updatedAt": "2026-08-18T10:00:00Z",
+    "startedAt": "2026-08-18T09:30:00.000Z",
+    "updatedAt": "2026-08-18T10:00:00.000Z",
     "eventCount": 6
   }
 ]

@@ -1,5 +1,6 @@
 package dev.swapve.csms.support
 
+import dev.swapve.ocpp.json.OcppDateTime
 import org.springframework.boot.test.context.TestConfiguration
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Primary
@@ -24,7 +25,12 @@ class FixedClockConfig {
     companion object {
         val FIXED_NOW: Instant = Instant.parse("2026-08-18T09:30:00Z")
 
-        /** [FIXED_NOW] 를 스키마의 `date-time` 형식으로 적은 것. */
-        const val FIXED_NOW_TEXT = "2026-08-18T09:30:00Z"
+        /**
+         * [FIXED_NOW] 를 스키마의 `date-time` 형식으로 적은 것.
+         *
+         * 손으로 적지 않고 `OcppDateTime` 에서 얻는다 — 형식을 두 곳에 적으면 언젠가
+         * 한쪽만 달라지고, 그때 시험은 **어긋난 쪽을 초록으로 통과시킨다.**
+         */
+        val FIXED_NOW_TEXT: String = OcppDateTime.format(FIXED_NOW)
     }
 }

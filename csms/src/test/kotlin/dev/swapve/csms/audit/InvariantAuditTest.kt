@@ -429,6 +429,6 @@ class InvariantAuditTest {
 
         val TOKEN = IdToken("RFID-0001", "ISO14443")
         val AT: Instant = FixedClockConfig.FIXED_NOW
-        const val AT_TEXT = FixedClockConfig.FIXED_NOW_TEXT
+        val AT_TEXT: String = FixedClockConfig.FIXED_NOW_TEXT
     }
 }
