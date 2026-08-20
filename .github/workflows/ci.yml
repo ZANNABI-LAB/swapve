@@ -1,8 +1,17 @@
-# 세 게이트를 그대로 돈다 (PLAN §7.3 · §6 기술선택 CI).
+# `.zannabi.json` 의 게이트를 그대로 돈다 (PLAN §7.3 · §6 기술선택 CI).
+# 그 파일이 이 프로젝트의 **완료의 정의**이므로, 여기 목록이 그것과 갈리면 CI 가
+# 초록인데 완료 기준은 확인되지 않은 상태가 된다. 게이트를 늘릴 때 두 곳을 같이 고친다.
 #
-#   L1 단위        ./gradlew build          — 단위 시험 + 모듈 경계 검증 3종
-#   L2 표준 적합성  ./gradlew conformanceTest — TC_S_102/103_CSMS + 실패 F1~F6
-#   L3 부하 + 감사  ./gradlew auditTest       — 스테이션 20대 동시 → 불변식 감사 (S4)
+#   L1 단위        :csms:cleanTest build     — 단위 시험 + 모듈 경계 검증 3종
+#   L2 표준 적합성  conformanceTest           — TC_S_102/103_CSMS + 실패 F1~F6 (인증 BASIC)
+#   L3 부하 + 감사  auditTest                 — 스테이션 20대 동시 → 불변식 감사 (S4, 인증 BASIC)
+#   L4 복구·보존   EventLogRecovery/Retention/SwapMetrics — B02 · B21
+#   L5 인증        BasicAuthTest             — 보안 프로파일 1 (B01)
+#
+# ⚠️ L1 에 `:csms:cleanTest` 를 앞세우는 이유: 그냥 `build` 는 캐시가 살아 있으면
+#    `test` 가 UP-TO-DATE 로 스킵된다. CI 는 매번 새 체크아웃이지만 Gradle 캐시는
+#    액션이 복원하므로 여기서도 실제로 일어날 수 있다. B02 에서 이 눈먼 지점에
+#    결함이 숨었다.
 #
 # 게이트를 한 줄로 합치지 않는다. 합치면 "단위는 통과했는데 적합성이 깨졌다"가 로그
 # 어딘가에 묻히고, 게이트를 나눠 둔 이유(PLAN §7.3)가 사라진다.
@@ -36,13 +45,23 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
 
       - name: L1 단위 게이트 + 모듈 경계 검증
-        run: ./gradlew build
+        run: ./gradlew :csms:cleanTest build
 
       - name: L2 표준 적합성 게이트 (TC_S_102/103_CSMS · F1~F6)
         run: ./gradlew conformanceTest
 
       - name: L3 부하 + 불변식 감사 게이트 (스테이션 20대 동시)
         run: ./gradlew auditTest
+
+      - name: L4 복구 · 보존 게이트 (B02 · B21)
+        run: >-
+          ./gradlew :csms:cleanTest :csms:test
+          --tests '*EventLogRecoveryTest*'
+          --tests '*SwapMetricsApiTest*'
+          --tests '*RetentionTest*'
+
+      - name: L5 스테이션 인증 게이트 (보안 프로파일 1 · B01)
+        run: ./gradlew :csms:cleanTest :csms:test --tests '*BasicAuthTest*'
 
       # 실패했을 때 무엇이 깨졌는지 보려면 리포트가 있어야 한다.
       - name: 시험 리포트 보관
