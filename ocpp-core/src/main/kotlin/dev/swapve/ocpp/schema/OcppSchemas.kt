@@ -1,29 +1,45 @@
 package dev.swapve.ocpp.schema
 
 /**
- * OCA 공식 OCPP 2.1 JSON Schema 원문에 대한 클래스패스 접근자.
+ * Classpath access to the official OCA OCPP 2.1 JSON Schema documents.
  *
- * 스키마는 코드로 옮겨 적지 않는다 (설계원칙 2). 표준이 바뀌면 `schemas/` 의
- * `.json` 파일만 교체하면 된다.
+ * The schemas are never transcribed into code — they are read verbatim from the classpath.
+ * Transcribing them would start drifting from the standard, and CC BY-ND 4.0 forbids
+ * derivatives regardless. Moving to a new revision of the standard means replacing the `.json`
+ * files and nothing else.
  *
- * 이름은 OCPP action 이름 + `Request`/`Response` 다. 예: `BatterySwapRequest`.
+ * Names are the OCPP action plus `Request`/`Response`, e.g. `BatterySwapRequest`.
  */
 object OcppSchemas {
 
-    private const val ROOT = "ocpp/schemas"
+    private const val ROOT = "dev/swapve/ocpp/schemas"
     private const val INDEX = "$ROOT/_index.txt"
+    private const val VERSION = "$ROOT/_version.txt"
 
-    /** 클래스패스에 존재하는 스키마 이름 전체 (정렬됨). */
+    /** Every schema name on the classpath, sorted. */
     val names: List<String> by lazy {
         val index = resource(INDEX)
-            ?: error("스키마 인덱스를 찾을 수 없다: $INDEX — ocpp-core 의 syncOcppSchemas 태스크를 확인할 것")
+            ?: error("schema index not found: $INDEX — check the syncOcppSchemas task of ocpp-core")
         index.reader().readLines().filter { it.isNotBlank() }
     }
 
-    /** 스키마 원문. 없으면 [IllegalArgumentException]. */
+    /**
+     * The revision these schemas state they are, verbatim from their own `comment` field —
+     * `"OCPP 2.1 Edition 1 (c) OCA, Creative Commons Attribution-NoDerivatives 4.0 …"`.
+     *
+     * Read from the documents rather than written by hand, so replacing `schemas/` carries the
+     * revision with it. The build refuses to package a mixed set.
+     */
+    val version: String by lazy {
+        val text = resource(VERSION)
+            ?: error("schema version not found: $VERSION — check the syncOcppSchemas task of ocpp-core")
+        text.reader().readText().trim()
+    }
+
+    /** The schema document. Throws [IllegalArgumentException] if there is no such name. */
     fun read(name: String): String {
         val stream = resource("$ROOT/$name.json")
-            ?: throw IllegalArgumentException("알 수 없는 OCPP 스키마: $name")
+            ?: throw IllegalArgumentException("unknown OCPP schema: $name")
         return stream.use { it.readBytes().decodeToString() }
     }
 

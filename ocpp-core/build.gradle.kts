@@ -66,28 +66,49 @@ tasks.named("check") {
 }
 
 /**
- * 공식 스키마 181개를 클래스패스 `ocpp/schemas/` 로 옮긴다.
+ * 공식 스키마 181개를 클래스패스로 옮긴다.
  *
  * 원문을 수정하지 않고 그대로 복사한다 — CC BY-ND 4.0 (개작 금지). NOTICE 참조.
+ *
+ * **경로에 패키지 이름을 붙인다.** `ocpp/schemas/` 같은 일반 경로에 두면, 소비자가 다른
+ * OCPP 라이브러리를 함께 쓰거나 자기 `resources/ocpp/` 를 가질 때 클래스패스에서 겹친다.
+ * 겹치면 `getResourceAsStream` 이 첫 번째 하나만 돌려주므로 **인덱스가 통째로 가려지고
+ * 모든 페이로드가 "모르는 action" 으로 거부된다** — 예외가 아니라 오판정이라 추적이 어렵다.
+ *
  * 디렉토리 목록은 jar 안에서 열거할 수 없으므로 `_index.txt` 를 함께 생성한다.
+ * 판본은 `_version.txt` 에 적는다 — 스키마 원문의 `comment` 가 스스로 밝히는 값이므로,
+ * `schemas/` 를 교체하면 버전도 따라온다.
  */
 val schemaSourceDir = rootProject.layout.projectDirectory.dir("schemas")
 val schemaOutputDir = layout.buildDirectory.dir("generated-resources/schemas")
 
+/** 클래스패스에서 스키마가 놓이는 자리. `OcppSchemas.ROOT` 와 같은 문자열이어야 한다. */
+val schemaResourcePath = "dev/swapve/ocpp/schemas"
+
 val syncOcppSchemas by tasks.registering(Sync::class) {
     from(schemaSourceDir) {
         include("*.json")
-        into("ocpp/schemas")
+        into(schemaResourcePath)
     }
     into(schemaOutputDir)
 
     doLast {
-        val target = schemaOutputDir.get().dir("ocpp/schemas").asFile
-        val names = target.listFiles { f -> f.name.endsWith(".json") }
-            .orEmpty()
-            .map { it.name.removeSuffix(".json") }
-            .sorted()
-        target.resolve("_index.txt").writeText(names.joinToString("\n", postfix = "\n"))
+        val target = schemaOutputDir.get().dir(schemaResourcePath).asFile
+        val schemas = target.listFiles { f -> f.name.endsWith(".json") }.orEmpty().sortedBy { it.name }
+
+        check(schemas.isNotEmpty()) { "스키마가 하나도 복사되지 않았다: ${schemaSourceDir.asFile}" }
+
+        target.resolve("_index.txt")
+            .writeText(schemas.joinToString("\n", postfix = "\n") { it.name.removeSuffix(".json") })
+
+        // 판본을 스키마 원문에서 읽는다. 손으로 적으면 교체할 때 어긋난다.
+        val commentOf = Regex(""""comment"\s*:\s*"([^"]*)"""")
+        val versions = schemas.mapNotNull { commentOf.find(it.readText())?.groupValues?.get(1) }.distinct()
+
+        check(versions.size == 1) {
+            "스키마 판본이 섞여 있다 (${versions.size} 종):\n" + versions.joinToString("\n") { "  - $it" }
+        }
+        target.resolve("_version.txt").writeText(versions.single() + "\n")
     }
 }
 

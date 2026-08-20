@@ -43,4 +43,35 @@ class OcppSchemasTest {
     fun `없는 스키마는 조용히 넘어가지 않는다`() {
         assertFailsWith<IllegalArgumentException> { OcppSchemas.read("NoSuchRequest") }
     }
+
+    @Test
+    fun `판본을 스키마 원문에서 얻는다`() {
+        assertContains(OcppSchemas.version, "OCPP 2.1 Edition 1")
+
+        // 손으로 적은 값이 아니라 원문에서 온 값임을 대조한다. schemas/ 를 교체하면
+        // 양쪽이 함께 바뀌므로 이 시험은 그대로 통과한다.
+        assertContains(OcppSchemas.read("BatterySwapRequest"), OcppSchemas.version)
+    }
+
+    /**
+     * ★ **일반 경로를 쓰지 않는다.**
+     *
+     * `ocpp/schemas/` 처럼 흔한 경로에 두면 다른 OCPP 라이브러리나 소비자의 리소스와
+     * 클래스패스에서 겹친다. 겹치면 `getResourceAsStream` 이 첫 번째만 돌려주므로 인덱스가
+     * 통째로 가려지고, **모든 페이로드가 "모르는 action" 으로 거부된다** — 예외가 아니라
+     * 오판정이라 원인 추적이 어렵다. 그래서 경로에 패키지 이름을 붙였다.
+     */
+    @Test
+    fun `스키마는 패키지 경로 아래에만 있다`() {
+        val loader = OcppSchemas::class.java.classLoader
+
+        assertTrue(
+            loader.getResource("dev/swapve/ocpp/schemas/_index.txt") != null,
+            "패키지 경로에 인덱스가 없다",
+        )
+        assertTrue(
+            loader.getResource("ocpp/schemas/_index.txt") == null,
+            "일반 경로 ocpp/schemas/ 에 인덱스가 남아 있다 — 소비자 리소스와 겹칠 수 있다",
+        )
+    }
 }
