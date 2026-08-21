@@ -72,9 +72,15 @@ Thank you.
    ```bash
    gpg --gen-key                                   # 이름·메일 입력
    gpg --list-secret-keys --keyid-format=short     # 키 ID 확인
-   gpg --keyserver keyserver.ubuntu.com --send-keys <KEY_ID>   # 공개키 배포 (필수)
+   gpg --keyserver keyserver.ubuntu.com --send-keys <FINGERPRINT>   # 공개키 배포 (필수)
    gpg --armor --export-secret-keys <KEY_ID>       # 아래 gradle.properties 에 넣을 값
    ```
+
+   > `/dev/tty` 가 없는 환경(에이전트·CI·일부 원격 셸)에서는 `gpg --gen-key` 가
+   > *"cannot open '/dev/tty'"* 로 죽는다. 그때는 배치 모드를 쓴다 —
+   > `gpg --batch --pinentry-mode loopback --gen-key <파라미터파일>` 이고,
+   > 파라미터 파일에 `Key-Type`·`Name-Real`·`Name-Email`·`Passphrase` 를 적는다.
+   > **파라미터 파일에 암호가 평문으로 들어가므로 쓰고 나서 지운다.**
 
 4. **Portal 토큰** — Portal 화면에서 발급. 계정 비밀번호가 아니다
 5. **`~/.gradle/gradle.properties`** (저장소가 아니라 홈 디렉토리다):
@@ -82,10 +88,23 @@ Thank you.
    ```properties
    mavenCentralUsername=<Portal 토큰 username>
    mavenCentralPassword=<Portal 토큰 password>
-   signingInMemoryKey=<gpg --armor --export-secret-keys 출력에서 헤더/푸터를 뺀 본문>
+   signingInMemoryKey=-----BEGIN PGP PRIVATE KEY BLOCK-----\n\nlQdG...\n-----END PGP PRIVATE KEY BLOCK-----
    signingInMemoryKeyId=<KEY_ID>
    signingInMemoryKeyPassword=<키 암호>
    ```
+
+   ⚠️ **`signingInMemoryKey` 는 ASCII-armor 전문을 한 줄로 넣는다.** 줄바꿈은 `\n` 으로
+   바꾼다 — `.properties` 가 그것을 줄바꿈으로 되돌린다. **헤더·푸터를 떼면 안 된다.**
+   떼면 `signMavenPublication` 이 *"Could not read PGP secret key"* 로 죽는다
+   (2026-08-21 리허설에서 실제로 겪었다. 이 문서가 그렇게 시켰던 것을 고친 것이다).
+
+   ```bash
+   # 넣을 값을 그대로 만들어 주는 한 줄
+   gpg --armor --export-secret-keys <KEY_ID> | python3 -c \
+     "import sys;print(sys.stdin.read().strip().replace(chr(10), chr(92)+'n'))"
+   ```
+
+   파일 권한은 `chmod 600` 으로 좁힌다.
 
 ## 리허설 — 여기서 다 잡는다
 
