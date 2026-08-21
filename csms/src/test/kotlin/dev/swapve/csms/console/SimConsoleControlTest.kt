@@ -399,38 +399,30 @@ class SimConsoleControlTest {
     }
 
     /**
-     * ★ **`close` 는 되돌릴 수 없다** — `reconnect` 가 살려내는 것은 소켓뿐이다.
+     * ★ **`close` 는 조작 목록에 없다 — 되돌릴 수 없어서가 아니라 조작이 아니어서다.**
      *
-     * 조작 13종 중 이것 하나만 되돌아오지 않는다. `disconnect` 는 소켓만 끊어 세션·슬롯을
-     * 남기지만 `close` 는 [dev.swapve.ocpp.session.OcppSession] 까지 닫는다. 그런데
-     * `reconnect` 의 검사는 `transport == null` 뿐이고 `close` 가 그 자리를 비워 놓으므로
-     * **재접속은 성공한다** — 화면에는 `connected:true` 와 협상 결과가 다시 뜬다.
+     * `StationSimulator.close()` 는 `AutoCloseable.close()` 이고, 뜻은 "스테이션 전원을
+     * 내린다"가 아니라 "이 객체를 그만 쓴다"이다. 한때 손잡이로 열려 있었는데 그때 드러난
+     * 것이 **반쪽 죽은 스테이션**이다: `close()` 는 [dev.swapve.ocpp.session.OcppSession]
+     * 까지 닫지만 `reconnect()` 의 검사는 `transport == null` 뿐이라 **재접속이 성공한다.**
+     * 소켓이 다시 열려 `connected:true` 와 `ocpp2.1` 이 스냅샷에 뜨는데, 세션은 죽어 있어
+     * 발신만 못 한다 — 인바운드 요청에는 계속 답한다(`closed` 를 보는 자리가 `call()`
+     * 하나뿐이다). 실물 스테이션에 없는 상태이고, 화면은 그것을 멀쩡한 스테이션으로 그린다.
      *
-     * 그래서 여기서 붙잡는 것은 "재접속이 막힌다"가 아니라 **살아난 것처럼 보이는 그 화면이
-     * 거짓이라는 것**이다. 죽은 것은 세션이라 다음 조작에서야 드러나고, 그 드러나는 자리를
-     * 시험이 못박아 둔다. 콘솔이 나중에 이 조작을 되돌릴 수 있게 만든다면 여기가 먼저 터진다.
-     *
-     * 마지막 `authorize` 가 그 자리다. 붙어 보이지만 아무것도 보낼 수 없고, 422 와 스테이션의
-     * 사유가 그대로 온다 — 콘솔이 거절한 것이 아니라 시뮬레이터가 보낼 연결을 못 찾은 것이다.
+     * 그래서 손잡이를 뺐다. 스테이션을 끝내는 입구는 `DELETE /api/stations/{id}` 이고,
+     * 사람이 "전원을 내린다"로 원하는 것은 대개 `disconnect` 다 — 세션·슬롯이 남아 되돌아온다.
+     * 이 시험은 **다시 열리는 것을 막는다.** 목록에 되돌릴 수 없는 것이 섞이면 여기가 터진다.
      */
     @Test
-    fun `close 뒤 reconnect 는 소켓만 되살리고 세션은 죽어 있다`() {
+    fun `close 는 조작으로 열려 있지 않다`() {
         val stationId = "CS-CONSOLE-OP-CLOSE"
         attach(stationId)
 
-        val (closeStatus, closed) = op(stationId, """{"op":"close"}""")
-        assertEquals(200, closeStatus, "닫기가 통하지 않았다: ${closed.path("error").asText()}")
-        assertEquals(false, closed.path("connected").asBoolean(), "닫았는데 연결이 남아 있다")
-        assertTrue(closed.path("subprotocol").isNull, "연결이 없는데 협상 결과를 알고 있다")
+        val (status, body) = op(stationId, """{"op":"close"}""")
 
-        val (reconnectStatus, reconnected) = op(stationId, """{"op":"reconnect"}""")
-        assertEquals(200, reconnectStatus, "재접속이 거절됐다: ${reconnected.path("error").asText()}")
-        assertTrue(reconnected.path("connected").asBoolean(), "소켓이 다시 열리지 않았다")
-        assertEquals("ocpp2.1", reconnected.path("subprotocol").asText())
-
-        val (status, body) = op(stationId, """{"op":"authorize"}""")
-        assertEquals(422, status, "세션이 닫혔는데 조작이 통했다")
-        assertContains(body.path("error").asText(), "보낼 연결이 없다")
+        assertEquals(400, status, "수명 관리 호출이 조작으로 열려 있다")
+        assertContains(body.path("error").asText(), "close")
+        assertContains(body.path("error").asText(), "disconnect", message = "고를 수 있는 조작이 안내되지 않는다")
     }
 
     // ------------------------------------------------------------------ 오류 처리

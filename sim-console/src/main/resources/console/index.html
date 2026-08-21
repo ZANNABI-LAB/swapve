@@ -121,8 +121,6 @@ var OPS = [
     effect: "소켓만 닫는다 — 세션·슬롯·requestId 는 살아 있다" },
   { op: "reconnect", label: "reconnect", group: "Acts",
     effect: "같은 세션·슬롯 위에 전송만 다시 연다" },
-  { op: "close", label: "close", group: "Acts", confirm: true,
-    effect: "세션까지 닫혀 reconnect 로도 살아나지 않는다 — 내렸다 다시 붙여야 한다" },
   { op: "boot", label: "boot", group: "Acts",
     effect: "BootNotification → 슬롯마다 NotifyEvent → SecurityEventNotification → 배터리가 있는 슬롯마다 TransactionEvent(Started)" },
   { op: "reboot", label: "reboot", group: "Acts",
@@ -253,8 +251,6 @@ function disabledReason(station, op, form) {
   if (op === "connect" || op === "reconnect") {
     return station.connected ? "이미 붙어 있다" : null;
   }
-  // close 는 붙어 있든 아니든 통한다 — 닫는 것은 전송이 아니라 세션이다.
-  if (op === "close") return null;
   if (!station.connected) return "붙어 있지 않다 — 먼저 connect 를 걸어야 한다";
 
   if (op === "insertBatteries") {
@@ -325,9 +321,6 @@ function opButton(station, spec, variant) {
   button.disabled = !!reason;
 
   button.onclick = function () {
-    // close 는 비활성하지 않는다. 세션이 닫힌 뒤로는 되돌릴 손잡이가 없는데, 표시만으로는
-    // 오클릭을 막지 못한다 — 되돌릴 수 없는 일에만 한 번 되묻는다.
-    if (spec.confirm && !window.confirm(station.stationId + " 의 세션을 닫습니다. " + spec.effect)) return;
     if (spec.args === "charging") {
       var charging = { slotId: Number(form.slotId) };
       // byPercent 를 화면에서 검사하지 않는다. 비운 채 누르면 서버의 400

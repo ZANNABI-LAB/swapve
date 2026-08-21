@@ -106,6 +106,13 @@ enum class FaultScenario(val title: String, val expectation: String) {
  *   기다린다**. CSMS 가 `RequestBatterySwap` 이나 `GetBaseReport` 를 보내지 않으면 영영
  *   돌아오지 않고, 그동안 HTTP 요청이 매달린 채로 상한([ControlledStation.OP_TIMEOUT_MS])만
  *   태운다. 기다림이 필요한 시나리오는 F1 이고, 그건 각본 쪽이 이미 다룬다.
+ * - ★ `close()` — **조작이 아니라 수명 관리다.** `AutoCloseable.close()` 이고, 뜻은
+ *   "스테이션 전원을 내린다"가 아니라 "이 객체를 그만 쓴다"이다. 손잡이로 내주면 되돌릴 수
+ *   없는 것이 되돌릴 수 있는 것들 옆에 놓이고, 실제로 **반쪽 죽은 스테이션**이 만들어진다:
+ *   `close()` 뒤 `reconnect()` 는 소켓을 다시 열지만 세션은 죽은 채라, 스테이션이 CSMS 의
+ *   요청에는 계속 답하면서 자기는 아무것도 못 보낸다 (`docs/VIRTUAL-STATION.md` §5).
+ *   스테이션을 끝내는 입구는 `DELETE /api/stations/{id}` 이고, 사람이 "전원을 내린다"로
+ *   원하는 것은 대개 `disconnect` 다 — 그쪽은 세션·슬롯을 남기므로 되돌아온다.
  *
  * @param wireValue 요청 본문의 `op` 에 적는 값. 시뮬레이터 함수 이름과 **같다** — 문서의
  *   표에서 이름을 옮겨 적으면 그대로 통해야 한다.
@@ -117,7 +124,6 @@ enum class StationOp(val wireValue: String) {
     CONNECT("connect"),
     DISCONNECT("disconnect"),
     RECONNECT("reconnect"),
-    CLOSE("close"),
     BOOT("boot"),
     REBOOT("reboot"),
     INSERT_BATTERIES("insertBatteries"),
@@ -580,7 +586,6 @@ class ControlledStation(val spec: StationSpec) : AutoCloseable {
             StationOp.CONNECT -> simulator.connect()
             StationOp.DISCONNECT -> simulator.disconnect()
             StationOp.RECONNECT -> simulator.reconnect()
-            StationOp.CLOSE -> simulator.close()
             StationOp.BOOT -> simulator.boot()
             StationOp.REBOOT -> simulator.reboot()
             StationOp.INSERT_BATTERIES -> simulator.insertBatteries()
