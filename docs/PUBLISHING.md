@@ -1,144 +1,121 @@
-# Maven Central 배포 절차
+# Releasing to Maven Central
 
-> ⚠️ **Central 은 한 번 올린 버전을 지울 수 없다.** 그래서 이 문서의 절반이 리허설이다.
-> 배포 자체는 마지막 두 줄이다.
+> ⚠️ **Central can never delete a version once it is released.** That is why half of this document
+> is rehearsal. The release itself is the last two lines.
 
-## 무엇을 올리고, 무엇을 안 올리나
+## What is published, and what is not
 
-| 모듈 | 좌표 | 왜 |
+| Module | Coordinates | Why |
 |---|---|---|
-| `ocpp-core` | `io.github.zannabi-lab:ocpp-core` | 프레임워크를 모르는 코덱·스키마·세션 계층. **남이 의존으로 적을 수 있는 것** |
-| `swap-domain` | `io.github.zannabi-lab:swap-domain` | 의존성 0 의 도메인 모델 |
+| `ocpp-core` | `io.github.zannabi-lab:ocpp-core` | The framework-agnostic codec, schema, and session layers. **The thing someone else can depend on** |
+| `swap-domain` | `io.github.zannabi-lab:swap-domain` | The domain model, with zero dependencies |
 
-`csms` · `station-sim` · `sim-console` 은 애플리케이션이고 `java-compat` 은 시험 전용이라
-좌표를 가질 이유가 없다. 설정은 루트 `build.gradle.kts` 의 `publishedModules` 한 곳에 있다.
+`csms` · `station-sim` · `sim-console` are applications and `java-compat` is test-only, so none of
+them has a reason to own coordinates. The configuration lives in one place: `publishedModules` in
+the root `build.gradle.kts`.
 
-## 먼저 풀어야 할 것 — 네임스페이스 (진행 중)
+## Status
 
-**`io.github.zannabi-lab` 을 그대로 쓰기로 했다** (2026-08-20 결정). 그룹 ID 가 저장소 URL 과
-한 줄로 이어지는 값이 응답을 기다리는 비용보다 크다고 봤다.
+**The namespace `io.github.zannabi-lab` is registered, and `0.0.1` was released on 2026-08-21.**
 
-⚠️ **다만 조직 네임스페이스는 자동 등록되지 않는다.** Portal 이 자동으로 주는 것은 가입에 쓴
-GitHub **username** 기준 `io.github.<username>` 뿐이다
-([공식 문서](https://central.sonatype.org/register/namespace/)):
+> How the namespace was obtained is worth recording. Central does **not** register organization
+> namespaces automatically — the Portal only grants `io.github.<username>` for the GitHub username
+> the account signed up with ([official docs](https://central.sonatype.org/register/namespace/)):
+>
+> > *"Currently, we only support the GitHub username that you used to sign up, so
+> > `io.github.<github organization name>` is not available as an automatically registered
+> > namespace."*
+>
+> The route that works is *Namespaces → Add Namespace* in the Portal, which issues a verification
+> key; you create a public repository with that key as its name under the organization and press
+> *Verify*. (The empty repository can be deleted afterwards.) If that is blocked, mail
+> <central-support@sonatype.com> asking for manual verification of organization ownership.
+>
+> Changing the group ID later is **one line in `gradle.properties`** — the module boundary checks
+> reference `rootProject.group` rather than hardcoding coordinates, so they follow along.
 
-> *"Currently, we only support the GitHub username that you used to sign up, so
-> `io.github.<github organization name>` is not available as an automatically registered namespace."*
+## Prerequisites
 
-### 절차
-
-**1단계 — 먼저 Portal 에서 직접 시도한다.** <https://central.sonatype.com> → *Namespaces* →
-*Add Namespace* 에 `io.github.zannabi-lab` 을 넣는다. 검증 키가 나오면 **`ZANNABI-LAB` 조직에
-그 키와 같은 이름의 public 저장소**를 만들고 *Verify* 를 누른다. 이걸로 통과하면 메일은 필요 없다.
-(검증이 끝나면 그 빈 저장소는 지워도 된다.)
-
-**2단계 — 막히면 Central Support 에 요청한다.** <central-support@sonatype.com>.
-조직 소유를 확인받는 절차이므로 아래 정보를 처음부터 담는다:
-
-```
-Subject: Namespace request for io.github.zannabi-lab (GitHub organization)
-
-Hello,
-
-I would like to register the namespace io.github.zannabi-lab.
-
-- GitHub organization: https://github.com/ZANNABI-LAB
-- My GitHub account (organization owner): https://github.com/<username>
-- Portal account email: <가입 메일>
-- Project to publish: https://github.com/ZANNABI-LAB/swapve
-  (Apache-2.0, an OCPP 2.1 Battery Swap library for the JVM)
-
-The Add Namespace flow does not accept an organization name automatically,
-so I am requesting manual verification. I can prove ownership of the
-organization in whatever way you prefer — for example by creating a public
-repository with a verification key under the organization.
-
-Thank you.
-```
-
-**응답을 기다리는 동안 배포 외의 것은 전부 준비해 둘 수 있다** — 아래 GPG 와 리허설이 그것이다.
-
-> 그룹 ID 를 나중에 바꿔야 해도 고칠 곳은 **`gradle.properties` 한 줄**이다. 경계 검사도
-> 좌표를 하드코딩하지 않고 `rootProject.group` 을 참조하므로 함께 따라온다.
-> 대안이었던 것 둘: 개인 username 기준 `io.github.<username>`(자동, 30분) ·
-> 보유 도메인 기준 `space.deep-thought`(DNS TXT, 1시간).
-
-## 사전 준비
-
-1. **Central Portal 계정** — <https://central.sonatype.com> 에서 GitHub 로 로그인
-2. **네임스페이스 등록** — 위 절차 (조직 승인 대기 중)
-3. **GPG 키** — Central 은 모든 아티팩트의 서명을 요구한다
+1. **A Central Portal account** — sign in with GitHub at <https://central.sonatype.com>
+2. **A registered namespace** — see above
+3. **A GPG key** — Central requires every artifact to be signed
 
    ```bash
-   gpg --gen-key                                   # 이름·메일 입력
-   gpg --list-secret-keys --keyid-format=short     # 키 ID 확인
-   gpg --keyserver keyserver.ubuntu.com --send-keys <FINGERPRINT>   # 공개키 배포 (필수)
-   gpg --armor --export-secret-keys <KEY_ID>       # 아래 gradle.properties 에 넣을 값
+   gpg --gen-key                                   # name and email
+   gpg --list-secret-keys --keyid-format=short     # find the key ID
+   gpg --keyserver keyserver.ubuntu.com --send-keys <FINGERPRINT>   # publish the public key (required)
+   gpg --armor --export-secret-keys <KEY_ID>       # the value for gradle.properties below
    ```
 
-   > `/dev/tty` 가 없는 환경(에이전트·CI·일부 원격 셸)에서는 `gpg --gen-key` 가
-   > *"cannot open '/dev/tty'"* 로 죽는다. 그때는 배치 모드를 쓴다 —
-   > `gpg --batch --pinentry-mode loopback --gen-key <파라미터파일>` 이고,
-   > 파라미터 파일에 `Key-Type`·`Name-Real`·`Name-Email`·`Passphrase` 를 적는다.
-   > **파라미터 파일에 암호가 평문으로 들어가므로 쓰고 나서 지운다.**
+   > In an environment with no `/dev/tty` (agents, CI, some remote shells) `gpg --gen-key` dies
+   > with *"cannot open '/dev/tty'"*. Use batch mode there —
+   > `gpg --batch --pinentry-mode loopback --gen-key <parameter-file>`, with `Key-Type`,
+   > `Name-Real`, `Name-Email`, and `Passphrase` in the file.
+   > **The passphrase sits in that file in plain text, so delete it afterwards.**
 
-4. **Portal 토큰** — Portal 화면에서 발급. 계정 비밀번호가 아니다
-5. **`~/.gradle/gradle.properties`** (저장소가 아니라 홈 디렉토리다):
+   Keep the revocation certificate that `gpg --gen-key` writes to
+   `~/.gnupg/openpgp-revocs.d/<FINGERPRINT>.rev` **somewhere off this machine**. It is the only way
+   to invalidate the key if it is lost or leaked.
+
+4. **A Portal token** — generated in the Portal UI. It is not your account password
+5. **`~/.gradle/gradle.properties`** (in your home directory, not in the repository):
 
    ```properties
-   mavenCentralUsername=<Portal 토큰 username>
-   mavenCentralPassword=<Portal 토큰 password>
+   mavenCentralUsername=<Portal token username>
+   mavenCentralPassword=<Portal token password>
    signingInMemoryKey=-----BEGIN PGP PRIVATE KEY BLOCK-----\n\nlQdG...\n-----END PGP PRIVATE KEY BLOCK-----
    signingInMemoryKeyId=<KEY_ID>
-   signingInMemoryKeyPassword=<키 암호>
+   signingInMemoryKeyPassword=<key passphrase>
    ```
 
-   ⚠️ **`signingInMemoryKey` 는 ASCII-armor 전문을 한 줄로 넣는다.** 줄바꿈은 `\n` 으로
-   바꾼다 — `.properties` 가 그것을 줄바꿈으로 되돌린다. **헤더·푸터를 떼면 안 된다.**
-   떼면 `signMavenPublication` 이 *"Could not read PGP secret key"* 로 죽는다
-   (2026-08-21 리허설에서 실제로 겪었다. 이 문서가 그렇게 시켰던 것을 고친 것이다).
+   ⚠️ **`signingInMemoryKey` takes the whole ASCII-armored key on one line**, with newlines written
+   as `\n` — a `.properties` file turns those back into newlines. **Do not strip the header and
+   footer.** Stripping them makes `signMavenPublication` die with *"Could not read PGP secret key"*
+   (observed for real in the 2026-08-21 rehearsal; this document used to give the wrong
+   instruction).
 
    ```bash
-   # 넣을 값을 그대로 만들어 주는 한 줄
+   # produces exactly the value to paste
    gpg --armor --export-secret-keys <KEY_ID> | python3 -c \
      "import sys;print(sys.stdin.read().strip().replace(chr(10), chr(92)+'n'))"
    ```
 
-   파일 권한은 `chmod 600` 으로 좁힌다.
+   Narrow the file permissions with `chmod 600`.
 
-## 리허설 — 여기서 다 잡는다
+## Rehearsal — this is where problems get caught
 
-### 1. 로컬 저장소에 올린다
+### 1. Publish to the local repository
 
 ```bash
 ./gradlew :ocpp-core:publishToMavenLocal :swap-domain:publishToMavenLocal
 ```
 
-서명 키가 없어도 통과한다 (`signMavenPublication SKIPPED`). 루트 빌드가 키 없는 환경에서
-`signing.required = false` 로 두기 때문이고, **배포 경로는 이 완화를 타지 않는다** —
-Central 이 서명 없는 번들을 거절하므로 키를 잊으면 업로드에서 잡힌다.
+This passes even with no signing key (`signMavenPublication SKIPPED`), because the root build sets
+`signing.required = false` where no key exists. **The release path does not take that relaxation** —
+Central rejects an unsigned bundle, so a forgotten key is caught at upload.
 
-### 2. 산출물을 눈으로 확인한다
+### 2. Inspect the artifacts
 
 ```bash
-cd ~/.m2/repository/io/github/zannabi-lab/ocpp-core/0.1.0
-unzip -l ocpp-core-0.1.0.jar | grep -c 'ocpp/schemas/.*\.json'   # → 181
-unzip -l ocpp-core-0.1.0.jar | grep 'META-INF/NOTICE'            # → 있어야 한다
-cat ocpp-core-0.1.0.pom
+cd ~/.m2/repository/io/github/zannabi-lab/ocpp-core/<version>
+unzip -l ocpp-core-<version>.jar | grep -c 'ocpp/schemas/.*\.json'   # → 181
+unzip -l ocpp-core-<version>.jar | grep 'META-INF/NOTICE'            # → must be there
+cat ocpp-core-<version>.pom
 ```
 
-세 가지가 반드시 있어야 한다:
+Three things must be present:
 
-- **공식 스키마 181개** — 없으면 소비자 쪽에서 스키마 검증이 통째로 죽는다
-- **`META-INF/LICENSE` · `META-INF/NOTICE`** — Apache-2.0 §4(d) 이고, 더 중요하게는
-  jar 안에 **CC BY-ND 4.0 인 OCA 스키마가 들어 있다.** 좌표로만 받은 사람은 그 고지를
-  jar 안에서만 볼 수 있다. *(첫 리허설에서 실제로 빠져 있었다.)*
-- **POM 의 name · description · url · licenses · developers · scm** — 하나라도 없으면
-  Central 이 거절한다
+- **The 181 official schemas** — without them schema validation dies wholesale on the consumer's side
+- **`META-INF/LICENSE` and `META-INF/NOTICE`** — Apache-2.0 §4(d), and more importantly the jar
+  contains **the OCA schemas, which are CC BY-ND 4.0**. Someone who took only the coordinates can
+  see that notice nowhere else. *(They were genuinely missing in the first rehearsal.)*
+- **`name`, `description`, `url`, `licenses`, `developers`, `scm` in the POM** — Central rejects the
+  bundle if any is absent
 
-### 3. 소비자 입장에서 실제로 컴파일한다
+### 3. Compile it as a consumer would
 
-**이것이 리허설의 핵심이다.** 별도 디렉토리에 최소 프로젝트를 만들고 `mavenLocal()` 에서 받는다.
+**This is the core of the rehearsal.** Create a minimal project in a separate directory and resolve
+from `mavenLocal()`.
 
 ```kotlin
 // settings.gradle.kts
@@ -147,38 +124,59 @@ dependencyResolutionManagement { repositories { mavenLocal(); mavenCentral() } }
 // build.gradle.kts
 plugins { kotlin("jvm") version "2.1.0"; application }
 dependencies {
-    implementation("io.github.zannabi-lab:ocpp-core:0.1.0")
-    implementation("io.github.zannabi-lab:swap-domain:0.1.0")
+    implementation("io.github.zannabi-lab:ocpp-core:<version>")
+    implementation("io.github.zannabi-lab:swap-domain:<version>")
 }
 ```
 
-확인할 것 셋:
+Three things to confirm:
 
-1. **코덱 왕복** — `OcppFrameCodec().encode(...)` → `decode(...)` 가 `Decoded` 로 온다
-2. **스키마 검증** — `OcppPayloadValidator().validateCall("BootNotification", payload)` 가
-   `Valid` 를, 빈 페이로드가 `Invalid` 를 준다. **jar 안의 스키마가 실제로 로드된다는 증거다**
-3. **Java 에서도 부른다** — `new OcppFrameCodec(new ObjectMapper())`.
-   [LAYERS §4](LAYERS.md) 의 판정을 배포 아티팩트로 다시 확인하는 것이다
+1. **Codec round-trip** — `OcppFrameCodec().encode(...)` → `decode(...)` comes back as `Decoded`
+2. **Schema validation** — `OcppPayloadValidator().validateCall("BootNotification", payload)` gives
+   `Valid`, and an empty payload gives `Invalid`. **That is the evidence that the schemas inside the
+   jar really load**
+3. **Call it from Java too** — `new OcppFrameCodec(new ObjectMapper())`. This re-confirms the
+   verdict of [LAYERS §4](LAYERS.md) against the actual published artifact
 
-> **알아 둘 것**: 소비자 콘솔에 `SLF4J(W): No SLF4J providers were found` 가 뜬다.
-> `json-schema-validator` 가 `slf4j-api` 를 쓰기 때문이고, 구현체를 하나 넣으면 사라진다.
-> 동작에는 영향이 없다.
+> **Expect this**: the consumer's console prints `SLF4J(W): No SLF4J providers were found`, because
+> `json-schema-validator` uses `slf4j-api`. Adding any implementation removes it. It has no effect
+> on behaviour.
 
-## 배포
+### 4. After the release, repeat step 3 against the real thing
+
+Once the release has propagated, delete the local copy and resolve **without `mavenLocal()`**, so
+nothing can leak in from `~/.m2`:
 
 ```bash
-./gradlew publishToMavenCentral            # 업로드만 — Portal 화면에서 사람이 릴리스한다
-./gradlew publishAndReleaseToMavenCentral  # 업로드 + 자동 릴리스
+rm -rf ~/.m2/repository/io/github/zannabi-lab
+# settings.gradle.kts → repositories { mavenCentral() }   (mavenLocal deliberately omitted)
 ```
 
-**첫 배포는 반드시 앞의 것으로 한다.** Portal 화면에서 파일 목록과 POM 을 한 번 더 보고
-누르는 절차가 남아 있는 편이 낫다 — 되돌릴 수 없기 때문이다.
+## Releasing
 
-버전은 `gradle.properties` 한 줄이다. 계획은 **`0.0.1` 로 한 번 올려 전 과정을 확인한 뒤
-`0.1.0`** 이다. `0.0.1` 이 남는 것은 비용이 아니라 기록이다.
+```bash
+./gradlew publishToMavenCentral            # upload only — a human releases it in the Portal
+./gradlew publishAndReleaseToMavenCentral  # upload and release automatically
+```
 
-## 배포 후
+**Always use the first form for a first release.** It is better to keep the step where a person
+looks at the file list and the POM once more and then presses the button, because it cannot be
+undone.
 
-- `README.md` 의 *"Not yet published to Maven Central"* 문장을 의존성 좌표로 바꾼다
-  (한글판 `README.ko.md` 도 같이)
+The version is one line in `gradle.properties`. The plan was **`0.0.1` first to walk the whole
+path, then `0.1.0`** — `0.0.1` remaining is not a cost, it is a record.
 
+Watch it land:
+
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' \
+  https://repo1.maven.org/maven2/io/github/zannabi-lab/ocpp-core/<version>/ocpp-core-<version>.pom
+```
+
+Propagation to `repo1.maven.org` takes minutes to tens of minutes after the Portal reports the
+release; the search index takes longer still.
+
+## After a release
+
+- Replace the dependency coordinates in `README.md` and `README.ko.md`
+- Add the version to [`CHANGELOG.md`](../CHANGELOG.md)
