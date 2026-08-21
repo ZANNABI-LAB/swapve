@@ -37,8 +37,14 @@
 > **This does not promise a finished CSMS.** `csms` is a reference implementation, not a product.
 > The codec and schema layers **are callable from Java** — the session layer is Kotlin-only.
 > That is measured, not assumed: see [LAYERS §4](docs/LAYERS.md).
+>
+> **There are no generated message DTOs.** Payloads are Jackson `JsonNode` / `ObjectNode`, and
+> correctness is decided by the **official schema** rather than by a transcribed class. That is a
+> licensing consequence, not an oversight — the OCA schemas are CC BY-ND 4.0, so putting them into
+> code would make a derivative. You gain a validator that cannot drift from the standard; you pay
+> for it by reading and building fields by hand.
 
-**Not yet published to Maven Central.** For now you build from source (B07).
+**Not yet published to Maven Central.** For now you build from source — see [docs/PUBLISHING.md](docs/PUBLISHING.md).
 
 ## Quick start
 
@@ -67,8 +73,7 @@ station-sim → ws://localhost:8080/ocpp/CS001 (순서 In-Out, 배터리 2 개)
 ```
 
 <sub>The simulator's console output is currently Korean: *"swap complete: requestId=1001,
-42 messages exchanged."* Log message localization is tracked with the docs under
-B06.</sub>
+42 messages exchanged."* Log message localization is still open, together with the docs.</sub>
 
 **Terminal C** — query exactly what an app would see.
 
@@ -125,11 +130,11 @@ The console drives the *test rig*. It is not a CSMS and does not pretend to be o
 </details>
 
 <details>
-<summary><b>Measured run</b> — timings from actually following the steps above (2026-08-18)</summary>
+<summary><b>Measured run</b> — timings from actually following the steps above (2026-08-21)</summary>
 
 | Step | Took | Observed |
 |---|---|---|
-| `./gradlew build` | 54s – 1m25s | 279 tests + 3 module boundary checks passed |
+| `./gradlew build` | 54s – 1m25s | 368 tests + 5 module boundary checks passed |
 | `./gradlew :csms:bootRun` | ~20s after the command (server itself boots in 2.8s) | `Started CsmsApplicationKt` · `Tomcat started on port 8080` |
 | `./gradlew :station-sim:run …` | 13s | `교환 완주: requestId=1001, 오간 메시지 42 건` (swap complete, 42 messages) |
 | Confirmed on the CSMS side | — | `BatteryIn → HalfIn`, `BatteryOut → Completed` |
@@ -155,7 +160,7 @@ Spring context on every build.
 **Not a production system.** The absences come first.
 
 - **What is closed and what is still open differ.** WebSocket defaults to `BASIC`, the REST API has
-  its own Basic realm, and `sim-console` binds to loopback. There is no mTLS (B12), no credential
+  its own Basic realm, and `sim-console` binds to loopback. There is no mTLS, no credential
   rotation, no rate limiting, no operational audit trail.
 - **Single instance.** Horizontal scaling is not blocked — serialization and the idempotency
   ledger are both keyed by `stationId`, which is the partition key a distributed setup would use —
@@ -260,7 +265,7 @@ why the metrics avoid Micrometer) is in **[docs/API.md](docs/API.md)**.
 
 > ⚠️ **The documents under `docs/` are currently written in Korean.** The code, identifiers, and
 > commit messages that matter for reading the source are language-neutral; translating the deep-dive
-> docs is tracked as B06.
+> docs is still open.
 
 ## How this is built
 

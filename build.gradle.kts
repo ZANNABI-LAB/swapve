@@ -32,7 +32,7 @@ subprojects {
      *
      * 표준 적합성 시험이 일반 단위 시험에 섞이면, 200건 넘는 초록 사이에서 `TC_S_103_CSMS`
      * 하나가 빨개져도 눈에 띄지 않는다. 게이트를 나눠 두면 "단위는 통과했는데 적합성이
-     * 깨졌다"가 한눈에 읽힌다 — 게이트 이 L1/L2/L3 를 따로 둔 이유다.
+     * 깨졌다"가 한눈에 읽힌다 — 게이트를 L1·L2·L3 로 나눠 둔 이유다.
      *
      * L3(부하 + 감사)도 같은 이유로 뺀다. 그쪽은 초 단위가 아니라 **20 대 동시 접속**을
      * 세우고 도는 시험이라, 단위 게이트에 섞이면 L1 의 "수 초" 성질이 사라진다.
@@ -95,7 +95,9 @@ subprojects {
             description.set(
                 when (project.name) {
                     "ocpp-core" ->
-                        "OCPP 2.1 (OCPP-J) framing, official JSON schema validation, and session layer for the JVM. Framework-agnostic."
+                        "OCPP 2.1 (OCPP-J) framing, official JSON schema validation, and a session layer for the JVM. " +
+                            "Framework-agnostic. Payloads are Jackson JsonNode - there are no generated message DTOs. " +
+                            "The codec and schema layers are callable from Java; the session layer is Kotlin-only (coroutines)."
                     else ->
                         "OCPP 2.1 Battery Swap (Block S) domain model: swap state machine, slot model, and invariants. No I/O, no dependencies."
                 },
@@ -186,7 +188,7 @@ tasks.register("conformanceTest") {
  * --gate "audit:./gradlew auditTest"
  * ```
  *
- * 스테이션 20 대가 동시에 붙어 교환을 완주한 뒤, **이벤트 로그(이벤트 로그)에서 재구성한 상태**로
+ * 스테이션 20 대가 동시에 붙어 교환을 완주한 뒤, **이벤트 로그에서 재구성한 상태**로
  * 불변식을 전수 검사한다. 실체는 `:csms` 에 있다 — 시험 대상이 CSMS 이므로.
  */
 tasks.register("auditTest") {

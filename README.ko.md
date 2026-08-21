@@ -37,8 +37,13 @@
 > **완제품 CSMS 를 약속하지 않습니다.** `csms` 는 제품이 아니라 참조 구현입니다.
 > 코덱·스키마 층은 **Java 에서도 호출됩니다** — 세션 층은 Kotlin 전용입니다
 > (짐작이 아니라 실측입니다: [LAYERS §4](docs/LAYERS.md)).
+>
+> **생성된 메시지 DTO 가 없습니다.** 페이로드는 Jackson 의 `JsonNode` / `ObjectNode` 이고,
+> 맞고 틀림은 옮겨 적은 클래스가 아니라 **공식 스키마**가 판정합니다. 실수가 아니라 라이선스의
+> 결과입니다 — OCA 스키마는 CC BY-ND 4.0 이라 코드로 옮기면 파생물이 됩니다. 표준과 어긋날 수
+> 없는 검증기를 얻는 대신, 필드를 손으로 읽고 쌓는 값을 치릅니다.
 
-**아직 Maven Central 에 배포되지 않았습니다.** 지금은 소스로 씁니다 (B07).
+**아직 Maven Central 에 배포되지 않았습니다.** 지금은 소스로 씁니다 — [docs/PUBLISHING.md](docs/PUBLISHING.md) 를 보세요.
 
 ## 빠른 시작
 
@@ -119,11 +124,11 @@ curl -X POST localhost:8080/api/swaps -H 'Content-Type: application/json' \
 </details>
 
 <details>
-<summary><b>실측 기록</b> — 위 절차를 실제로 따라 해서 잰 시간 (2026-08-18)</summary>
+<summary><b>실측 기록</b> — 위 절차를 실제로 따라 해서 잰 시간 (2026-08-21)</summary>
 
 | 단계 | 걸린 시간 | 관측한 것 |
 |---|---|---|
-| `./gradlew build` | 54s ~ 1m25s | 시험 279건 + 모듈 경계 검증 3종 통과 |
+| `./gradlew build` | 54s ~ 1m25s | 시험 368건 + 모듈 경계 검증 5종 통과 |
 | `./gradlew :csms:bootRun` | 명령 후 ~20s (서버 자체 기동은 2.8s) | `Started CsmsApplicationKt` · `Tomcat started on port 8080` |
 | `./gradlew :station-sim:run …` | 13s | `교환 완주: requestId=1001, 오간 메시지 42 건` |
 | CSMS 쪽 확인 | — | `BatteryIn → HalfIn`, `BatteryOut → Completed` |
@@ -148,7 +153,7 @@ curl -X POST localhost:8080/api/swaps -H 'Content-Type: application/json' \
 **프로덕션 시스템이 아닙니다.** 없는 것을 먼저 적습니다.
 
 - **닫힌 경계와 남은 경계가 다릅니다.** WebSocket 은 기본 `BASIC`, REST 는 별도 Basic,
-  `sim-console` 은 loopback 바인딩입니다. mTLS(B12)·자격증명 회전·운영용 감사·속도 제한은 없습니다.
+  `sim-console` 은 loopback 바인딩입니다. mTLS·자격증명 회전·운영용 감사·속도 제한은 없습니다.
 - **단일 인스턴스입니다.** 수평 확장은 봉쇄하지 않았습니다 — 직렬화와 멱등 원장이 모두
   `stationId` 로 잡혀 있고, 그것이 분산 시 파티셔닝 키가 됩니다. 다만 구현하지는
   않았습니다. 재시작은 견딥니다 — 이벤트 로그(H2)에 OCPP 원문이
