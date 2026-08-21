@@ -15,8 +15,13 @@ import dev.swapve.station.SwapOrder
 import dev.swapve.swap.IdToken
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
+import java.io.IOException
 import java.time.Instant
+import java.util.concurrent.Callable
+import java.util.concurrent.ExecutionException
 import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
@@ -79,6 +84,70 @@ enum class FaultScenario(val title: String, val expectation: String) {
     F5("순서 위반", "AUTHORIZED 없이 BatterySwap 도착 → 이상 이벤트 기록 (응답은 정상 회신)"),
     F6("재접속 중 재전송", "재연결 후 같은 messageId 로 CALL 재전송 → 멱등 처리, 장부 무결"),
 }
+
+/**
+ * 콘솔이 스테이션에 직접 걸 수 있는 조작들.
+ *
+ * ### 목록의 출처는 `docs/VIRTUAL-STATION.md` §2 다
+ *
+ * 그 문서가 `StationSimulator` 의 호출을 **Acts(사실을 바꾸고 알린다) / Reports(말할 뿐
+ * 아무것도 바꾸지 않는다) / Scripts(앞의 둘을 묶은 것) / Observations(읽기만 한다)** 로
+ * 가른다. 콘솔이 손잡이로 내주는 것은 앞의 둘이다 — 각본은 이미 `POST .../swap` 이 덮고,
+ * 관측은 `GET /api/state` 가 덮는다.
+ *
+ * ### 빠진 것과 그 이유
+ *
+ * - **Scripts** (`runSwap` `bootAndSwap` `runRemoteSwap` `chargeUntilMaxSoc`) — `POST
+ *   /api/stations/{id}/swap` 이 이미 하는 일이다. 같은 일에 두 번째 입구를 내면 어느 쪽이
+ *   진짜인지가 다시 흐려진다.
+ * - **Observations** (`config` `eventLog` `slotState` `batteryAt` …) — `GET /api/state` 의
+ *   스냅샷이 그대로 싣는다. 읽는 일에 조작을 쓸 이유가 없다.
+ * - `awaitRemoteStart()` · `reportFullInventory()` — 둘 다 **상대가 먼저 움직여 주기를
+ *   기다린다**. CSMS 가 `RequestBatterySwap` 이나 `GetBaseReport` 를 보내지 않으면 영영
+ *   돌아오지 않고, 그동안 HTTP 요청이 매달린 채로 상한([ControlledStation.OP_TIMEOUT_MS])만
+ *   태운다. 기다림이 필요한 시나리오는 F1 이고, 그건 각본 쪽이 이미 다룬다.
+ *
+ * @param wireValue 요청 본문의 `op` 에 적는 값. 시뮬레이터 함수 이름과 **같다** — 문서의
+ *   표에서 이름을 옮겨 적으면 그대로 통해야 한다.
+ */
+enum class StationOp(val wireValue: String) {
+
+    // Acts — 사실을 바꾸고 그 결과를 전선에 알린다.
+
+    CONNECT("connect"),
+    DISCONNECT("disconnect"),
+    RECONNECT("reconnect"),
+    CLOSE("close"),
+    BOOT("boot"),
+    REBOOT("reboot"),
+    INSERT_BATTERIES("insertBatteries"),
+    REMOVE_BATTERIES("removeBatteries"),
+
+    /** `slotId` 와 `byPercent` 를 받는다. 둘 다 없으면 400 이다. */
+    ADVANCE_CHARGING("advanceCharging"),
+
+    // Reports — 말할 뿐, 스테이션 안의 사실은 그대로다.
+
+    AUTHORIZE("authorize"),
+    REPORT_CHARGING_STARTED("reportChargingStarted"),
+    REPORT_BATTERY_OUT_TIMEOUT("reportBatteryOutTimeout"),
+
+    /** `sameMessageId` 를 받는다. `true` 는 F6(멱등 원장), `false` 는 F4(중복 BatteryIn)다. */
+    RESEND_LAST_BATTERY_SWAP("resendLastBatterySwap"),
+}
+
+/**
+ * 조작에 딸린 인자들. 쓰이는 것은 두 조작뿐이라 전부 선택값이다.
+ *
+ * 기본값을 두지 않는다. `sameMessageId` 에 기본을 두면 F6 을 부르려던 요청이 조용히 F4 가
+ * 되고, 그 차이는 응답에 드러나지 않는다 — 모르는 채로 다른 시험을 하게 되는 편보다
+ * 400 으로 되묻는 편이 낫다.
+ */
+data class StationOpParams(
+    val slotId: Int? = null,
+    val byPercent: Double? = null,
+    val sameMessageId: Boolean? = null,
+)
 
 /**
  * 화면에서 받은 스테이션 한 대의 구성.
@@ -230,12 +299,21 @@ data class StationSnapshot(
  * 들면 언젠가 어긋나고, 그때 화면은 **없는 것을 보여주게** 된다. 콘솔이 스스로 아는 것은
  * 자기가 시킨 일의 진행 상태뿐이다.
  *
- * ### 교환을 시작할 때마다 시뮬레이터를 새로 만든다
+ * ### 각본은 시뮬레이터를 새로 만들고, 수동 조작은 만들지 않는다
  *
- * 두 가지 이유다. 하나는 [FaultScenario] 의 절반이 **구성**으로 재현되기 때문이고(F1·F3),
- * 다른 하나는 한 번 완주한 스테이션은 투입 슬롯이 차 있어서 다음 교환의 전제조건
- * (`insertSlots` 는 비어 있어야 한다)을 만족하지 못하기 때문이다. 매번 새로 만들면 두
- * 사정이 한 규칙으로 없어진다.
+ * 갈래가 둘이고, 수명 규칙도 둘이다.
+ *
+ * **각본([start])은 시뮬레이터를 새로 만든다.** 두 가지 이유다. 하나는 [FaultScenario] 의
+ * 절반이 **구성**으로 재현되기 때문이고(F1·F3 — 내줄 배터리를 두지 않거나 일련번호를 등록
+ * 목록 밖의 값으로 짓는다), 다른 하나는 한 번 완주한 스테이션은 투입 슬롯이 차 있어서
+ * 다음 교환의 전제조건(`insertSlots` 는 비어 있어야 한다)을 만족하지 못하기 때문이다.
+ * 매번 새로 만들면 두 사정이 한 규칙으로 없어진다.
+ *
+ * **수동 조작([operate])은 만들지 않는다.** 사람이 버튼을 누르는 것은 "이 스테이션을 이렇게
+ * 움직여 보겠다"는 뜻이고, 그 결과는 **누른 그 스테이션에 쌓여야** 한다. 조작마다 다시
+ * 지으면 앞선 조작의 결과가 매번 지워져 `authorize()` → `insertBatteries()` 같은 두 걸음이
+ * 성립하지 않는다 — 그건 조종이 아니라 각본 하나짜리 재생이다. 그래서 [operate] 는
+ * [attach] 가 만든 그 인스턴스에 계속 작용한다.
  */
 class ControlledStation(val spec: StationSpec) : AutoCloseable {
 
@@ -311,23 +389,109 @@ class ControlledStation(val spec: StationSpec) : AutoCloseable {
             // 아직 붙지도 부팅하지도 않았으므로 **기다리는 중이 아니다** — 그 상태를 보고
             // 개시를 걸면 CSMS 는 모르는 스테이션을 향해 요청하게 된다.
             progress = SwapProgress.RUNNING
+
+            // 접수도 가드와 **같은 락 안**에서 한다. 밖으로 내면 가드를 통과한 수동 조작이
+            // 이 각본의 rebuild() 뒤로 밀려, 이미 닫힌 시뮬레이터를 붙들고 돌게 된다.
+            worker.execute {
+                try {
+                    val simulator = rebuild(fault)
+                    runBlocking {
+                        simulator.connect()
+                        simulator.boot()
+                        runScenario(simulator, fault)
+                    }
+                    // 거부로 끝난 시나리오(F1)를 완주로 덮어쓰지 않는다.
+                    if (progress != SwapProgress.REJECTED) progress = SwapProgress.COMPLETED
+                } catch (failure: Throwable) {
+                    if (detached) return@execute
+                    error = failure.message ?: failure.toString()
+                    progress = SwapProgress.FAILED
+                }
+            }
+        }
+    }
+
+    /**
+     * 조작 하나를 걸고, 그 **뒤의 모습**을 돌려준다.
+     *
+     * ### 순서를 검사하지 않는다
+     *
+     * `authorize()` 없이 `insertBatteries()` 를 부르는 것이 통해야 한다. 그게 **F5** 이고,
+     * `docs/VIRTUAL-STATION.md` §3 이 적어 둔 그대로다 — `StationSimulator` 의 모든 검사는
+     * 스테이션 안의 **물리적 사실**(슬롯이 비었는가, 연결이 있는가)을 묻지 우리가 부른
+     * 순서를 묻지 않는다. 콘솔이 그 위에 순서 게이트를 새로 만들면 릴레이가 붙어버린 실제
+     * 스테이션이 내는 프레임을 CSMS 에 **영영 보여줄 수 없게** 된다.
+     *
+     * ### 실패를 사실별로 가른다
+     *
+     * - **409** — 각본이 도는 중이다 ([onWorker] 의 가드). 스테이션이 거절한 것이 아니라
+     *   콘솔이 받지 않은 것이다.
+     * - **422** — 시뮬레이터가 거절했다. `IllegalStateException`·`IllegalArgumentException`
+     *   의 메시지를 **손대지 않고** 그대로 싣는다. "빈 슬롯은 충전되지 않는다: 1" 이 이미
+     *   무엇이 왜 안 되는지를 말하고 있는데, 콘솔이 그것을 자기 말로 바꾸면 사실 하나에
+     *   문장이 둘이 된다.
+     * - **502** — 전송이나 CSMS 쪽이 답하지 않았다 (`IOException`). 요청은 성립했는데
+     *   상대가 없는 것이라, 우리 잘못(4xx)으로 적으면 거짓이다.
+     * - **400 / 504** 는 각각 인자 해석([StationOpParams])과 상한([OP_TIMEOUT_MS])의 몫이다.
+     */
+    fun operate(op: StationOp, params: StationOpParams): StationSnapshot {
+        try {
+            onWorker { simulator -> perform(simulator, op, params) }
+        } catch (rejected: IllegalStateException) {
+            throw ControlError(422, rejected.message ?: "스테이션이 조작을 받아들이지 않았다: ${op.wireValue}")
+        } catch (rejected: IllegalArgumentException) {
+            throw ControlError(422, rejected.message ?: "스테이션이 조작을 받아들이지 않았다: ${op.wireValue}")
+        } catch (unreachable: IOException) {
+            throw ControlError(
+                502,
+                "전송이 조작을 실어 나르지 못했다 (${spec.csmsUrl}): ${unreachable.message ?: unreachable.toString()}",
+            )
+        }
+        // 조작의 결과는 새 상태 변수가 아니라 슬롯과 이벤트 꼬리에서 파생돼 보인다.
+        return snapshot()
+    }
+
+    /**
+     * 붙어 있는 그 시뮬레이터 위에서 조작 한 건을 돌리고, 끝날 때까지 기다린다.
+     *
+     * ### [start] 와 세 군데가 다르다
+     *
+     * - **다시 짓지 않는다.** [rebuild] 를 부르지 않으므로 [attach] 가 만든 인스턴스에
+     *   조작이 쌓인다. 클래스 KDoc 의 "수동 조작은 만들지 않는다"가 여기 한 줄이다.
+     * - **기다린다.** 각본은 몇 초씩 걸려 202 로 접수만 하지만, 조작 한 건은 프레임 몇 개다.
+     *   기다려서 **조작 뒤의 스냅샷**을 그대로 돌려주는 편이 호출자에게 정직하다 — 폴링해야
+     *   무엇이 바뀌었는지 알 수 있는 API 는 조종 손잡이가 아니다.
+     * - **진행 상태를 건드리지 않는다.** [SwapProgress] 는 각본의 진행이지 조작의 진행이
+     *   아니다. 조작의 결과는 새 상태 변수가 아니라 슬롯과 이벤트 꼬리에서 파생돼 보인다.
+     *
+     * ### 상한을 넘겨도 취소하지 않는다
+     *
+     * [OP_TIMEOUT_MS] 를 넘기면 504 로 "아직 돌고 있다"를 그대로 답하고 **작업을 끊지
+     * 않는다**. `Future.cancel(true)` 은 작업 스레드를 인터럽트하는데, 그 스레드는 프레임을
+     * 절반쯤 내보낸 채일 수 있다. 그러면 시뮬레이터의 슬롯·트랜잭션·`seqNo` 는 어느 쪽도
+     * 아닌 상태로 남고, 이후의 모든 관측이 거짓이 된다. 응답을 포기하는 것과 스테이션을
+     * 망가뜨리는 것은 다른 일이다.
+     */
+    private fun <T> onWorker(block: suspend (StationSimulator) -> T): T {
+        val pending = synchronized(lock) {
+            if (progress == SwapProgress.RUNNING || progress == SwapProgress.AWAITING_REMOTE_START) {
+                throw ControlError(409, "교환이 진행 중이라 조작을 받지 않는다: ${spec.stationId} ($progress)")
+            }
+            if (detached) throw ControlError(404, "이미 내려간 스테이션이다: ${spec.stationId}")
+            // 락 안에서 집은 그 인스턴스를 작업 스레드까지 들고 간다. 밖에서 다시 읽으면
+            // 그 사이의 rebuild() 가 바꿔치기한 다른 시뮬레이터를 잡게 된다.
+            val simulator = this.simulator
+                ?: throw ControlError(409, "아직 붙지 않은 스테이션이다: ${spec.stationId}")
+            worker.submit(Callable<T> { runBlocking { block(simulator) } })
         }
 
-        worker.execute {
-            try {
-                val simulator = rebuild(fault)
-                runBlocking {
-                    simulator.connect()
-                    simulator.boot()
-                    runScenario(simulator, fault)
-                }
-                // 거부로 끝난 시나리오(F1)를 완주로 덮어쓰지 않는다.
-                if (progress != SwapProgress.REJECTED) progress = SwapProgress.COMPLETED
-            } catch (failure: Throwable) {
-                if (detached) return@execute
-                error = failure.message ?: failure.toString()
-                progress = SwapProgress.FAILED
-            }
+        return try {
+            pending.get(OP_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+        } catch (timeout: TimeoutException) {
+            throw ControlError(504, "조작이 ${OP_TIMEOUT_MS}ms 안에 끝나지 않았다 — 아직 돌고 있다: ${spec.stationId}")
+        } catch (failure: ExecutionException) {
+            // 껍데기를 벗겨 원인을 그대로 올린다. 상태 코드는 원인의 종류가 정한다.
+            throw failure.cause ?: failure
         }
     }
 
@@ -404,6 +568,39 @@ class ControlledStation(val spec: StationSpec) : AutoCloseable {
     }
 
     // ------------------------------------------------------------------ 내부
+
+    /**
+     * `when` 하나가 전부다 — 조작 이름과 시뮬레이터 함수 사이에 아무것도 끼우지 않는다.
+     *
+     * 여기 조건문이 늘어나기 시작하면 콘솔이 스테이션의 두 번째 상태머신이 되고, 그때부터
+     * 화면이 보여주는 것은 실제 스테이션이 아니라 콘솔이 믿는 스테이션이다.
+     */
+    private suspend fun perform(simulator: StationSimulator, op: StationOp, params: StationOpParams) {
+        when (op) {
+            StationOp.CONNECT -> simulator.connect()
+            StationOp.DISCONNECT -> simulator.disconnect()
+            StationOp.RECONNECT -> simulator.reconnect()
+            StationOp.CLOSE -> simulator.close()
+            StationOp.BOOT -> simulator.boot()
+            StationOp.REBOOT -> simulator.reboot()
+            StationOp.INSERT_BATTERIES -> simulator.insertBatteries()
+            StationOp.REMOVE_BATTERIES -> simulator.removeBatteries()
+            StationOp.ADVANCE_CHARGING -> simulator.advanceCharging(
+                slotId = required(params.slotId, "slotId", op),
+                byPercent = required(params.byPercent, "byPercent", op),
+            )
+
+            StationOp.AUTHORIZE -> simulator.authorize()
+            StationOp.REPORT_CHARGING_STARTED -> simulator.reportChargingStarted()
+            StationOp.REPORT_BATTERY_OUT_TIMEOUT -> simulator.reportBatteryOutTimeout()
+            StationOp.RESEND_LAST_BATTERY_SWAP ->
+                simulator.resendLastBatterySwap(required(params.sameMessageId, "sameMessageId", op))
+        }
+    }
+
+    /** 없으면 400 이다 — 아직 아무것도 시키지 않았으므로 스테이션이 거절한 것(422)이 아니다. */
+    private fun <T : Any> required(value: T?, name: String, op: StationOp): T =
+        value ?: throw ControlError(400, "${op.wireValue} 에는 $name 이 필요하다")
 
     private fun rebuild(fault: FaultScenario?): StationSimulator = synchronized(lock) {
         check(!detached) { "이미 내려간 스테이션이다: ${spec.stationId}" }
@@ -538,6 +735,14 @@ class ControlledStation(val spec: StationSpec) : AutoCloseable {
 
         /** CALLRESULT 프레임 `[3,"<id>",{payload}]` 에서 페이로드의 자리. */
         const val RESULT_PAYLOAD_INDEX = 2
+
+        /**
+         * 조작 한 건을 기다려 주는 상한.
+         *
+         * 조작 하나는 프레임 몇 개라 로컬에서 수십 ms 다. 10초를 넘겼다면 느린 것이 아니라
+         * 상대가 답하지 않는 것이고, 그때는 기다리는 대신 그 사실을 답해야 한다.
+         */
+        const val OP_TIMEOUT_MS = 10_000L
 
         /** 사람이 curl 을 치는 데 걸리는 시간을 감안한다. 2분이면 데모에 넉넉하다. */
         const val REMOTE_START_POLLS = 1200

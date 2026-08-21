@@ -259,6 +259,145 @@ class SimConsoleControlTest {
         )
     }
 
+    // ------------------------------------------------------------------ 수동 조작
+
+    /**
+     * ★ **조작은 붙어 있는 그 스테이션에 쌓인다** — 조작마다 시뮬레이터를 다시 짓지 않는다.
+     *
+     * 이것이 각본(`POST .../swap`)과 갈리는 지점이다. 각본은 매번 새로 짓지만 (구성으로
+     * 재현되는 F1·F3 과 "완주한 스테이션은 투입 슬롯이 차 있다"는 두 사정 때문에), 사람이
+     * 버튼을 누르는 것은 **누른 그 스테이션을 움직이는 일**이라 결과가 이어져야 한다.
+     *
+     * 그래서 "이어졌다"를 세 갈래로 확인한다. 다시 지었다면 셋 다 무너진다 —
+     * `messageCount` 는 0 부터 다시 세고, `seq` 는 끊기고, 투입 슬롯은 다시 비어 있다.
+     */
+    @Test
+    fun `조작 두 건이 같은 스테이션에 이어서 쌓인다`() {
+        val stationId = "CS-CONSOLE-OP-CHAIN"
+        val attached = attach(stationId)
+        val afterBoot = attached.path("messageCount").asInt()
+        assertTrue(slot(attached, 1).path("battery").isNull, "투입 슬롯에 이미 배터리가 있다")
+
+        val (authorizeStatus, authorized) = op(stationId, """{"op":"authorize"}""")
+        assertEquals(200, authorizeStatus, "인가가 통하지 않았다: ${authorized.path("error").asText()}")
+        val afterAuthorize = authorized.path("messageCount").asInt()
+        assertTrue(afterAuthorize > afterBoot, "Authorize 가 오갔는데 메시지가 늘지 않았다")
+
+        val (insertStatus, inserted) = op(stationId, """{"op":"insertBatteries"}""")
+        assertEquals(200, insertStatus, "투입이 통하지 않았다: ${inserted.path("error").asText()}")
+
+        // (1) 앞선 조작 위에 이어 셌다.
+        assertTrue(
+            inserted.path("messageCount").asInt() > afterAuthorize,
+            "투입 뒤에도 메시지 수가 인가 시점 그대로다 — 시뮬레이터가 다시 지어졌다",
+        )
+
+        // (2) 오간 프레임의 일련번호가 끊기지 않았다.
+        val sequences = inserted.path("events").map { it.path("seq").asLong() }
+        assertEquals(sequences.sortedDescending(), sequences, "최신이 앞이 아니다")
+        assertEquals(
+            (sequences.first() downTo sequences.last()).toList(),
+            sequences,
+            "이벤트 일련번호가 끊겼다 — 로그가 갈아 끼워졌다",
+        )
+
+        // (3) 투입한 배터리가 그 슬롯에 남아 있다. 다시 지었다면 빈 슬롯으로 돌아간다.
+        assertEquals("BAT-USED-1", slot(inserted, 1).path("battery").path("serialNumber").asText())
+        assertEquals("BAT-USED-2", slot(inserted, 2).path("battery").path("serialNumber").asText())
+
+        // 각본이 도는 중이 아니므로 진행 상태는 붙었을 때 그대로다 — 조작은 각본이 아니다.
+        assertEquals("ATTACHED", inserted.path("progress").asText())
+    }
+
+    /**
+     * ★ **콘솔은 순서를 막지 않는다** — `authorize()` 없는 `insertBatteries()` 가 통한다.
+     *
+     * 그게 F5 다 (docs/VIRTUAL-STATION.md §3). 시뮬레이터의 모든 검사는 스테이션 안의
+     * **물리적 사실**을 묻지 우리가 부른 순서를 묻지 않고, 콘솔이 그 위에 순서 게이트를
+     * 새로 만들면 릴레이가 붙어버린 실제 스테이션이 내는 프레임을 CSMS 에 보여줄 길이
+     * 없어진다. 막는 대신 보내고, 판정은 CSMS 가 한다.
+     */
+    @Test
+    fun `인가 없이 투입해도 콘솔이 막지 않는다`() {
+        val stationId = "CS-CONSOLE-OP-F5"
+        attach(stationId)
+
+        val (status, inserted) = op(stationId, """{"op":"insertBatteries"}""")
+
+        assertEquals(200, status, "콘솔이 순서를 막았다: ${inserted.path("error").asText()}")
+        assertEquals("BAT-USED-1", slot(inserted, 1).path("battery").path("serialNumber").asText())
+    }
+
+    /**
+     * ★ **각본이 도는 중에는 조작을 받지 않는다.**
+     *
+     * F1 은 CSMS 의 개시를 기다리며 `AWAITING_REMOTE_START` 에 머문다. 그 위로 수동 조작이
+     * 끼어들면 같은 시뮬레이터에 두 손이 얹히고, 그때 화면이 보여주는 상태는 어느 쪽의
+     * 결과도 아니게 된다. 거절하는 것은 스테이션이 아니라 **콘솔**이므로 422 가 아니라 409 다.
+     */
+    @Test
+    fun `각본이 도는 중에 조작하면 409 로 답한다`() {
+        val stationId = "CS-CONSOLE-OP-BUSY"
+        attach(stationId)
+
+        post("/api/stations/$stationId/swap", """{"fault":"F1"}""")
+        awaitProgress(stationId, "AWAITING_REMOTE_START")
+
+        val (status, body) = op(stationId, """{"op":"authorize"}""")
+
+        assertEquals(409, status, "각본 중인데 조작이 통했다")
+        assertContains(body.path("error").asText(), "AWAITING_REMOTE_START")
+    }
+
+    /**
+     * ★ **스테이션이 거절한 조작은 422 이고, 사유는 스테이션의 말 그대로다.**
+     *
+     * 투입 슬롯은 붙은 직후 비어 있다. 거기에 충전을 걸면 `advanceCharging()` 의
+     * `checkNotNull` 이 걸리고, 그 메시지가 이미 무엇이 왜 안 되는지를 말하고 있다. 콘솔이
+     * 그것을 자기 말로 바꾸면 사실 하나에 문장이 둘이 된다.
+     *
+     * 400 이 아닌 이유: 요청은 성립했다. 슬롯 1은 있는 슬롯이고 5% 는 온전한 값이다.
+     * 성립하지 않는 것은 **지금 이 스테이션의 사정**이라 그 구분이 상태 코드에 남아야 한다.
+     */
+    @Test
+    fun `빈 슬롯을 충전하려 하면 422 와 스테이션의 사유가 온다`() {
+        val stationId = "CS-CONSOLE-OP-EMPTY"
+        attach(stationId)
+
+        val (status, body) = op(stationId, """{"op":"advanceCharging","slotId":1,"byPercent":5}""")
+
+        assertEquals(422, status, "빈 슬롯 충전이 거절되지 않았다")
+        assertContains(body.path("error").asText(), "빈 슬롯은 충전되지 않는다")
+    }
+
+    /** 인자가 빠진 조작은 아직 스테이션에 닿지도 않았다 — 400 이지 422 가 아니다. */
+    @Test
+    fun `인자가 빠진 조작은 400 으로 되묻는다`() {
+        val stationId = "CS-CONSOLE-OP-ARGS"
+        attach(stationId)
+
+        val (status, body) = op(stationId, """{"op":"advanceCharging","slotId":1}""")
+
+        assertEquals(400, status)
+        assertContains(body.path("error").asText(), "byPercent")
+    }
+
+    @Test
+    fun `모르는 조작과 없는 스테이션이 갈린다`() {
+        val stationId = "CS-CONSOLE-OP-UNKNOWN"
+        attach(stationId)
+
+        val (unknown, unknownBody) = op(stationId, """{"op":"selfDestruct"}""")
+        assertEquals(400, unknown)
+        assertContains(unknownBody.path("error").asText(), "selfDestruct")
+        // 무엇을 부를 수 있는지가 응답에 실린다 — 문서를 찾아가지 않아도 다음 수가 보인다.
+        assertContains(unknownBody.path("error").asText(), "insertBatteries")
+
+        val (missing, missingBody) = op("CS-NOT-THERE", """{"op":"authorize"}""")
+        assertEquals(404, missing)
+        assertContains(missingBody.path("error").asText(), "CS-NOT-THERE")
+    }
+
     // ------------------------------------------------------------------ 오류 처리
 
     @Test
@@ -340,6 +479,10 @@ class SimConsoleControlTest {
         }
         throw AssertionError("$stationId 가 $expected 에 이르지 못했다: ${state().toPrettyString()}")
     }
+
+    /** 조작 한 건. 각본과 달리 응답이 곧 결과라 폴링할 것이 없다. */
+    private fun op(stationId: String, body: String): Pair<Int, JsonNode> =
+        post("/api/stations/$stationId/op", body)
 
     private fun state(): JsonNode = MAPPER.readTree(
         http.send(

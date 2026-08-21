@@ -82,6 +82,13 @@ class SimConsoleServer(
      * - `POST   /api/stations`            붙인다. 이미 있는 `stationId` 면 409
      * - `DELETE /api/stations/{id}`       내린다. 없으면 404
      * - `POST   /api/stations/{id}/swap`  교환을 시작한다. 본문의 `fault` 로 F1~F6 을 건다
+     * - `POST   /api/stations/{id}/op`    조작 하나를 건다. 본문의 `op` 로 고른다 ([StationOp])
+     *
+     * ### `swap` 은 202 인데 `op` 는 200 이다
+     *
+     * 교환 한 건은 몇 초짜리 각본이라 접수만 하고 돌아간다 — 붙들고 있으면 화면이 멈춘다.
+     * 조작 하나는 프레임 몇 개라 끝까지 기다렸다가 **그 뒤의 스냅샷**을 그대로 싣는다.
+     * 상태 코드가 다른 것은 두 요청이 실제로 다른 약속을 하기 때문이다.
      */
     private fun stationRoute(exchange: HttpExchange): Reply {
         val segments = exchange.requestURI.path
@@ -103,6 +110,13 @@ class SimConsoleServer(
                 val station = stations.find(segments[0])
                 station.start(faultOf(body(exchange)))
                 Reply(202, snapshotOf(station.snapshot()))
+            }
+
+            segments.size == 2 && segments[1] == "op" && exchange.requestMethod == "POST" -> {
+                // 없는 스테이션은 여기서 404 로 갈린다. 본문을 읽기도 전이다.
+                val station = stations.find(segments[0])
+                val body = body(exchange)
+                Reply(200, snapshotOf(station.operate(opOf(body), paramsOf(body))))
             }
 
             else -> throw ControlError(405, "다루지 않는 요청이다: ${exchange.requestMethod} ${exchange.requestURI.path}")
@@ -245,6 +259,29 @@ class SimConsoleServer(
         return FaultScenario.entries.firstOrNull { it.name.equals(value, ignoreCase = true) }
             ?: throw ControlError(400, "모르는 장애 시나리오다: $value (F1~F6)")
     }
+
+    private fun opOf(body: JsonNode): StationOp {
+        val value = body.path("op").asText("")
+        if (value.isBlank()) throw ControlError(400, "op 을 적어야 한다")
+        return StationOp.entries.firstOrNull { it.wireValue.equals(value, ignoreCase = true) || it.name == value }
+            ?: throw ControlError(
+                400,
+                "모르는 조작이다: $value (${StationOp.entries.joinToString { it.wireValue }})",
+            )
+    }
+
+    /**
+     * 인자는 **적힌 것만** 읽는다.
+     *
+     * 없는 값을 `0` 이나 `false` 로 채우지 않는다 — `asInt()` 의 기본값을 쓰면 `slotId` 를
+     * 빠뜨린 요청이 "0번 슬롯" 요청이 되어 400 대신 422 로 돌아온다. 빠진 것은 빠진 것으로
+     * 넘겨 [ControlledStation.operate] 가 400 으로 되묻게 한다.
+     */
+    private fun paramsOf(body: JsonNode) = StationOpParams(
+        slotId = body.path("slotId").takeIf { it.isNumber }?.asInt(),
+        byPercent = body.path("byPercent").takeIf { it.isNumber }?.asDouble(),
+        sameMessageId = body.path("sameMessageId").takeIf { it.isBoolean }?.asBoolean(),
+    )
 
     private fun snapshotOf(snapshot: StationSnapshot): ObjectNode {
         val slots = array()
