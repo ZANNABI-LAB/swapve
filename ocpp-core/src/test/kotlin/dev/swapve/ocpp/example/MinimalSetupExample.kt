@@ -33,7 +33,17 @@ import kotlin.test.assertTrue
  * 세션 하나를 열기까지 소비자가 **직접 만들어 수명을 관리해야 하는 것이 다섯**이다 —
  * `ledger` · `serializer` · `eventSink` · `validator` · `clock`. 그런데 그중 넷은 정답이
  * 사실상 하나뿐이다: 원장과 직렬화기는 스테이션 단위로, 검증기와 코덱은 전역으로 공유한다.
- * 아래 "공유물" 절이 그 여덟 줄이고, 팩토리가 걷어낼 자리도 정확히 거기다.
+ *
+ * [dev.swapve.ocpp.session.OcppSessions] 가 그 넷을 들고 있으므로, 같은 일이 이렇게 줄어든다:
+ *
+ * ```
+ * val sessions = OcppSessions(clock, eventSink = myEventLog)
+ * val session = sessions.open(stationId, transmit = { ws.send(it) }, onCall = ::handle)
+ * ```
+ *
+ * **이 예제는 일부러 손으로 조립한 쪽을 남겨 둔다.** 팩토리가 감추는 것이 무엇인지 보여
+ * 주기 위해서이고, 세밀한 제어가 필요한 소비자에게 그 길이 여전히 열려 있음을 확인하기
+ * 위해서다. 팩토리 쪽 성질은 `OcppSessionsTest` 가 따로 검증한다.
  */
 class MinimalSetupExample {
 
