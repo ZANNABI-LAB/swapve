@@ -44,7 +44,18 @@
 > code would make a derivative. You gain a validator that cannot drift from the standard; you pay
 > for it by reading and building fields by hand.
 
-**Not yet published to Maven Central.** For now you build from source — see [docs/PUBLISHING.md](docs/PUBLISHING.md).
+**On Maven Central.** Take either module on its own.
+
+```kotlin
+dependencies {
+    implementation("io.github.zannabi-lab:ocpp-core:0.1.0")   // codec · schema validation · session
+    implementation("io.github.zannabi-lab:swap-domain:0.1.0") // the swap state machine, zero dependencies
+}
+```
+
+<sub>Changes between versions are in [CHANGELOG.md](CHANGELOG.md). While the major version is `0`
+the public API may still change between minor versions — no consumer outside this repository has
+tested its shape yet.</sub>
 
 ## Quick start
 
@@ -263,9 +274,8 @@ why the metrics avoid Micrometer) is in **[docs/API.md](docs/API.md)**.
 | [docs/CONFORMANCE.md](docs/CONFORMANCE.md) | Conformance cases · success criteria S1–S7 · audit output |
 | [docs/PUBLISHING.md](docs/PUBLISHING.md) | How releases reach Maven Central — and the rehearsal that must pass first |
 
-> ⚠️ **The documents under `docs/` are currently written in Korean.** The code, identifiers, and
-> commit messages that matter for reading the source are language-neutral; translating the deep-dive
-> docs is still open.
+> The documents under `docs/` are **English only**, deliberately — keeping 1,100 lines in two
+> languages guarantees they drift apart. This README is the one page kept in both.
 
 ## How this is built
 

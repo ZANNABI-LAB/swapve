@@ -43,7 +43,18 @@
 > 결과입니다 — OCA 스키마는 CC BY-ND 4.0 이라 코드로 옮기면 파생물이 됩니다. 표준과 어긋날 수
 > 없는 검증기를 얻는 대신, 필드를 손으로 읽고 쌓는 값을 치릅니다.
 
-**아직 Maven Central 에 배포되지 않았습니다.** 지금은 소스로 씁니다 — [docs/PUBLISHING.md](docs/PUBLISHING.md) 를 보세요.
+**Maven Central 에 있습니다.** 둘 중 필요한 것만 가져가면 됩니다.
+
+```kotlin
+dependencies {
+    implementation("io.github.zannabi-lab:ocpp-core:0.1.0")   // 코덱 · 스키마 검증 · 세션
+    implementation("io.github.zannabi-lab:swap-domain:0.1.0") // 교환 상태머신, 의존성 0
+}
+```
+
+<sub>판 사이의 변경은 [CHANGELOG.md](CHANGELOG.md) 에 있습니다. 주 버전이 `0` 인 동안에는
+부 버전 사이에도 공개 API 가 바뀔 수 있습니다 — 이 저장소 밖의 소비자가 그 모양을 아직
+시험해 보지 않았기 때문입니다.</sub>
 
 ## 빠른 시작
 
@@ -250,6 +261,9 @@ battery swap **via a smartphone app, e.g. by scanning a QR code**"*. 즉
 | [docs/CONFIGURATION.md](docs/CONFIGURATION.md) | 스테이션 인증 · REST 인증 · TLS |
 | [docs/CONFORMANCE.md](docs/CONFORMANCE.md) | 적합성 케이스 · 성공 기준 S1~S7 · 감사 출력 |
 | [docs/PUBLISHING.md](docs/PUBLISHING.md) | Maven Central 배포 절차와 그 앞에 두는 리허설 |
+
+> `docs/` 의 문서는 **영문 단일본**입니다. 1,100줄을 두 언어로 유지하면 반드시 어긋나기
+> 때문에 일부러 그렇게 두었습니다. 두 언어로 유지하는 것은 이 README 한 장입니다.
 
 ## 개발 방식
 
