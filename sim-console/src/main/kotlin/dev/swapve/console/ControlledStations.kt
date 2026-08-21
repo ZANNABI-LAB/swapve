@@ -15,6 +15,7 @@ import dev.swapve.station.SwapOrder
 import dev.swapve.swap.IdToken
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
+import java.time.Instant
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -150,15 +151,47 @@ data class StationSpec(
     }
 }
 
-/** 슬롯 하나가 화면에 보이는 모습. 값을 모르면 `null` 이다 — 그럴듯한 기본값을 만들지 않는다. */
+/**
+ * 슬롯 하나가 화면에 보이는 모습. 값을 모르면 `null` 이다 — 그럴듯한 기본값을 만들지 않는다.
+ *
+ * @param chargingSuspended 충전이 상한에 닿아 멈췄는가. [chargingTransactionId] 와 **함께**
+ *   봐야 뜻이 선다 — 상한 도달은 트랜잭션을 닫지 않으므로 (`Updated(EnergyLimitReached,
+ *   SuspendedEVSE)`), 멈춘 것은 트랜잭션이 아니라 에너지 흐름이다. 트랜잭션 번호만 보면
+ *   둘을 가릴 수 없다.
+ */
 data class SlotSnapshot(
     val slotId: Int,
     val role: String,
     val battery: SimBattery?,
     val chargingTransactionId: String?,
+    val chargingSuspended: Boolean,
 )
 
-/** 스테이션 한 대의 현재 모습. `GET /api/state` 가 이것을 그대로 싣는다. */
+/**
+ * 오간 프레임 한 건의 머리말.
+ *
+ * ### 페이로드를 싣지 않는다
+ *
+ * `OcppEventRecord.payload` 는 프레임 **한 줄 전체**라 수 KB 에 이른다. 그것을 스냅샷에
+ * 실으면 상태 조회 한 번이 로그 덤프가 되고, 화면은 그것을 매초 다시 받는다. 여기 있는
+ * 것은 "무엇이 언제 어느 방향으로 지나갔는가"뿐이다 — 내용을 봐야 한다면 그건 CSMS 의
+ * 이벤트 로그 API 가 할 일이다.
+ */
+data class StationEvent(
+    val seq: Long,
+    val direction: String,
+    val action: String?,
+    val messageId: String,
+    val occurredAt: Instant,
+)
+
+/**
+ * 스테이션 한 대의 현재 모습. `GET /api/state` 가 이것을 그대로 싣는다.
+ *
+ * @param subprotocol 협상된 서브프로토콜 (`ocpp2.1`). 붙어 있지 않으면 `null` 이다.
+ * @param events 최근 프레임의 꼬리 — **최신이 앞**이다. [messageCount] 가 전체 수고
+ *   이쪽은 그중 마지막 [StationSnapshot.EVENT_TAIL] 건이다.
+ */
 data class StationSnapshot(
     val stationId: String,
     val csmsUrl: String,
@@ -173,7 +206,20 @@ data class StationSnapshot(
     val requestId: Int?,
     val messageCount: Int,
     val slots: List<SlotSnapshot>,
-)
+    val subprotocol: String?,
+    val events: List<StationEvent>,
+) {
+    companion object {
+        /**
+         * 되싣는 프레임의 수.
+         *
+         * 교환 한 건의 **마지막 단계**(반출·트랜잭션 종료·상태 통보)가 요청/응답 쌍으로
+         * 모두 들어오는 최소치다. 더 줄이면 무엇으로 끝났는지가 잘리고, 더 늘리면 부팅
+         * 시퀀스 전체가 매 조회마다 따라온다.
+         */
+        const val EVENT_TAIL = 20
+    }
+}
 
 /**
  * 조종당하는 스테이션 한 대.
@@ -296,6 +342,20 @@ class ControlledStation(val spec: StationSpec) : AutoCloseable {
 
     // ------------------------------------------------------------------ 관측
 
+    /**
+     * 지금 이 순간의 모습. 전부 시뮬레이터에게 물어 만든다.
+     *
+     * 두 자리가 시뮬레이터의 값을 그대로 옮기지 못한다.
+     *
+     * - `subprotocol` 은 연결이 있어야 답할 수 있다 — 없으면 `StationSimulator` 가 예외를
+     *   던진다. 관측이 상태를 무너뜨려서는 안 되므로 `isConnected` 로 갈라 `null` 로 둔다.
+     *   붙지 않은 스테이션의 협상 결과를 아는 척하는 것보다 모른다고 답하는 편이 맞다.
+     * - `chargingSuspended` 는 시뮬레이터가 없으면 `false` 다. 급전 자체가 없는 것이지
+     *   멈춰 있는 것이 아니다.
+     *
+     * `events` 는 새 상태 없이 이벤트 로그에서만 파생한다 — 콘솔이 사본을 들면 언젠가
+     * 어긋난다.
+     */
     fun snapshot(): StationSnapshot {
         val simulator = this.simulator
         val config = simulator?.config
@@ -324,8 +384,22 @@ class ControlledStation(val spec: StationSpec) : AutoCloseable {
                     // 시뮬레이터가 지금 들고 있는 값이다. 구성의 초기값이 아니다.
                     battery = simulator?.batteryAt(slot.slotId),
                     chargingTransactionId = simulator?.chargingTransactionAt(slot.slotId),
+                    chargingSuspended = simulator?.isChargingSuspended(slot.slotId) == true,
                 )
             },
+            subprotocol = simulator?.takeIf { it.isConnected }?.subprotocol,
+            events = simulator?.eventLog?.of(spec.stationId).orEmpty()
+                .takeLast(StationSnapshot.EVENT_TAIL)
+                .asReversed()
+                .map {
+                    StationEvent(
+                        seq = it.seq,
+                        direction = it.direction.name,
+                        action = it.action,
+                        messageId = it.messageId,
+                        occurredAt = it.occurredAt,
+                    )
+                },
         )
     }
 

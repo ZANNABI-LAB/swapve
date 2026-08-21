@@ -255,6 +255,7 @@ class SimConsoleServer(
                     .put("slotId", slot.slotId)
                     .put("role", slot.role)
                     .put("chargingTransactionId", slot.chargingTransactionId)
+                    .put("chargingSuspended", slot.chargingSuspended)
                     // 빈 슬롯은 빈 슬롯이다. 없는 배터리를 그럴듯하게 채우지 않는다.
                     .set<ObjectNode>(
                         "battery",
@@ -267,6 +268,18 @@ class SimConsoleServer(
                                 .put("soH", battery.soH)
                         },
                     ),
+            )
+        }
+
+        val events = array()
+        snapshot.events.forEach { event ->
+            events.add(
+                node()
+                    .put("seq", event.seq)
+                    .put("direction", event.direction)
+                    .put("action", event.action)
+                    .put("messageId", event.messageId)
+                    .put("occurredAt", event.occurredAt.toString()),
             )
         }
 
@@ -284,7 +297,9 @@ class SimConsoleServer(
             .put("error", snapshot.error)
             .put("requestId", snapshot.requestId)
             .put("messageCount", snapshot.messageCount)
+            .put("subprotocol", snapshot.subprotocol)
             .set<ObjectNode>("slots", slots)
+            .set<ObjectNode>("events", events)
     }
 
     private fun node(): ObjectNode = JsonNodeFactory.instance.objectNode()

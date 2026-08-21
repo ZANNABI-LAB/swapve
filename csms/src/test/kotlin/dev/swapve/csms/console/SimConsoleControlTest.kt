@@ -2,8 +2,11 @@ package dev.swapve.csms.console
 
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
+import dev.swapve.console.ControlledStation
 import dev.swapve.console.ControlledStations
 import dev.swapve.console.SimConsoleServer
+import dev.swapve.console.StationSnapshot
+import dev.swapve.console.StationSpec
 import dev.swapve.csms.support.FixedClockConfig
 import dev.swapve.csms.swap.RemoteSwapStart
 import dev.swapve.csms.swap.RemoteSwapStarter
@@ -28,6 +31,7 @@ import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
@@ -88,6 +92,11 @@ class SimConsoleControlTest {
      * 완주 판정을 콘솔의 말만 듣고 하지 않는다. CSMS 의 장부에서 같은 교환이
      * [SwapTransaction.Completed] 인지 교차 확인한다 — 콘솔이 "끝났다"고 말하는 것과
      * 관제 서버의 장부가 맞는 것은 다른 일이다.
+     *
+     * 슬롯의 `chargingSuspended` 도 여기서 함께 본다. 콘솔 경로는 `MaxSoc` 기본값(100)을
+     * 쓰므로 상한에 닿을 일이 없다 — 확인하는 것은 **필드가 실리고 `false` 라는 것**이다.
+     * 상한 도달 자체를 만들려면 `chargeUntilMaxSoc` 를 여는 새 제어면이 필요하고, 그건 이
+     * 콘솔이 하는 일이 아니다.
      */
     @Test
     fun `제어 API 로 붙인 스테이션이 교환 1건을 완주한다`() {
@@ -115,6 +124,76 @@ class SimConsoleControlTest {
         assertEquals("BAT-USED-1", slot(completed, 1).path("battery").path("serialNumber").asText())
         assertTrue(slot(completed, 3).path("battery").isNull, "내준 배터리가 슬롯에 남아 있다")
         assertTrue(completed.path("messageCount").asInt() > 0, "오간 메시지가 없다")
+
+        assertTrue(slot(completed, 1).has("chargingSuspended"), "슬롯에 충전 정지 여부가 없다")
+        assertTrue(
+            completed.path("slots").none { it.path("chargingSuspended").asBoolean() },
+            "상한에 닿지 않았는데 충전이 멈춘 슬롯이 있다",
+        )
+    }
+
+    // ------------------------------------------------------------------ 연결과 이력
+
+    /**
+     * **붙지 않은 스테이션은 서브프로토콜을 아는 척하지 않는다.**
+     *
+     * 이 상태는 REST 로는 관측되지 않는다 — `ControlledStations.attach` 는 연결에 실패하면
+     * 등록을 되돌리므로 `GET /api/state` 에 미연결 스테이션이 실릴 자리가 없다. 그래도 파생
+     * 규칙 자체는 성립해야 하므로 (`subprotocol` 은 연결이 없으면 예외를 던진다) 여기서는
+     * 콘솔의 스테이션을 직접 지어 스냅샷을 읽는다.
+     */
+    @Test
+    fun `붙지 않은 스테이션은 서브프로토콜을 아는 척하지 않는다`() {
+        ControlledStation(StationSpec(csmsUrl = "ws://localhost:$port/ocpp", stationId = "CS-NEVER-ATTACHED")).use {
+            val snapshot = it.snapshot()
+
+            assertEquals(false, snapshot.connected)
+            assertNull(snapshot.subprotocol, "붙지도 않았는데 협상 결과를 알고 있다")
+            assertTrue(snapshot.events.isEmpty(), "오간 것이 없는데 이력이 있다")
+        }
+    }
+
+    /** 붙었다면 협상 결과가 남는다 — OCPP 2.1 이 아니면 그 위의 모든 것이 무의미하다 (Part 4 §3.1.2). */
+    @Test
+    fun `붙은 스테이션은 ocpp2_1 로 협상돼 있다`() {
+        val attached = attach("CS-CONSOLE-PROTO")
+
+        assertTrue(attached.path("connected").asBoolean(), "붙었다는데 연결이 없다")
+        assertEquals("ocpp2.1", attached.path("subprotocol").asText())
+    }
+
+    /**
+     * ★ **이벤트 꼬리가 최신 것부터 상한까지만 실린다.**
+     *
+     * 스냅샷은 로그 덤프가 아니다. 되싣는 것은 마지막 [StationSnapshot.EVENT_TAIL] 건이고,
+     * **페이로드는 빠진다** — 프레임 한 줄이 수 KB 라 매초 폴링하는 화면이 그것을 감당하지
+     * 못한다. 교환 1건이면 부팅만으로도 상한을 채우고 남으므로, 넘치지 않는다는 것이
+     * 여기서 실제로 걸린다.
+     */
+    @Test
+    fun `이벤트 꼬리가 최신 것부터 상한까지만 실린다`() {
+        val stationId = "CS-CONSOLE-EVENTS"
+        attach(stationId)
+        post("/api/stations/$stationId/swap", "{}")
+
+        val completed = awaitProgress(stationId, "COMPLETED")
+        val events = completed.path("events")
+
+        assertEquals(StationSnapshot.EVENT_TAIL, events.size(), "이벤트 꼬리가 상한과 다르다")
+        assertTrue(
+            completed.path("messageCount").asInt() >= events.size(),
+            "전체 수보다 꼬리가 길다",
+        )
+
+        val sequences = events.map { it.path("seq").asLong() }
+        assertEquals(sequences.sortedDescending(), sequences, "최신이 앞이 아니다")
+
+        events.forEach { event ->
+            assertTrue(event.path("messageId").asText().isNotBlank(), "messageId 가 비어 있다: $event")
+            assertContains(listOf("INBOUND", "OUTBOUND"), event.path("direction").asText())
+            assertTrue(event.has("occurredAt"), "발생 시각이 없다: $event")
+            assertTrue(!event.has("payload"), "스냅샷에 프레임 본문이 실렸다: $event")
+        }
     }
 
     // ------------------------------------------------------------------ 장애 주입
