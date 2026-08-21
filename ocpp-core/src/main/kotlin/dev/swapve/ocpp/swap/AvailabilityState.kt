@@ -47,8 +47,19 @@ enum class AvailabilityState(val wireValue: String) {
 
     companion object {
 
-        /** Reads the value off the wire. `null` for anything outside the table — the caller records it rather than dropping it. */
-        fun parse(wireValue: String): AvailabilityState? = entries.firstOrNull { it.wireValue == wireValue }
+        /**
+         * Reads the value off the wire, **ignoring case**. `null` for anything outside the
+         * table — the caller records it rather than dropping it.
+         *
+         * Case is ignored because this value does not arrive as an enum. It travels in
+         * `NotifyEvent.actualValue`, which the schema types as a plain
+         * `string` of up to 2500 characters, so a station reporting `"occupied"` passes
+         * validation just as well. Refusing that spelling would leave the slot state unknown and
+         * a battery unaccounted for. What we *send* stays canonical — [wireOf] settles that —
+         * which is the same split [DeviceModelVariables] makes for variable names.
+         */
+        fun parse(wireValue: String): AvailabilityState? =
+            entries.firstOrNull { it.wireValue.equals(wireValue, ignoreCase = true) }
 
         /**
          * Holding a battery → the value on the wire. **A battery in the slot is [OCCUPIED].**

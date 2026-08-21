@@ -29,6 +29,24 @@ class AvailabilityStateTest {
     }
 
     @Test
+    fun `대소문자가 달라도 읽는다`() {
+        // actualValue 는 enum 이 아니라 자유 문자열(maxLength 2500)이라, 스테이션이 어떤
+        // 철자로 보내든 스키마 검증을 통과한다. 읽지 못하면 슬롯 상태가 "모름"이 되고
+        // 배터리가 장부에서 빠진다.
+        assertEquals(true, AvailabilityState.holdsBattery("occupied"))
+        assertEquals(true, AvailabilityState.holdsBattery("OCCUPIED"))
+        assertEquals(false, AvailabilityState.holdsBattery("available"))
+        assertEquals(AvailabilityState.UNAVAILABLE, AvailabilityState.parse("UNAVAILABLE"))
+    }
+
+    @Test
+    fun `내보내는 철자는 정본 그대로다`() {
+        // 관대한 것은 받을 때뿐이다. 우리가 만드는 값은 흔들리지 않는다.
+        assertEquals("Occupied", AvailabilityState.wireOf(holdsBattery = true))
+        assertEquals("Available", AvailabilityState.wireOf(holdsBattery = false))
+    }
+
+    @Test
     fun `배터리를 넣으면 Occupied 를 보고한다`() {
         assertEquals("Occupied", AvailabilityState.wireOf(holdsBattery = true))
         assertEquals("Available", AvailabilityState.wireOf(holdsBattery = false))
