@@ -66,8 +66,8 @@ OCPP 2.1 Part 6는 **시험 대상이 CSMS인** Battery Swap 테스트 케이스
 > `EVConnectedPreSessionBatterySwapping` · `EnergyTransferStartedBatterySwapping` ·
 > `EVDisconnectedBatterySwapping` 다섯 재사용 상태를 그대로 연기합니다.
 >
-> **OCTT 공식 인증은 받지 않았습니다** — 유료이고 OCA 승인 시험소를 거쳐야 합니다
-> (B17). 여기 있는 것은 Part 6 케이스의 **자체 구현**입니다.
+> **OCTT 공식 인증은 받지 않았습니다** — 유료이고 OCA 승인 시험소를 거쳐야 합니다.
+> 여기 있는 것은 Part 6 케이스의 **자체 구현**입니다.
 
 ### OCPP-J 전송 계층 (Part 4 Edition 2 §3)
 
@@ -90,6 +90,6 @@ OCPP 2.1 Part 6는 **시험 대상이 CSMS인** Battery Swap 테스트 케이스
 **§3.1.1 이중 확인에 대한 기록.** 스펙은 연결 URL만으로 스테이션을 식별하지 말라고 권고합니다.
 현재 기본 구현은 Basic 인증의 username 과 경로 stationId 를 대조하고, 성공한 등록에는
 `StationPrincipal.authMethod = BASIC` 이 남습니다. 로컬 실험용 `NONE` 프로파일도 같은 타입에
-`authMethod = NONE` 으로 남습니다 (보안 프로파일).
+`authMethod = NONE` 으로 남습니다 (설정 방법은 [CONFIGURATION.md](CONFIGURATION.md)).
 인증서 발급·CSR·키 저장소는 범위 밖입니다.
 

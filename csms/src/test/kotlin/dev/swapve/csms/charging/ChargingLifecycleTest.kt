@@ -26,7 +26,7 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
- * ★ **S04 충전 트랜잭션의 생명주기** (확정 결정 결정 #8 — 수신·기록만).
+ * ★ **S04 충전 트랜잭션의 생명주기** (확정된 범위 결정 — 수신·기록만).
  *
  * 다섯 계기가 순서대로 일어나고, CSMS 가 그것을 기록한다:
  *

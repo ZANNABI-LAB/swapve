@@ -194,7 +194,7 @@ class FailureScenarioTest {
 
     /**
      * **F3 — 미등록 배터리.** CSMS 가 `BatterySwapResponse.customData` 로
-     * `Rejected` / `BatteryUnknown` 을 알린다 (확정 결정 결정 #7).
+     * `Rejected` / `BatteryUnknown` 을 알린다 (확정된 범위 결정).
      *
      * ### 이 시험이 확인하는 두 가지
      *

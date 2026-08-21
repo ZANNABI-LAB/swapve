@@ -32,7 +32,7 @@ import org.springframework.web.bind.annotation.RestController
  * ### 쓰기가 없다
  *
  * 충전 트랜잭션은 스테이션이 만드는 사실이지 CSMS 가 지시하는 것이 아니다. 스마트차징도
- * 요금도 범위 밖이다 (확정 결정 결정 #8). 그래서 이 컨트롤러에는 `POST` 도 `PATCH` 도 없다.
+ * 요금도 범위 밖이다 (확정된 범위 결정). 그래서 이 컨트롤러에는 `POST` 도 `PATCH` 도 없다.
  *
  * ### REST Basic 경계를 지난다
  *

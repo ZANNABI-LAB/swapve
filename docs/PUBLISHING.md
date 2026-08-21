@@ -1,4 +1,4 @@
-# Maven Central 배포 절차 (공개 로드맵 6단계 · B07)
+# Maven Central 배포 절차
 
 > ⚠️ **Central 은 한 번 올린 버전을 지울 수 없다.** 그래서 이 문서의 절반이 리허설이다.
 > 배포 자체는 마지막 두 줄이다.
@@ -162,4 +162,4 @@ dependencies {
 
 - `README.md` 의 *"Not yet published to Maven Central"* 문장을 의존성 좌표로 바꾼다
   (한글판 `README.ko.md` 도 같이)
-- B07 을 완료로 옮긴다
+
