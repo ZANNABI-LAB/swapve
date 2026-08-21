@@ -107,7 +107,6 @@ class OcppSession(
                 throw e
             }
 
-            // 가상 시간에서도 그대로 동작한다 — 테스트가 실제로 기다리지 않는 지점이다.
             val result = withTimeoutOrNull(callTimeout) { waiter.response.await() }
             pending.remove(messageId)
             result ?: OcppResult.TimedOut(messageId)
