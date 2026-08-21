@@ -8,6 +8,7 @@ import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
@@ -198,4 +199,49 @@ class OcppSessionInboundTest {
     private fun periodicEventStreamPayload() = obj(
         """{"id": 1, "pending": 0, "basetime": "2026-08-14T09:00:00Z", "data": [{"t": 0, "v": "23"}]}""",
     )
+    /**
+     * ★ **닫힌 세션은 반쪽만 죽지 않는다.**
+     *
+     * `closed` 를 발신 쪽만 보던 때가 있었다. 그러면 세션을 닫은 뒤 전송만 다시 열었을 때
+     * **상대의 요청에는 계속 답하면서 자기는 아무것도 못 보내는** 상대가 만들어진다. 실물
+     * 스테이션에도 실물 CSMS 에도 없는 상태이고, 그런 물건을 만들 수 있는 시험 도구는
+     * 언젠가 그 상태를 정상으로 착각하게 만든다.
+     *
+     * 세션 하나는 연결 하나의 것이다. 상대가 돌아오면 새로 열어야지, 이 객체 밑에 새 전송을
+     * 끼우는 것이 아니다.
+     */
+    @Test
+    fun `닫힌 세션은 인바운드 CALL 에 답하지 않는다`() = runTest {
+        val connection = TestConnection()
+
+        connection.session.receive(callText("m1", "BatterySwap", batterySwapPayload(1, "BatteryIn")))
+        advanceUntilIdle()
+        assertEquals(1, connection.sent.size, "열린 세션이 답하지 않았다")
+
+        connection.session.close()
+        connection.session.receive(callText("m2", "BatterySwap", batterySwapPayload(2, "BatteryIn")))
+        advanceUntilIdle()
+
+        assertEquals(1, connection.sent.size, "닫힌 세션이 답했다")
+        assertTrue(
+            connection.log.of(connection.stationId).none { it.messageId == "m2" },
+            "닫힌 세션이 받은 프레임을 장부에 적었다",
+        )
+    }
+
+    /** 닫힌 뒤의 발신은 세 갈래가 한 방향이다 — CALL 은 [OcppResult.NotConnected], SEND 는 예외. */
+    @Test
+    fun `닫힌 세션은 발신도 거절한다`() = runTest {
+        val connection = TestConnection()
+        connection.session.close()
+
+        val result = connection.session.call(OcppCall("Heartbeat", emptyObj()))
+        assertIs<OcppResult.NotConnected>(result)
+
+        assertFailsWith<IllegalStateException> {
+            connection.session.send("NotifyPeriodicEventStream", emptyObj())
+        }
+        assertTrue(connection.sent.isEmpty(), "닫힌 세션에서 프레임이 나갔다")
+    }
+
 }

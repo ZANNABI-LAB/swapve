@@ -11,6 +11,20 @@ repository.
 
 ## [Unreleased]
 
+### Fixed
+
+- **A closed `OcppSession` now refuses inbound frames as well as outbound ones.** `closed` was
+  consulted only by `call()`, so a session that had been closed while a transport was still (or
+  again) attached would keep answering the peer's requests while refusing to originate anything —
+  a half-dead peer that no real station or CSMS can be. `receive()` now drops the line without
+  decoding, logging or answering, and `send()` throws rather than returning a messageId for a
+  frame that never left. `call()` is unchanged; it already answered `OcppResult.NotConnected`.
+
+  **This is a behaviour change.** A session belongs to one connection: when the peer comes back,
+  open a new session instead of putting a fresh transport under the closed one. Nothing in this
+  repository relied on the old behaviour — it was found by a test written against the simulator
+  console, not by a consumer.
+
 ## [0.1.0] — 2026-08-21
 
 The first release intended for use. Identical in behaviour to `0.0.1`; what changed is the

@@ -172,15 +172,20 @@ caller passed, capped at `MaxSoc`. There is no current, no taper, no temperature
 battery inserted above the cap is not pulled down to it — charging does not lower SoC, and rewriting
 an observation would be a lie — it simply suspends immediately.
 
-**A closed session does not reopen, and nothing announces that.** `close()` shuts down the
-`OcppSession` as well as the transport, and that flag is one-way. But `reconnect()` checks only
-whether a transport exists, so calling it after `close()` **succeeds**: the socket comes back,
-`isConnected` reads true, and `subprotocol` reports `ocpp2.1` again. The session underneath is
-still closed, and only outbound CALLs notice — `closed` is consulted in exactly one place, so the
-station keeps answering the CSMS's requests while being unable to originate anything itself.
-No real station is half-dead in that particular way. The console therefore does not expose
-`close()` as an operation at all; it ends stations by discarding them. If you drive
-`StationSimulator` directly, treat `close()` as terminal and build a new one.
+**`close()` is terminal — and `reconnect()` will not tell you so.** `close()` shuts down the
+`OcppSession` as well as the transport, and that flag is one-way: the session then refuses
+everything, inbound and outbound alike. `reconnect()`, however, checks only whether a transport
+exists, so calling it after `close()` **succeeds** — the socket comes back, `isConnected` reads
+true, and `subprotocol` reports `ocpp2.1` again. What you get is a station that is connected and
+completely mute: it originates nothing and answers nothing.
+
+That is a real state (a station whose software died while its modem stayed up), which is why
+`reconnect()` does not refuse — every check in this simulator asks about a physical fact, and
+"the session object is closed" is a fact about our software, not about the station. But it is
+almost never what you meant. Treat `close()` as the end of that simulator and build a new one;
+`disconnect()` is the reversible one, and it leaves the session, the slots and the `requestId`
+intact. The console does not expose `close()` as an operation for this reason — it ends stations
+by discarding them.
 
 **There is no real time.** Every timestamp comes from the injected `Clock` and every step waits for
 the peer's CALLRESULT. There is no `sleep` anywhere, so "ten minutes later" is produced by moving the

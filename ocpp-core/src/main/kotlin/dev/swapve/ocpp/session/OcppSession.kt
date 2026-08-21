@@ -119,9 +119,14 @@ class OcppSession(
      * It expects no response, so the §4.1.1 synchronicity rule does not apply — **it goes out
      * immediately even with a CALL pending.**
      *
+     * Throws once [close] has run. [call] can report that as an [OcppResult.NotConnected] because
+     * it returns one; this returns a messageId, and handing back an id for a frame that never
+     * left would be a lie the caller cannot detect.
+     *
      * @return the messageId that was issued, for matching against the event log.
      */
     suspend fun send(action: String, payload: ObjectNode): String {
+        check(!closed) { "session is closed: $stationId" }
         val messageId = MessageIds.newId()
         emit(OcppFrame.Send(messageId, action, payload), action)
         return messageId
@@ -130,8 +135,14 @@ class OcppSession(
     /**
      * The connection ended. Wakes every awaiting CALL with [OcppResult.NotConnected].
      *
+     * **This session is finished — the flag is one-way and every entry point honours it.**
+     * [call] answers [OcppResult.NotConnected], [send] throws, and [receive] drops the line.
+     * A session belongs to one connection: when the peer comes back, open a new one rather than
+     * putting a fresh transport under this object. Reusing it would leave the outbound half dead
+     * and the inbound half alive, which is a state no station has.
+     *
      * **Leaves the idempotency ledger alone.** When a retransmission arrives after reconnect,
-     * the stored response has to go back out unchanged.
+     * the stored response has to go back out unchanged — that is the new session's business.
      */
     fun close() {
         closed = true
@@ -148,8 +159,15 @@ class OcppSession(
      *
      * The flow is: raw line → decode → (ignore, or CALLERROR if malformed) → schema validation →
      * (the layer above, or a CALLERROR carrying that errorCode).
+     *
+     * **A closed session drops the line without decoding it.** Nothing is logged and nothing is
+     * answered. This costs nothing when the transport is gone too — no line arrives — and it is
+     * what keeps a closed session from becoming a half-dead peer: one that still answers the
+     * other side's requests while [call] refuses to originate anything. No real station behaves
+     * that way, and a test tool that can produce it will eventually be believed.
      */
     suspend fun receive(text: String) {
+        if (closed) return
         val outcome = codec.decode(text)
         logInbound(outcome, text)
 
