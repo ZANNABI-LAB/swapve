@@ -218,6 +218,44 @@ class WireContractTest {
     }
 
     /**
+     * ★ **스키마가 제약하지 않는 상수에는 ⚠️ 표시가 붙어 있어야 한다.**
+     *
+     * 이 파일의 나머지 시험이 지키는 것은 "표준에 있는 값인가"뿐이다. 스키마가 `enum` 으로
+     * 좁히지 않는 자리는 그 검사가 성립하지 않고 **사람이 스펙을 읽어야만** 옳은지 알 수
+     * 있다. 소비자가 그 둘을 구분하려면 표시가 사실과 맞아야 한다.
+     *
+     * 산문으로 적어 두면 지켜졌는지 알 수 없으므로 소스를 직접 읽어 대조한다. 상수를 새로
+     * 넣는 사람은 그것이 어느 부류인지 판정하게 된다.
+     */
+    @Test
+    fun `제약 없는 상수와 표시가 일치한다`() {
+        val source = java.io.File("src/main/kotlin/dev/swapve/ocpp/swap/BatterySwapWire.kt")
+        assertTrue(source.isFile, "원본을 찾지 못했다: ${source.absolutePath}")
+        val text = source.readText()
+
+        val marked = Regex("""/\*\*(?:(?!\*/)[\s\S])*?⚠️(?:(?!\*/)[\s\S])*?\*/\s*\n\s*const val (\w+)""")
+            .findAll(text).map { it.groupValues[1] }.toSet()
+
+        val unconstrained = Regex("""const val (\w+) = "([^"]*)"""").findAll(text)
+            .filterNot { OcppSchemas.contains(it.groupValues[2] + "Request") }
+            .filterNot { isInAnyEnum(it.groupValues[2]) }
+            .map { it.groupValues[1] }
+            .toSet()
+
+        assertEquals(
+            unconstrained, marked,
+            "표시가 사실과 어긋난다. 누락=${unconstrained - marked}, 과잉=${marked - unconstrained}",
+        )
+    }
+
+    /** 어느 공식 스키마의 enum 에든 들어 있는 값인가. */
+    private fun isInAnyEnum(value: String): Boolean = OcppSchemas.names.any { name ->
+        mapper.readTree(OcppSchemas.read(name)).path("definitions").any { definition ->
+            definition.path("enum").any { it.asText() == value }
+        }
+    }
+
+    /**
      * 위 자리들이 **여전히 자유 문자열**임을 고정한다.
      *
      * 표준이 이들을 `enum` 으로 좁히는 날, 우리 값이 그 목록에 없을 수 있다. 그때 이 시험이

@@ -66,6 +66,20 @@ tasks.named("check") {
 }
 
 /**
+ * ⚠️ **소스를 읽는 시험은 그 파일을 입력으로 선언해야 한다.**
+ *
+ * `WireContractTest` 는 `BatterySwapWire.kt` 원문을 열어 ⚠️ 표시와 실제 제약을 대조한다.
+ * 그런데 KDoc 만 바뀌면 바이트코드가 같아 Gradle 이 `test` 를 up-to-date 로 건너뛴다 —
+ * 표시를 지워도 시험이 아예 돌지 않아 초록으로 보였다. 실제로 그렇게 통과하는 것을
+ * 확인하고 나서 이 선언을 넣었다.
+ */
+tasks.named<Test>("test") {
+    inputs.file(layout.projectDirectory.file("src/main/kotlin/dev/swapve/ocpp/swap/BatterySwapWire.kt"))
+        .withPropertyName("wireConstantsSource")
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+}
+
+/**
  * 공식 스키마 181개를 클래스패스로 옮긴다.
  *
  * 원문을 수정하지 않고 그대로 복사한다 — CC BY-ND 4.0 (개작 금지). NOTICE 참조.

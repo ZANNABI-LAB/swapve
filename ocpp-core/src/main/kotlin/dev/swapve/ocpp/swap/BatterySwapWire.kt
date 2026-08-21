@@ -19,6 +19,23 @@ package dev.swapve.ocpp.swap
  *
  * Slot availability alone is pulled out into [AvailabilityState] — that one is not a value but
  * **an inverted meaning**.
+ *
+ * ### What a machine checks here, and what it cannot
+ *
+ * `WireContractTest` reads the official schemas and compares every constant below against them,
+ * so most of this file is verified on each build rather than trusted:
+ *
+ * - **36 values** are members of a schema `enum`. A value the standard does not define cannot
+ *   survive here.
+ * - **12 values** are action names, checked by the existence of their `…Request` and `…Response`
+ *   schema files. A typo would otherwise be rejected as `NotImplemented` forever.
+ * - **9 values sit where the schema constrains nothing** — a plain string with a length limit.
+ *   Those are marked ⚠️ below. A typo in one of them passes schema validation, so **they rest on
+ *   reading the specification**, and only their length is machine-checked.
+ *
+ * None of this catches **the wrong choice among permitted values**. `EnergyLimitReached` and
+ * `EVCommunicationLost` are both valid `TriggerReasonEnumType` members; which one belongs where a
+ * battery is removed comes from Part 6, not from the schema.
  */
 object BatterySwapWire {
 
@@ -56,12 +73,20 @@ object BatterySwapWire {
     const val BATTERY_OUT_TIMEOUT = "BatteryOutTimeout"
 
     /**
+     * ⚠️ **Not constrained by any schema** — `component.name` is a plain string. The name comes
+     * from the Part 2 device model appendix.
+     *
      * The component that carries slot state. One slot is one EVSE, and the connector inside it
      * reports the state.
      */
     const val COMPONENT_CONNECTOR = "Connector"
 
-    /** The slot occupancy variable. For what the values mean see [AvailabilityState] — they invert. */
+    /**
+     * ⚠️ **Not constrained by any schema** — `variable.name` is a plain string, from the Part 2
+     * device model appendix.
+     *
+     * The slot occupancy variable. For what the values mean see [AvailabilityState] — they invert.
+     */
     const val VARIABLE_AVAILABILITY_STATE = "AvailabilityState"
 
     /** `EventTriggerEnumType` — sent because the state **changed**. */
@@ -70,10 +95,10 @@ object BatterySwapWire {
     /** `EventNotificationEnumType` — hard-wired into the device, not created by a monitoring setting. */
     const val NOTIFICATION_HARD_WIRED = "HardWiredNotification"
 
-    /** The security event reported right after boot (Part 6 `BootedBatterySwapping`). */
+    /** ⚠️ Not schema-constrained. The security event reported right after boot (Part 6 `BootedBatterySwapping`). */
     const val SECURITY_EVENT_STARTUP = "StartupOfTheDevice"
 
-    /** A restart or reboot. Part 6 accepts either this or [SECURITY_EVENT_STARTUP]. */
+    /** ⚠️ Not schema-constrained. A restart or reboot; Part 6 accepts either this or [SECURITY_EVENT_STARTUP]. */
     const val SECURITY_EVENT_RESET_OR_REBOOT = "ResetOrReboot"
 
     const val BOOT_REASON_POWER_UP = "PowerUp"
@@ -141,7 +166,7 @@ object BatterySwapWire {
     const val MEASURAND_SOC = "SoC"
 
     /**
-     * `SampledValue.unitOfMeasure.unit` — percent.
+     * ⚠️ **Not constrained by any schema.** `SampledValue.unitOfMeasure.unit` — percent.
      *
      * The schema leaves this field a plain string rather than an enum, saying only *"SHALL use a
      * value from the list Standardized Units of Measurements in Part 2 Appendices"*. A typo
@@ -159,6 +184,9 @@ object BatterySwapWire {
     const val STOPPED_REASON_EV_DISCONNECTED = "EVDisconnected"
 
     /**
+     * ⚠️ **Not constrained by any schema** — `idToken.type` is a plain string of up to 20
+     * characters in 2.1; the list of kinds lives in the Part 2 appendix.
+     *
      * The kind of substitute token a charging transaction uses (S04.FR.02/03).
      *
      * Charging at a swap station is not started by a person presenting a card. Either the
@@ -167,7 +195,7 @@ object BatterySwapWire {
      */
     const val ID_TOKEN_TYPE_CENTRAL = "Central"
 
-    /** An unauthorized transaction. `idToken.idToken` is then **the empty string** (Part 6 Tool validation). */
+    /** ⚠️ Not schema-constrained. An unauthorized transaction; `idToken.idToken` is then **the empty string** (Part 6 Tool validation). */
     const val ID_TOKEN_TYPE_NO_AUTHORIZATION = "NoAuthorization"
 
     /** `RegistrationStatusEnumType` */
@@ -213,12 +241,12 @@ object BatterySwapWire {
     /** The value is one of a fixed list. `valuesList` is then **required** (official schema). */
     const val DATA_TYPE_OPTION_LIST = "OptionList"
 
-    /** `VariableCharacteristics.unit` — seconds. The same position as [UNIT_PERCENT]. */
+    /** ⚠️ Not schema-constrained. `VariableCharacteristics.unit` — seconds, as [UNIT_PERCENT] is. */
     const val UNIT_SECONDS = "seconds"
 
     /**
-     * The vendor identifier used to refuse a battery through `BatterySwapResponse`
-     * (Part 2 S03 Error handling).
+     * ⚠️ **Not constrained by any schema.** The vendor identifier used to refuse a battery
+     * through `BatterySwapResponse` (Part 2 S03 Error handling).
      *
      * `BatterySwapResponse` is *"Empty response by CSMS to confirm receipt"* and **cannot carry
      * a refusal**. OCA defined an official way around that limit: the response carries
