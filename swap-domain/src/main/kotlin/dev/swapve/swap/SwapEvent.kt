@@ -3,25 +3,27 @@ package dev.swapve.swap
 import java.time.Instant
 
 /**
- * 교환 트랜잭션에 입력되는 사건.
+ * An event fed into a swap transaction.
  *
- * 모든 사건이 [key] 와 [at] 을 갖는다. 시각을 이벤트에 실어 주입받으므로 상태 전이가
- * 현재 시각을 조회할 필요가 없다 — 같은 입력이면 언제 돌려도 같은 결과다.
+ * Every event carries [key] and [at]. Time rides on the event rather than being read, so a
+ * transition never asks for the current clock — the same input gives the same result whenever it
+ * is replayed.
  *
- * 배터리는 **항상 리스트**다. 공식 적합성 시험이 배터리 2개 세트로 교환한다
- * (`TC_S_103_CSMS`, 확정 결정 결정 #6). 단일 배터리만 지원하면 적합성 미달이다.
+ * Batteries are **always a list**. The official conformance case swaps a set of two
+ * (`TC_S_103_CSMS`); supporting a single battery would fail conformance.
  */
 sealed interface SwapEvent {
 
-    /** 이 사건이 속한 교환 (복합키). */
+    /** The swap this event belongs to (a composite key). */
     val key: SwapKey
 
-    /** 사건이 관측된 시각. */
+    /** When the event was observed. */
     val at: Instant
 
     /**
-     * 인가가 났다. 로컬 개시(스테이션 RFID)든 원격 개시(CSMS 발신)든 도메인에는 같은 사건이다
-     * (S01/S02). 어느 쪽이 상관 번호를 발번했는지는 경계 계층의 관심사다.
+     * Authorization was granted. Locally initiated (RFID at the station) or remotely (sent by the
+     * CSMS), it is the same event to the domain (S01/S02) — which side issued the correlation
+     * number is the boundary layer's concern.
      */
     data class Authorized(
         override val key: SwapKey,
@@ -29,7 +31,7 @@ sealed interface SwapEvent {
         override val at: Instant,
     ) : SwapEvent
 
-    /** 이용자가 헌 배터리를 **넣었다.** */
+    /** The driver **put in** a depleted battery. */
     data class BatteryIn(
         override val key: SwapKey,
         val idToken: IdToken,
@@ -37,11 +39,11 @@ sealed interface SwapEvent {
         override val at: Instant,
     ) : SwapEvent {
         init {
-            require(batteries.isNotEmpty()) { "배터리 없는 입고 사건" }
+            require(batteries.isNotEmpty()) { "an incoming event with no batteries" }
         }
     }
 
-    /** 이용자가 새 배터리를 **가져갔다.** */
+    /** The driver **took** a fresh battery. */
     data class BatteryOut(
         override val key: SwapKey,
         val idToken: IdToken,
@@ -49,15 +51,16 @@ sealed interface SwapEvent {
         override val at: Instant,
     ) : SwapEvent {
         init {
-            require(batteries.isNotEmpty()) { "배터리 없는 출고 사건" }
+            require(batteries.isNotEmpty()) { "an outgoing event with no batteries" }
         }
     }
 
     /**
-     * 제공된 배터리를 **꺼내가지 않았다** (S03.FR.06).
+     * The offered battery was **never collected** (S03.FR.06).
      *
-     * 두 종류의 타임아웃 중 CSMS 가 통보받는 쪽이다. 인가 후 배터리를 넣지 않은 타임아웃은
-     * 스테이션이 자체 종료하고 CSMS 에 아무것도 보내지 않으므로 사건 자체가 없다.
+     * The one of the two timeouts a CSMS is told about. The other — authorized but no battery
+     * inserted — is closed by the station on its own, and nothing reaches the CSMS, so there is
+     * no event for it at all.
      */
     data class BatteryOutTimeout(
         override val key: SwapKey,

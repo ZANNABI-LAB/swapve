@@ -1,10 +1,11 @@
 package dev.swapve.swap
 
 /**
- * 교환 스테이션 — 슬롯의 집합과 소유자.
+ * A swap station — a set of slots and their owner.
  *
- * [operatorId] 는 값이 항상 하나여도 둔다. 재고 판정은 스테이션이 하므로
- * CSMS 는 이 모델로 재고를 계산하지 않는다 — 관측된 슬롯 상태를 담아 둘 뿐이다.
+ * [operatorId] is kept even while there is only ever one value. Stock is judged by the station,
+ * so a CSMS does not compute availability from this model; it only holds the slot states it has
+ * observed.
  */
 data class Station(
     val id: StationId,
@@ -12,9 +13,9 @@ data class Station(
     val slots: Map<SlotId, Slot> = emptyMap(),
 ) {
     init {
-        require(slots.all { (id, slot) -> id == slot.id }) { "슬롯 번호와 키가 어긋났다" }
+        require(slots.all { (id, slot) -> id == slot.id }) { "slot key disagrees with the slot's own id" }
     }
 
-    /** 배터리가 들어 있어 교환에 쓸 수 있는 슬롯들. */
+    /** The slots holding a battery that can be swapped. */
     val slotsHoldingBattery: List<Slot> get() = slots.values.filter { it.state == SlotState.HOLDS_BATTERY }
 }

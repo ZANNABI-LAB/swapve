@@ -1,22 +1,22 @@
 package dev.swapve.swap
 
 /**
- * 인가 토큰 — `(식별자, 종류)` 값 객체.
+ * An authorization token — the value pair `(identifier, kind)`.
  *
- * **로컬 사용자 테이블의 FK 로 취급하지 않는다**. 로밍 토큰은 우리 DB 에 없다.
- * FK 로 묶는 순간 "모든 토큰은 우리 사용자"라는 되돌릴 수 없는 전제가 코드에 박힌다.
+ * **Not treated as a foreign key into a local user table.** Roaming tokens are not in our
+ * database, and binding them as a foreign key would bake in the irreversible assumption that
+ * every token belongs to one of our users.
  *
- * [type] 을 열거형이 아니라 자유 문자열로 두는 이유는 두 가지다.
- * 표준이 종류를 필수 필드로 두고 있으니 값 자체는 그대로 따르되, 프로토콜 열거형을
- * 도메인에 박지 않는다 (원칙 4). 그리고 표에 없는 값이 와도 버리지 않고 기록한다
- * (정보를 버리지 않는다).
+ * [type] is a free string rather than an enum for two reasons. The standard makes the kind a
+ * required field, so the value is carried as given — but a protocol enum has no place in the
+ * domain. And a value outside the table is recorded rather than discarded.
  */
 data class IdToken(
     val idToken: String,
     val type: String,
 ) {
     init {
-        require(idToken.isNotBlank()) { "idToken 이 비어 있다" }
-        require(type.isNotBlank()) { "idToken 의 종류가 비어 있다" }
+        require(idToken.isNotBlank()) { "idToken is blank" }
+        require(type.isNotBlank()) { "idToken type is blank" }
     }
 }

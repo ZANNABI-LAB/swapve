@@ -3,29 +3,29 @@ package dev.swapve.swap
 import java.time.Instant
 
 /**
- * 교환 트랜잭션 상태머신.
+ * The swap transaction state machine.
  *
- * `(현재 상태, 사건) -> 전이 결과` 순수 함수 하나다. I/O 도, 전역 상태도, 현재 시각 조회도
- * 없다 — 시각은 사건이 실어 온다. 같은 입력이면 항상 같은 결과다.
+ * One pure function, `(state, event) -> transition`. No I/O, no global state, no reading of the
+ * clock — time rides on the event. The same input always gives the same result.
  *
- * **순서 불가지론이다**. 입고 먼저와 출고 먼저를 대칭으로 처리하고, 두 경로 모두
- * 같은 [SwapTransaction.Completed] 에 도달한다. 어느 순서로 동작하는 스테이션인지는 이
- * 상태머신이 알 필요가 없다 — 안다면 그건 잘못된 전제를 코드에 박은 것이다.
+ * **Order-agnostic.** In-first and out-first are handled symmetrically and both reach the same
+ * [SwapTransaction.Completed]. Which order a station runs is something this machine has no need
+ * to know; knowing it would mean an assumption baked into the code.
  *
- * **배터리는 세트 단위다** (결정 #6). 입고도 출고도 여러 개를 한 번에 받는다.
+ * **Batteries move as a set.** Both directions take several at once.
  */
 object SwapStateMachine {
 
     /**
-     * 사건 하나를 적용한다.
+     * Applies one event.
      *
-     * 예외를 던지지 않는다. 규약을 벗어난 사건은 [SwapTransition.Anomaly] 로, 중복 수신은
-     * [SwapTransition.Ignored] 로 돌려준다. 두 경우 모두 상태는 그대로다.
+     * Never throws. An event outside the protocol comes back as [SwapTransition.Anomaly], a
+     * duplicate as [SwapTransition.Ignored]. In both cases the state is unchanged.
      */
     fun transition(state: SwapTransaction, event: SwapEvent): SwapTransition {
         val current = state.key
         if (current != null && current != event.key) {
-            return anomaly(state, AnomalyReason.KEY_MISMATCH, "진행 중인 교환은 $current 인데 ${event.key} 사건이 왔다")
+            return anomaly(state, AnomalyReason.KEY_MISMATCH, "swap in progress is $current but an event for ${event.key} arrived")
         }
         if (state.isTerminal) {
             return SwapTransition.Ignored(state, IgnoreReason.ALREADY_TERMINAL)
@@ -36,13 +36,12 @@ object SwapStateMachine {
             is SwapTransaction.Authorized -> fromAuthorized(state, event)
             is SwapTransaction.HalfIn -> fromHalfIn(state, event)
             is SwapTransaction.HalfOut -> fromHalfOut(state, event)
-            // 종단 상태는 위에서 걸렀다.
             is SwapTransaction.Completed, is SwapTransaction.OutTimedOut ->
                 SwapTransition.Ignored(state, IgnoreReason.ALREADY_TERMINAL)
         }
     }
 
-    /** 여러 사건을 순서대로 적용하고 마지막 상태를 돌려준다. 중간 결과가 필요하면 [transition] 을 직접 쓴다. */
+    /** Applies events in order and returns the final state. Use [transition] when the steps matter. */
     fun replay(state: SwapTransaction, events: List<SwapEvent>): SwapTransaction =
         events.fold(state) { acc, event -> transition(acc, event).state }
 
@@ -51,13 +50,11 @@ object SwapStateMachine {
             SwapTransaction.Authorized(event.key, event.idToken, event.at),
         )
 
-        // F5 순서 위반 — 인가 없이 교환 사건이 왔다. 기록만 하고 상태는 그대로 둔다.
         is SwapEvent.BatteryIn, is SwapEvent.BatteryOut, is SwapEvent.BatteryOutTimeout ->
-            anomaly(state, AnomalyReason.NOT_AUTHORIZED, "인가되지 않은 교환 ${event.key} 에 ${event.label} 사건이 왔다")
+            anomaly(state, AnomalyReason.NOT_AUTHORIZED, "a ${event.label} event arrived for unauthorized swap ${event.key}")
     }
 
     private fun fromAuthorized(state: SwapTransaction.Authorized, event: SwapEvent): SwapTransition = when (event) {
-        // F6 재전송 — 같은 상관키의 인가가 또 왔다.
         is SwapEvent.Authorized -> SwapTransition.Ignored(state, IgnoreReason.DUPLICATE_AUTHORIZATION)
 
         is SwapEvent.BatteryIn -> SwapTransition.Advanced(
@@ -68,15 +65,13 @@ object SwapStateMachine {
             SwapTransaction.HalfOut(state.key, state.idToken, state.authorizedAt, event.batteries, event.at),
         )
 
-        // 아직 오간 배터리가 없으니 수령 타임아웃이 성립하지 않는다. orphan 도 없다.
         is SwapEvent.BatteryOutTimeout ->
-            anomaly(state, AnomalyReason.UNEXPECTED_TIMEOUT, "오간 배터리가 없는 교환 ${state.key} 에 수령 타임아웃이 왔다")
+            anomaly(state, AnomalyReason.UNEXPECTED_TIMEOUT, "a collection timeout arrived for swap ${state.key}, where no battery has moved")
     }
 
     private fun fromHalfIn(state: SwapTransaction.HalfIn, event: SwapEvent): SwapTransition = when (event) {
         is SwapEvent.Authorized -> SwapTransition.Ignored(state, IgnoreReason.DUPLICATE_AUTHORIZATION)
 
-        // F4 중복 입고 — 장부가 두 번 늘면 안 된다.
         is SwapEvent.BatteryIn -> SwapTransition.Ignored(state, IgnoreReason.DUPLICATE_BATTERY_IN)
 
         is SwapEvent.BatteryOut -> complete(
@@ -90,7 +85,6 @@ object SwapStateMachine {
             completedAt = event.at,
         )
 
-        // F2 수령 타임아웃 — 들어온 배터리가 orphan 으로 남는다 (S03.FR.06).
         is SwapEvent.BatteryOutTimeout -> SwapTransition.Advanced(
             SwapTransaction.OutTimedOut(
                 key = state.key,
@@ -119,16 +113,15 @@ object SwapStateMachine {
 
         is SwapEvent.BatteryOut -> SwapTransition.Ignored(state, IgnoreReason.DUPLICATE_BATTERY_OUT)
 
-        // 배터리는 이미 나갔다. 수령 타임아웃이 뒤늦게 올 자리가 아니다.
         is SwapEvent.BatteryOutTimeout ->
-            anomaly(state, AnomalyReason.UNEXPECTED_TIMEOUT, "이미 출고된 교환 ${state.key} 에 수령 타임아웃이 왔다")
+            anomaly(state, AnomalyReason.UNEXPECTED_TIMEOUT, "a collection timeout arrived for swap ${state.key}, whose battery already went out")
     }
 
     /**
-     * 두 반쪽을 합쳐 완료한다. 입고 먼저든 출고 먼저든 같은 자리로 모인다.
+     * Joins the two halves into a completed swap. In-first and out-first arrive at the same place.
      *
-     * 수량이 맞지 않으면 [SwapTransaction.Completed] 를 만들지 않는다. "들어온 수 = 나간 수"
-     * 불변식 이 구성상 항상 참이 되도록, 불균형은 완료가 아니라 이상으로 뺀다.
+     * Mismatched counts do not produce a [SwapTransaction.Completed]. An imbalance leaves as an
+     * anomaly rather than a completion, so that *"in = out"* holds by construction.
      */
     private fun complete(
         state: SwapTransaction,
@@ -144,7 +137,7 @@ object SwapStateMachine {
             return anomaly(
                 state,
                 AnomalyReason.BATTERY_COUNT_MISMATCH,
-                "교환 $key 의 장부가 맞지 않는다: 입고 ${batteriesIn.size} 개, 출고 ${batteriesOut.size} 개",
+                "the ledger of swap $key does not balance: ${batteriesIn.size} in, ${batteriesOut.size} out",
             )
         }
         return SwapTransition.Advanced(
@@ -163,12 +156,12 @@ object SwapStateMachine {
     private fun anomaly(state: SwapTransaction, reason: AnomalyReason, description: String) =
         SwapTransition.Anomaly(state, reason, description)
 
-    /** 이상 이벤트 설명에 쓰는 사건 이름. */
+    /** The event name used in anomaly descriptions. */
     private val SwapEvent.label: String
         get() = when (this) {
-            is SwapEvent.Authorized -> "인가"
-            is SwapEvent.BatteryIn -> "입고"
-            is SwapEvent.BatteryOut -> "출고"
-            is SwapEvent.BatteryOutTimeout -> "수령 타임아웃"
+            is SwapEvent.Authorized -> "authorization"
+            is SwapEvent.BatteryIn -> "battery-in"
+            is SwapEvent.BatteryOut -> "battery-out"
+            is SwapEvent.BatteryOutTimeout -> "collection timeout"
         }
 }

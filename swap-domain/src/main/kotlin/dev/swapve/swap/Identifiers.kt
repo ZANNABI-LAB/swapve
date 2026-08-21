@@ -1,54 +1,54 @@
 package dev.swapve.swap
 
 /**
- * 스테이션 식별자.
+ * A station identifier.
  *
- * OCPP 프레임에는 없다 — WebSocket 핸드셰이크에서 정해지는 연결의 속성이다.
- * 도메인에는 **반드시 있어야 한다**: 교환 상관키가 스테이션 범위에서만 유일하기 때문이다.
+ * Absent from OCPP frames — it is a property of the connection, settled at the WebSocket
+ * handshake. The domain **must** have it: a swap correlation key is only unique within a station.
  */
 @JvmInline
 value class StationId(val value: String) {
     init {
-        require(value.isNotBlank()) { "stationId 가 비어 있다" }
+        require(value.isNotBlank()) { "stationId is blank" }
     }
 
     override fun toString(): String = value
 }
 
 /**
- * 스테이션 소유 사업자 식별자.
+ * The operator that owns a station.
  *
- * 값이 항상 하나여도 둔다. 단일 사업자를 코드에 전제로 박으면 나중에
- * 로밍(OCPI)을 붙일 때 전 데이터 마이그레이션이 필요해진다.
+ * Kept even while there is only ever one value. Baking a single operator into the code as an
+ * assumption would mean migrating every row the day roaming (OCPI) arrives.
  */
 @JvmInline
 value class OperatorId(val value: String) {
     init {
-        require(value.isNotBlank()) { "operatorId 가 비어 있다" }
+        require(value.isNotBlank()) { "operatorId is blank" }
     }
 
     override fun toString(): String = value
 }
 
 /**
- * 슬롯 식별자. 슬롯 하나가 프로토콜의 EVSE 하나에 대응한다.
+ * A slot identifier. One slot corresponds to one EVSE in the protocol.
  *
- * 프로토콜 필드는 0 이상의 정수다. 경계 계층에서 이 타입으로 변환한다.
+ * The protocol field is a non-negative integer; the boundary layer converts it into this type.
  */
 @JvmInline
 value class SlotId(val value: Int) {
     init {
-        require(value >= 0) { "슬롯 번호는 0 이상이어야 한다: $value" }
+        require(value >= 0) { "slot number must be non-negative: $value" }
     }
 
     override fun toString(): String = value.toString()
 }
 
 /**
- * 교환 1건의 상관 번호.
+ * The correlation number of one swap.
  *
- * **이것만으로는 교환을 식별할 수 없다.** 스펙에 전역 유일성 규정이 없으므로 스테이션
- * 범위에서만 유일하다. 상관키가 필요한 자리에는 항상 [SwapKey] 를 쓴다.
+ * **It does not identify a swap on its own.** The standard requires no global uniqueness of it,
+ * so it is unique only within a station. Wherever a correlation key is needed, use [SwapKey].
  */
 @JvmInline
 value class SwapRequestId(val value: Int) {
@@ -56,9 +56,9 @@ value class SwapRequestId(val value: Int) {
 }
 
 /**
- * 교환 1건의 상관키 — `(스테이션, 상관 번호)` 복합키.
+ * The correlation key of one swap — the composite `(station, correlation number)`.
  *
- * 서로 다른 스테이션이 같은 [SwapRequestId] 를 써도 충돌하지 않는다.
+ * Two stations reusing the same [SwapRequestId] do not collide.
  */
 data class SwapKey(
     val stationId: StationId,

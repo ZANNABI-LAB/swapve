@@ -1,28 +1,28 @@
 package dev.swapve.swap
 
 /**
- * 상태 전이 시도의 결과.
+ * The outcome of attempting a transition.
  *
- * 성공·무시·이상을 **구분해서 돌려준다.** 예외로 흐름을 제어하지 않는다 — 규약 위반도
- * 정상 응답 대상이고 (: *"모든 위반은 CALLRESULT 로 정상 응답한다"*), 무엇을
- * 기록하고 무엇을 회신할지는 상위 계층의 정책이다. 여기서는 판정까지만 한다.
+ * Success, ignore and anomaly are **told apart and returned**, never signalled by an exception.
+ * A protocol violation is still answered normally, and what to record or reply is policy for the
+ * layer above. This decides, and stops there.
  *
- * 세 결과 모두 [state] 를 갖는다. 호출자는 결과 종류를 보든 안 보든 [state] 를 다음 상태로
- * 쓰면 된다 — [Ignored] 와 [Anomaly] 는 이전 상태를 그대로 돌려준다.
+ * All three carry [state]. A caller may use [state] as the next state whether or not it examines
+ * the kind — [Ignored] and [Anomaly] hand back the state unchanged.
  */
 sealed interface SwapTransition {
 
-    /** 이 전이 이후의 상태. */
+    /** The state after this transition. */
     val state: SwapTransaction
 
-    /** 전이했다. */
+    /** It advanced. */
     data class Advanced(override val state: SwapTransaction) : SwapTransition
 
     /**
-     * 멱등 무시했다. 장부는 변하지 않는다 (F4/F6).
+     * Ignored for idempotency. The ledger does not move.
      *
-     * 실패가 아니다. 재전송·중복 수신은 정상적으로 일어나는 일이고, 두 번 반영되지 않는 것이
-     * 올바른 동작이다.
+     * Not a failure. Retransmissions and duplicate deliveries happen in normal operation, and not
+     * counting them twice is the correct behaviour.
      */
     data class Ignored(
         override val state: SwapTransaction,
@@ -30,9 +30,10 @@ sealed interface SwapTransition {
     ) : SwapTransition
 
     /**
-     * 규약을 벗어난 사건이다. 상태는 그대로 두고 **사실만 기록한다** (F5).
+     * An event outside the protocol. The state is left alone and **the fact is recorded**.
      *
-     * 상태머신은 여기서 폭발하지 않는다. 상위 계층은 이상 이벤트로 남기되 응답은 정상 회신한다.
+     * The state machine does not blow up here. The layer above records an anomaly and still
+     * answers normally.
      */
     data class Anomaly(
         override val state: SwapTransaction,
@@ -41,34 +42,34 @@ sealed interface SwapTransition {
     ) : SwapTransition
 }
 
-/** 무시한 이유. */
+/** Why it was ignored. */
 enum class IgnoreReason {
 
-    /** 같은 상관키로 입고가 다시 왔다 (F4). */
+    /** An incoming event arrived again under the same correlation key. */
     DUPLICATE_BATTERY_IN,
 
-    /** 같은 상관키로 출고가 다시 왔다. */
+    /** An outgoing event arrived again under the same correlation key. */
     DUPLICATE_BATTERY_OUT,
 
-    /** 이미 인가된 교환에 인가가 또 왔다 (재접속 중 재전송 — F6). */
+    /** An already authorized swap was authorized again — a retransmission across a reconnect. */
     DUPLICATE_AUTHORIZATION,
 
-    /** 이미 끝난 교환에 사건이 왔다. */
+    /** An event arrived for a swap that already ended. */
     ALREADY_TERMINAL,
 }
 
-/** 이상으로 판정한 이유. */
+/** Why it was judged an anomaly. */
 enum class AnomalyReason {
 
-    /** 인가 없이 교환 사건이 도착했다 (F5). */
+    /** A swap event arrived without authorization. */
     NOT_AUTHORIZED,
 
-    /** 진행 중인 교환과 상관키가 다른 사건이 도착했다. */
+    /** An event arrived under a different correlation key than the swap in progress. */
     KEY_MISMATCH,
 
-    /** 들어온 배터리 수와 나간 배터리 수가 맞지 않는다 (COMPLETED 불변식). */
+    /** The number of batteries in does not match the number out. */
     BATTERY_COUNT_MISMATCH,
 
-    /** 수령 타임아웃이 올 수 없는 상태에서 도착했다. */
+    /** A collection timeout arrived in a state where it cannot occur. */
     UNEXPECTED_TIMEOUT,
 }
