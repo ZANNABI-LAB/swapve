@@ -48,7 +48,7 @@ The project's success criteria, restated as **commands you can run**.
 | **S3** | Failure scenarios F1–F6 | `./gradlew conformanceTest` | `FailureScenarioTest` |
 | **S4** | 20 stations concurrently, then every invariant-audit row | `./gradlew auditTest` | `LoadAuditTest` (plus `InvariantAuditTest`, which tests the audit) |
 | **S5** | Success rate, duration, and failure reasons queryable over REST | `./gradlew build` | `SwapMetricsApiTest` · `SwapApiTest` · `ChargingApiTest` |
-| **S6** | All of the above verified automatically by the gates | [README — how this is built](../README.md) | `.zannabi/runs/` evidence directories · [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) |
+| **S6** | All of the above verified automatically by the gates | [README — how this is built](../README.md) | [`.zannabi.json`](../.zannabi.json) defines the gates · [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) runs them |
 | **S7** | Running it inside five minutes with only the README | [README — quick start](../README.md) | Measured — build → boot → one swap completed. The control console's routes are checked on every build by `SimConsoleControlTest` |
 
 ## Conformance cases
