@@ -269,6 +269,7 @@ why the metrics avoid Micrometer) is in **[docs/API.md](docs/API.md)**.
 | Document | Contents |
 |---|---|
 | [docs/LAYERS.md](docs/LAYERS.md) | **Layer boundaries** — the codec is I/O-agnostic, the session layer is coroutine-only. What you take on when you use this as a library |
+| [docs/VIRTUAL-STATION.md](docs/VIRTUAL-STATION.md) | **Simulator operations, layered** — which calls are physical acts, which are protocol reports, which are just scripts (module boundaries are LAYERS.md) |
 | [docs/API.md](docs/API.md) | Full REST contract and design record |
 | [docs/CONFIGURATION.md](docs/CONFIGURATION.md) | Station authentication · REST authentication · TLS |
 | [docs/CONFORMANCE.md](docs/CONFORMANCE.md) | Conformance cases · success criteria S1–S7 · audit output |
