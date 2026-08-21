@@ -9,10 +9,13 @@
 #   L5 스테이션 인증 BasicAuthTest             — 보안 프로파일 1
 #   L6 API 인증     ApiAuthTest/SimConsoleControlTest — REST · 콘솔 인증
 #
-# ⚠️ L1 에 `:csms:cleanTest` 를 앞세우는 이유: 그냥 `build` 는 캐시가 살아 있으면
-#    `test` 가 UP-TO-DATE 로 스킵된다. CI 는 매번 새 체크아웃이지만 Gradle 캐시는
-#    액션이 복원하므로 여기서도 실제로 일어날 수 있다. 실제로 이 눈먼 지점에 결함이
-#    숨은 적이 있다.
+# ⚠️ 모든 게이트에 `--no-build-cache` 를 붙이는 이유: `:csms:cleanTest` 만으로는
+#    부족하다. 출력을 지워도 **빌드 캐시가 복원한다** (`gradle.properties` 의
+#    `org.gradle.caching=true`). 2026-08-21 실측 — `./gradlew cleanTest build` 가
+#    `:csms:test FROM-CACHE` 로 3.1초에 끝났고, `--no-build-cache` 를 붙이니 32초 동안
+#    시험이 실제로 돌았다. **시험을 돌리지 않은 게이트는 초록이어도 아무것도 확인하지
+#    않은 것이다.** 실제로 이 눈먼 지점에 결함이 숨은 적이 있다.
+#    CI 는 새 체크아웃이지만 setup-gradle 이 캐시를 복원하므로 여기서도 똑같이 일어난다.
 #
 # 게이트를 한 줄로 합치지 않는다. 합치면 "단위는 통과했는데 적합성이 깨졌다"가 로그
 # 어딘가에 묻히고, 게이트를 나눠 둔 이유가 사라진다.
@@ -45,29 +48,29 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
 
       - name: L1 단위 게이트 + 모듈 경계 검증
-        run: ./gradlew :csms:cleanTest build
+        run: ./gradlew --no-build-cache :csms:cleanTest build
 
       - name: L2 표준 적합성 게이트 (TC_S_102/103_CSMS · F1~F6)
-        run: ./gradlew conformanceTest
+        run: ./gradlew --no-build-cache conformanceTest
 
       - name: L3 부하 + 불변식 감사 게이트 (스테이션 20대 동시)
-        run: ./gradlew auditTest
+        run: ./gradlew --no-build-cache auditTest
 
       - name: L4 복구 · 보존 게이트
         run: >-
-          ./gradlew :csms:cleanTest :csms:test
+          ./gradlew --no-build-cache :csms:cleanTest :csms:test
           --tests '*EventLogRecoveryTest*'
           --tests '*SwapMetricsApiTest*'
           --tests '*RetentionTest*'
 
       - name: L5 스테이션 인증 게이트 (보안 프로파일 1)
-        run: ./gradlew :csms:cleanTest :csms:test --tests '*BasicAuthTest*'
+        run: ./gradlew --no-build-cache :csms:cleanTest :csms:test --tests '*BasicAuthTest*'
 
       # ⚠️ 이 게이트는 `.zannabi.json` 에는 있었는데 여기에 없었다. 파일 머리의 규칙이
       #    "두 곳을 같이 고친다" 인데 실제로 갈렸던 자리다.
       - name: L6 REST · 콘솔 인증 게이트
         run: >-
-          ./gradlew :csms:cleanTest :csms:test
+          ./gradlew --no-build-cache :csms:cleanTest :csms:test
           --tests '*ApiAuthTest*'
           --tests '*SimConsoleControlTest*'
 

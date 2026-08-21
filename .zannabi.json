@@ -2,27 +2,27 @@
   "gates": [
     {
       "name": "build",
-      "cmd": "./gradlew :csms:cleanTest build"
+      "cmd": "./gradlew --no-build-cache :csms:cleanTest build"
     },
     {
       "name": "conformance",
-      "cmd": "./gradlew conformanceTest"
+      "cmd": "./gradlew --no-build-cache conformanceTest"
     },
     {
       "name": "audit",
-      "cmd": "./gradlew auditTest"
+      "cmd": "./gradlew --no-build-cache auditTest"
     },
     {
       "name": "recovery",
-      "cmd": "./gradlew :csms:cleanTest :csms:test --tests '*EventLogRecoveryTest*' --tests '*SwapMetricsApiTest*' --tests '*RetentionTest*'"
+      "cmd": "./gradlew --no-build-cache :csms:cleanTest :csms:test --tests '*EventLogRecoveryTest*' --tests '*SwapMetricsApiTest*' --tests '*RetentionTest*'"
     },
     {
       "name": "basic-auth",
-      "cmd": "./gradlew :csms:cleanTest :csms:test --tests '*BasicAuthTest*'"
+      "cmd": "./gradlew --no-build-cache :csms:cleanTest :csms:test --tests '*BasicAuthTest*'"
     },
     {
       "name": "api-auth",
-      "cmd": "./gradlew :csms:cleanTest :csms:test --tests '*ApiAuthTest*' --tests '*SimConsoleControlTest*'"
+      "cmd": "./gradlew --no-build-cache :csms:cleanTest :csms:test --tests '*ApiAuthTest*' --tests '*SimConsoleControlTest*'"
     }
   ],
   "planModel": "claude-opus-5",
