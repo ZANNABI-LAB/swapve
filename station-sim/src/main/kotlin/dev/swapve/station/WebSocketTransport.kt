@@ -44,17 +44,17 @@ import java.util.concurrent.CompletionStage
 class WebSocketTransport private constructor(
     private val webSocket: WebSocket,
     private val scope: CoroutineScope,
-) : AutoCloseable {
+) : StationTransport {
 
     private val sendLock = Mutex()
 
     /** 서버가 101 에 실어 답한 서브프로토콜 (Part 4 §3.3). 협상되지 않았으면 빈 문자열이다. */
-    val subprotocol: String get() = webSocket.subprotocol
+    override val subprotocol: String get() = webSocket.subprotocol
 
-    val isOpen: Boolean get() = !webSocket.isInputClosed && !webSocket.isOutputClosed
+    override val isOpen: Boolean get() = !webSocket.isInputClosed && !webSocket.isOutputClosed
 
     /** 텍스트 프레임 한 줄을 보낸다. */
-    suspend fun send(text: String) = sendLock.withLock {
+    override suspend fun send(text: String) = sendLock.withLock {
         webSocket.sendText(text, true).await()
         Unit
     }

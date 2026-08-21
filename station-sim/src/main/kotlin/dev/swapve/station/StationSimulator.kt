@@ -73,6 +73,13 @@ import kotlin.time.Duration.Companion.seconds
  *
  * 모든 시각은 [clock] 에서 오고, 모든 단계는 상대의 CALLRESULT 를 기다려 이어진다.
  * `sleep` 이 없으므로 시험이 결정적이다.
+ *
+ * ### 전송은 주입점이다
+ *
+ * 연결을 여는 일만 [openTransport] 에 맡긴다. JDK 에는 서버 쪽 WebSocket 이 없어 가짜
+ * CSMS 를 세울 수 없으므로, 이 이음새가 없으면 시뮬레이터는 **실제 CSMS 를 통해서만**
+ * 시험된다 — 그때 빨개진 시험은 어느 쪽이 틀렸는지 말해 주지 않는다. 이유는
+ * [StationTransport] 에 적혀 있다.
  */
 class StationSimulator(
     val config: StationSimConfig,
@@ -81,6 +88,8 @@ class StationSimulator(
     /** 오간 메시지 원문이 전부 남는다. 시험이 이 로그를 읽어 계약을 확인한다. */
     val eventLog: InMemoryOcppEventLog = InMemoryOcppEventLog(),
     private val validator: OcppPayloadValidator = OcppPayloadValidator(),
+    /** 연결을 여는 방법. 기본값이 실제 경로고, 시험만 이것을 갈아 끼운다. */
+    private val openTransport: StationTransportFactory = StationTransportFactory.WebSocket,
 ) : AutoCloseable {
 
     /** 슬롯 하나의 현재 상태. 배터리 유무가 곧 [SlotState] 다. */
@@ -117,7 +126,7 @@ class StationSimulator(
     private val maxSoc: Double
         get() = (deviceModel.intOf(DeviceModelVariables.maxSoc()) ?: SimDeviceModel.DEFAULT_MAX_SOC).toDouble()
 
-    private var transport: WebSocketTransport? = null
+    private var transport: StationTransport? = null
 
     private var eventIdSeq = 0
     private var notifySeqNo = 0
@@ -162,7 +171,7 @@ class StationSimulator(
     /** CSMS 에 붙는다. `{csmsUrl}/{stationId}` 로 간다 (Part 4 §3.1.1). */
     suspend fun connect() {
         check(transport == null) { "이미 연결돼 있다: ${config.stationId}" }
-        transport = WebSocketTransport.connect(
+        transport = openTransport.open(
             url = config.connectUrl,
             authorization = config.basicAuthorization,
         ) { text -> session.receive(text) }
@@ -688,7 +697,7 @@ class StationSimulator(
     /** 끊긴 뒤 다시 붙는다. 멱등 원장은 CSMS 쪽에 남아 있으므로 재전송이 그대로 잡힌다. */
     suspend fun reconnect() {
         check(transport == null) { "아직 끊기지 않았다: ${config.stationId}" }
-        transport = WebSocketTransport.connect(
+        transport = openTransport.open(
             url = config.connectUrl,
             authorization = config.basicAuthorization,
         ) { text -> session.receive(text) }
@@ -1000,7 +1009,7 @@ class StationSimulator(
 
     private fun nextTxSeqNo(slot: SimSlot): Int = slot.txSeqNo++
 
-    private fun connectedTransport(): WebSocketTransport =
+    private fun connectedTransport(): StationTransport =
         transport ?: error("연결되지 않았다: ${config.stationId}")
 
     private fun context(slotId: Int? = null, requestId: Int? = null) =
