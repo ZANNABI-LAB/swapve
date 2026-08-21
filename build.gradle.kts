@@ -1,6 +1,7 @@
 plugins {
     alias(libs.plugins.kotlin.jvm) apply false
     alias(libs.plugins.maven.publish) apply false
+    alias(libs.plugins.dokka) apply false
 }
 
 subprojects {
@@ -63,7 +64,24 @@ subprojects {
 
     apply(plugin = "com.vanniktech.maven.publish")
 
+    /**
+     * ★ **javadoc jar 를 Dokka 로 채운다.**
+     *
+     * 플러그인 기본값은 빈 jar 다 — Central 은 존재 여부만 검사하므로 그대로도 통과한다.
+     * 그러나 좌표로 받은 소비자가 문서를 보는 경로는 IDE 가 붙여 주는 sources jar 와 이
+     * javadoc 뿐이고, 웹에서 읽을 방법은 이것 하나다. 이 라이브러리의 값어치가 대부분
+     * KDoc 에 들어 있으므로 빈 jar 로 내보내면 그 값어치가 닿지 않는다.
+     */
+    apply(plugin = "org.jetbrains.dokka")
+
     extensions.configure<com.vanniktech.maven.publish.MavenPublishBaseExtension> {
+        configure(
+            com.vanniktech.maven.publish.KotlinJvm(
+                javadocJar = com.vanniktech.maven.publish.JavadocJar.Dokka("dokkaGeneratePublicationHtml"),
+                sourcesJar = true,
+            ),
+        )
+
         publishToMavenCentral()
 
         // 서명은 Central 의 요구사항이다. 키가 없는 환경(로컬 리허설·CI 의 일반 빌드)에서는
@@ -117,11 +135,14 @@ subprojects {
      *
      * sources jar 에도 스키마가 실리므로 모든 `Jar` 태스크에 건다.
      */
-    tasks.withType<Jar>().configureEach {
-        metaInf {
-            from(rootProject.file("LICENSE"), rootProject.file("NOTICE"))
-        }
+    val notice = { spec: CopySpec ->
+        spec.from(rootProject.file("LICENSE"), rootProject.file("NOTICE"))
+        Unit
     }
+    tasks.withType<Jar>().configureEach { metaInf(notice) }
+    // Dokka 가 만드는 javadoc jar 는 위 `withType<Jar>` 에 걸리지 않는다 — 플러그인이 자기
+    // 타입으로 등록하기 때문이다. 배포되는 아티팩트이므로 따로 건다.
+    tasks.withType<com.vanniktech.maven.publish.tasks.JavadocJar>().configureEach { metaInf(notice) }
 
     // 서명 키가 없으면 서명을 요구하지 않는다. **배포 경로는 이 완화를 타지 않는다** —
     // Central 이 서명 없는 번들을 거절하므로, 키를 잊으면 업로드 단계에서 잡힌다.

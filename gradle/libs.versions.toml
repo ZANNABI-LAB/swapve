@@ -4,20 +4,21 @@ junit = "5.11.4"
 jackson = "2.18.2"
 networknt = "1.5.6"
 coroutines = "1.10.1"
-# csms 전용. ocpp-core / swap-domain 은 Spring 을 모른다 (PLAN §6 설계원칙 1)
+# csms 전용. ocpp-core / swap-domain 은 Spring 을 모른다 (빌드 검사로 강제한다)
 spring-boot = "3.4.1"
 spring-dependency-management = "1.1.7"
 # Maven Central Portal 배포. Sonatype 공식 Gradle 플러그인이 아직 없어 커뮤니티 표준을 쓴다.
 # ⚠️ 0.34.0 이 **Kotlin 2.1.x 를 지원하는 마지막 판**이다 (0.35.0 부터 KGP 2.2.0 을 요구한다).
 # Kotlin 을 올릴 때 이 버전도 같이 올린다 — 배포하려고 Kotlin 을 올리지는 않는다.
 maven-publish = "0.34.0"
+# API 문서. javadoc jar 를 채운다 — 좌표로 받은 소비자가 문서를 보는 다른 경로가 없다.
+dokka = "2.0.0"
 
 [libraries]
 jackson-databind = { module = "com.fasterxml.jackson.core:jackson-databind", version.ref = "jackson" }
-# 공식 스키마는 draft-06 이다 (PLAN §6 기술선택)
+# 공식 스키마는 draft-06 이다
 json-schema-validator = { module = "com.networknt:json-schema-validator", version.ref = "networknt" }
-# 시간순 정렬 가능한 ID — 로컬 카운터 금지 (PLAN §11.5)
-# 세션 계층의 동시성 — pending CALL 대기, per-station 락 (PLAN §11.5)
+# 세션 계층의 동시성 — pending CALL 대기, 스테이션 단위 락
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
 # 가상 시간. 타임아웃 테스트가 실제로 기다리지 않게 한다
 kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "coroutines" }
@@ -26,7 +27,7 @@ spring-boot-starter-websocket = { module = "org.springframework.boot:spring-boot
 spring-boot-starter-test = { module = "org.springframework.boot:spring-boot-starter-test" }
 # BCryptPasswordEncoder 만 쓴다. starter-security 를 넣으면 필터체인 자동설정까지 따라온다.
 spring-security-crypto = { module = "org.springframework.security:spring-security-crypto" }
-# OUT_TIMED_OUT 장부의 영속 (PLAN §5.3 불변식, §6 기술선택). JdbcTemplate 하나면 충분해
+# OUT_TIMED_OUT 장부의 영속. JdbcTemplate 하나면 충분해
 # JPA 는 넣지 않는다 — 테이블 1개짜리 장부에 ORM 은 순비용이다
 spring-boot-starter-jdbc = { module = "org.springframework.boot:spring-boot-starter-jdbc" }
 h2 = { module = "com.h2database:h2" }
@@ -44,3 +45,4 @@ kotlin-spring = { id = "org.jetbrains.kotlin.plugin.spring", version.ref = "kotl
 spring-boot = { id = "org.springframework.boot", version.ref = "spring-boot" }
 spring-dependency-management = { id = "io.spring.dependency-management", version.ref = "spring-dependency-management" }
 maven-publish = { id = "com.vanniktech.maven.publish", version.ref = "maven-publish" }
+dokka = { id = "org.jetbrains.dokka", version.ref = "dokka" }
