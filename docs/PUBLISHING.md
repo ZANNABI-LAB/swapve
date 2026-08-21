@@ -82,6 +82,14 @@ the root `build.gradle.kts`.
 
    Narrow the file permissions with `chmod 600`.
 
+   > ⚠️ **The `\n` form belongs to `.properties` files only.** A `.properties` file cannot hold a
+   > real newline inside a value, so the escape is required there and `java.util.Properties`
+   > turns it back. **A CI secret is different** — it reaches Gradle as an
+   > `ORG_GRADLE_PROJECT_signingInMemoryKey` environment variable, which is taken verbatim with
+   > no unescaping, so a literal `\n` would stay literal and PGP parsing would fail. Paste the
+   > **real multi-line armored key** into the secret. Real newlines are correct in both places;
+   > the escape is a workaround for one file format.
+
 ## Rehearsal — this is where problems get caught
 
 ### 1. Publish to the local repository
