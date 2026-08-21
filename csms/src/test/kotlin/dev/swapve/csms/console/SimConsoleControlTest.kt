@@ -398,6 +398,41 @@ class SimConsoleControlTest {
         assertContains(missingBody.path("error").asText(), "CS-NOT-THERE")
     }
 
+    /**
+     * ★ **`close` 는 되돌릴 수 없다** — `reconnect` 가 살려내는 것은 소켓뿐이다.
+     *
+     * 조작 13종 중 이것 하나만 되돌아오지 않는다. `disconnect` 는 소켓만 끊어 세션·슬롯을
+     * 남기지만 `close` 는 [dev.swapve.ocpp.session.OcppSession] 까지 닫는다. 그런데
+     * `reconnect` 의 검사는 `transport == null` 뿐이고 `close` 가 그 자리를 비워 놓으므로
+     * **재접속은 성공한다** — 화면에는 `connected:true` 와 협상 결과가 다시 뜬다.
+     *
+     * 그래서 여기서 붙잡는 것은 "재접속이 막힌다"가 아니라 **살아난 것처럼 보이는 그 화면이
+     * 거짓이라는 것**이다. 죽은 것은 세션이라 다음 조작에서야 드러나고, 그 드러나는 자리를
+     * 시험이 못박아 둔다. 콘솔이 나중에 이 조작을 되돌릴 수 있게 만든다면 여기가 먼저 터진다.
+     *
+     * 마지막 `authorize` 가 그 자리다. 붙어 보이지만 아무것도 보낼 수 없고, 422 와 스테이션의
+     * 사유가 그대로 온다 — 콘솔이 거절한 것이 아니라 시뮬레이터가 보낼 연결을 못 찾은 것이다.
+     */
+    @Test
+    fun `close 뒤 reconnect 는 소켓만 되살리고 세션은 죽어 있다`() {
+        val stationId = "CS-CONSOLE-OP-CLOSE"
+        attach(stationId)
+
+        val (closeStatus, closed) = op(stationId, """{"op":"close"}""")
+        assertEquals(200, closeStatus, "닫기가 통하지 않았다: ${closed.path("error").asText()}")
+        assertEquals(false, closed.path("connected").asBoolean(), "닫았는데 연결이 남아 있다")
+        assertTrue(closed.path("subprotocol").isNull, "연결이 없는데 협상 결과를 알고 있다")
+
+        val (reconnectStatus, reconnected) = op(stationId, """{"op":"reconnect"}""")
+        assertEquals(200, reconnectStatus, "재접속이 거절됐다: ${reconnected.path("error").asText()}")
+        assertTrue(reconnected.path("connected").asBoolean(), "소켓이 다시 열리지 않았다")
+        assertEquals("ocpp2.1", reconnected.path("subprotocol").asText())
+
+        val (status, body) = op(stationId, """{"op":"authorize"}""")
+        assertEquals(422, status, "세션이 닫혔는데 조작이 통했다")
+        assertContains(body.path("error").asText(), "보낼 연결이 없다")
+    }
+
     // ------------------------------------------------------------------ 오류 처리
 
     @Test
