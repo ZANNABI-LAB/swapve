@@ -125,7 +125,13 @@ class TestConnection(
     callTimeout: Duration = OcppSession.DEFAULT_CALL_TIMEOUT,
     onCall: OcppCallHandler = { _, _ -> InboundResponse.Respond.empty() },
     onSend: OcppSendHandler = { _, _ -> },
-    private val onTransmit: suspend (String) -> Unit = {},
+    /**
+     * 전송이 무엇을 답할지. 기본은 [TransmitOutcome.Delivered] 다.
+     *
+     * 죽은 전송을 흉내내려면 [TransmitOutcome.Gone] 을 돌려준다 — 실제 소켓 없이 전송 실패
+     * 경로를 시험할 수 있는 자리가 여기다.
+     */
+    private val onTransmit: suspend (String) -> TransmitOutcome = { TransmitOutcome.Delivered },
 ) {
     /** 이 연결로 나간 프레임 원문. */
     val sent: MutableList<String> = Collections.synchronizedList(mutableListOf<String>())

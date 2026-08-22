@@ -38,7 +38,7 @@ import kotlin.time.Duration
  *
  * ```
  * val sessions = OcppSessions(Clock.systemUTC(), eventSink = myEventLog)
- * val session = sessions.open(stationId, transmit = { ws.send(it) }, onCall = ::handle)
+ * val session = sessions.open(stationId, transmit = { ws.send(it); TransmitOutcome.Delivered }, onCall = ::handle)
  * ```
  */
 class OcppSessions(
@@ -57,14 +57,15 @@ class OcppSessions(
      * Call it again for the same station after a reconnect — the ledger and the serializer are
      * the same ones, which is what keeps idempotency and ordering intact across the gap.
      *
-     * @param transmit sends one frame line. It may throw; a response already recorded survives,
-     *   and a retransmission after reconnect gets it back.
+     * @param transmit sends one frame line and says whether it left ([OcppTransmit]). A dead
+     *   connection is [TransmitOutcome.Gone], not an exception. A response already recorded
+     *   survives an undelivered send, and a retransmission after reconnect gets it back.
      * @param onCall handles an incoming CALL. Called serially per station.
      * @param onSend handles an incoming SEND. A SEND is never answered.
      */
     fun open(
         stationId: String,
-        transmit: suspend (String) -> Unit,
+        transmit: OcppTransmit,
         onCall: OcppCallHandler,
         onSend: OcppSendHandler = { _, _ -> },
     ): OcppSession = OcppSession(

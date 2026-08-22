@@ -11,6 +11,26 @@ repository.
 
 ## [Unreleased]
 
+### Changed
+
+- **`transmit` now reports whether the frame left, instead of throwing.** Its type went from
+  `suspend (String) -> Unit` to `OcppTransmit` — `suspend (String) -> TransmitOutcome`, which is
+  `Delivered` or `Gone(reason)`. `OcppSession.call()` turns `Gone` into
+  `OcppResult.NotConnected`, so its documented promise — *"Never throws. Every outcome is an
+  `OcppResult`"* — is now true; it previously rethrew whatever the transport raised, which the
+  same file described as expected behaviour two paragraphs earlier. `send()` returns the outcome
+  for the same reason and no longer returns a messageId; the frame is recorded in the event log
+  before the attempt either way.
+
+  A reply that cannot be delivered on the inbound path is now dropped deliberately rather than
+  raising into whatever coroutine the consumer reads frames on. The ledger still holds the
+  answer, so a retransmission after reconnect gets it back byte for byte (Part 4 §4.1.4).
+
+  **Migration**: a transmit lambda that used to end in `Unit` now ends in `TransmitOutcome`.
+  Wrap the send and report a dead connection as `Gone` rather than letting the exception out.
+  Making the boundary total also makes it composable — retry, metrics or backpressure can wrap
+  an `OcppTransmit`, which a throwing boundary cannot support.
+
 ### Fixed
 
 - **A closed `OcppSession` now refuses inbound frames as well as outbound ones.** `closed` was

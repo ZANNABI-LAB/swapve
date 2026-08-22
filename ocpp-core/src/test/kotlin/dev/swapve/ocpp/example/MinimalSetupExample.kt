@@ -9,6 +9,7 @@ import dev.swapve.ocpp.session.InboundResponse
 import dev.swapve.ocpp.session.OcppCall
 import dev.swapve.ocpp.session.OcppResult
 import dev.swapve.ocpp.session.OcppSession
+import dev.swapve.ocpp.session.TransmitOutcome
 import dev.swapve.ocpp.session.StationSerializer
 import dev.swapve.ocpp.swap.BatterySwapWire
 import kotlinx.coroutines.test.runTest
@@ -71,7 +72,7 @@ class MinimalSetupExample {
 
         val csms = OcppSession(
             stationId = STATION_ID,
-            transmit = { line -> station.receive(line) },
+            transmit = { line -> station.receive(line); TransmitOutcome.Delivered },
             onCall = { _, call ->
                 // CSMS 가 받는 CALL. BatterySwap 은 빈 응답이 정답이다
                 // ("Empty response by CSMS to confirm receipt").
@@ -87,7 +88,7 @@ class MinimalSetupExample {
 
         station = OcppSession(
             stationId = STATION_ID,
-            transmit = { line -> csms.receive(line) },
+            transmit = { line -> csms.receive(line); TransmitOutcome.Delivered },
             onCall = { _, call ->
                 // 스테이션이 받는 CALL. S02 원격 개시를 받아들인다.
                 assertEquals(BatterySwapWire.REQUEST_BATTERY_SWAP, call.action)
@@ -161,7 +162,7 @@ class MinimalSetupExample {
 
         fun openSession(sent: MutableList<String>) = OcppSession(
             stationId = STATION_ID,
-            transmit = { line -> sent += line },
+            transmit = { line -> sent += line; TransmitOutcome.Delivered },
             onCall = { _, _ ->
                 handledCount++
                 InboundResponse.Respond.empty()

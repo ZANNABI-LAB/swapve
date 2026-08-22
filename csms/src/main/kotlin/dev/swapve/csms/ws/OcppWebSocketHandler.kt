@@ -7,6 +7,7 @@ import dev.swapve.ocpp.schema.OcppPayloadValidator
 import dev.swapve.ocpp.session.InboundCallLedger
 import dev.swapve.ocpp.session.OcppEventSink
 import dev.swapve.ocpp.session.OcppSession
+import dev.swapve.ocpp.session.TransmitOutcome
 import dev.swapve.ocpp.session.SessionRegistry
 import dev.swapve.ocpp.session.StationSerializer
 import kotlinx.coroutines.CoroutineName
@@ -96,7 +97,16 @@ class OcppWebSocketHandler(
             stationId = principal.stationId,
             transmit = { text ->
                 // 송신은 블로킹 I/O 다. 코루틴 기본 디스패처의 스레드를 붙잡지 않게 옮긴다.
-                withContext(Dispatchers.IO) { transport.sendMessage(TextMessage(text)) }
+                withContext(Dispatchers.IO) {
+                    try {
+                        transport.sendMessage(TextMessage(text))
+                        TransmitOutcome.Delivered
+                    } catch (failure: Exception) {
+                        // 소켓이 죽은 것은 정상 사건이다. 예외로 올리면 세션의 "모든 결과를
+                        // 값으로 돌려준다"가 깨지고, REST 가 "안 붙어 있다" 대신 500 을 낸다.
+                        TransmitOutcome.Gone("${principal.stationId}: ${failure.message ?: failure.toString()}")
+                    }
+                }
             },
             // 핸들러는 stationId 문자열이 아니라 StationPrincipal 을 받는다.
             onCall = { _, call -> router.handle(principal, call) },

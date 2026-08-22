@@ -8,7 +8,6 @@ import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
@@ -229,19 +228,45 @@ class OcppSessionInboundTest {
         )
     }
 
-    /** 닫힌 뒤의 발신은 세 갈래가 한 방향이다 — CALL 은 [OcppResult.NotConnected], SEND 는 예외. */
+    /** 닫힌 뒤의 발신은 두 갈래가 한 방향이다 — 둘 다 **값으로** 거절한다. */
     @Test
     fun `닫힌 세션은 발신도 거절한다`() = runTest {
         val connection = TestConnection()
         connection.session.close()
 
-        val result = connection.session.call(OcppCall("Heartbeat", emptyObj()))
-        assertIs<OcppResult.NotConnected>(result)
-
-        assertFailsWith<IllegalStateException> {
-            connection.session.send("NotifyPeriodicEventStream", emptyObj())
-        }
+        assertIs<OcppResult.NotConnected>(connection.session.call(OcppCall("Heartbeat", emptyObj())))
+        assertIs<TransmitOutcome.Gone>(connection.session.send("NotifyPeriodicEventStream", emptyObj()))
         assertTrue(connection.sent.isEmpty(), "닫힌 세션에서 프레임이 나갔다")
+    }
+
+    /**
+     * ★ **죽은 전송은 예외가 아니라 [OcppResult.NotConnected] 다.**
+     *
+     * 이 시험이 성립한다는 것 자체가 요점이다 — 소켓 없이 "보낼 수 없는 상태"를 만들 수 있는
+     * 것은 [OcppTransmit] 이 결과를 돌려주기 때문이다. 예전에는 전송이 예외를 던졌고,
+     * `call()` 은 그것을 그대로 올려보내면서 *"Never throws"* 라고 적어 두고 있었다.
+     */
+    @Test
+    fun `전송이 Gone 이면 call 은 NotConnected 를 돌려준다`() = runTest {
+        val connection = TestConnection(onTransmit = { TransmitOutcome.Gone("소켓이 죽었다") })
+
+        val result = connection.session.call(OcppCall("Heartbeat", emptyObj()))
+
+        assertIs<OcppResult.NotConnected>(result)
+        // 나간 것으로 **기록**은 남는다. 기록됐는데 안 나간 쪽이 그 반대보다 낫다 (emitRaw KDoc).
+        assertEquals(1, connection.log.of(connection.stationId).count { it.direction == MessageDirection.OUTBOUND })
+    }
+
+    /** 못 보낸 응답은 조용히 버린다 — 물어본 그 연결만이 답을 나를 수 있고, 원장이 답을 들고 있다. */
+    @Test
+    fun `응답을 못 보내도 예외가 아니고 원장에는 남는다`() = runTest {
+        val connection = TestConnection(onTransmit = { TransmitOutcome.Gone("소켓이 죽었다") })
+
+        connection.session.receive(callText("m1", "BatterySwap", batterySwapPayload(1, "BatteryIn")))
+        advanceUntilIdle()
+
+        val claim = connection.ledger.claim(InboundCallKey(connection.stationId, "m1"))
+        assertIs<CallClaim.AlreadyAnswered>(claim, "재전송이 가져갈 답이 남아 있지 않다")
     }
 
 }

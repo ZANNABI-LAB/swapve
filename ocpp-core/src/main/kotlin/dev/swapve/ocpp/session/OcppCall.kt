@@ -99,6 +99,41 @@ sealed interface InboundResponse {
 }
 
 /**
+ * What [OcppTransmit] reports back.
+ *
+ * **A result, not an exception** — the same rule [OcppResult.NotConnected] states. A connection
+ * that has gone away is an ordinary event, not a programming error, and the session has to be
+ * able to say so without unwinding the stack.
+ *
+ * Making this total is also what makes the seam composable: retry, metrics and backpressure can
+ * wrap an [OcppTransmit] and decide, because there is something to decide on. A boundary that
+ * reports failure by throwing cannot be wrapped — the wrapper either swallows the exception or
+ * can do nothing with it.
+ */
+sealed interface TransmitOutcome {
+
+    /** The line left this machine. It says nothing about the peer having read it. */
+    data object Delivered : TransmitOutcome
+
+    /**
+     * The connection could not carry it.
+     *
+     * @param reason for a human reading a log. The session does not branch on it.
+     */
+    data class Gone(val reason: String) : TransmitOutcome
+}
+
+/**
+ * Sends one frame line.
+ *
+ * The session turns frames into text and hands them here; it knows nothing of WebSocket, Spring
+ * or Netty. **Report a dead connection as [TransmitOutcome.Gone] rather than throwing** — the
+ * session treats that as an ordinary outcome, and throwing breaks [OcppSession.call]'s promise
+ * that every outcome comes back as a value.
+ */
+typealias OcppTransmit = suspend (text: String) -> TransmitOutcome
+
+/**
  * Handles an incoming CALL.
  *
  * Called **serially per station** ([StationSerializer]), so an implementation needs no

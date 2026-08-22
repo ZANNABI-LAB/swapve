@@ -49,8 +49,10 @@ import kotlin.time.Duration.Companion.seconds
  * they carry across a reconnect that replaces the session — which is exactly when a station
  * retransmits and idempotency has to still hold.
  *
- * @param transmit sends one frame line. It may throw — a response already recorded in the
- *   ledger survives, and a retransmission after reconnect gets it back.
+ * @param transmit sends one frame line and says whether it left ([OcppTransmit]). A dead
+ *   connection is [TransmitOutcome.Gone], not an exception — see that type for why. A response
+ *   already recorded in the ledger survives an undelivered send, and a retransmission after
+ *   reconnect gets it back.
  * @param callTimeout how long to await a response. The spec leaves the interval to the
  *   implementation but asks that **mobile networks have far longer round trips than wired ones**
  *   be taken into account (Part 4 §4.1.1). [DEFAULT_CALL_TIMEOUT] leaves that room.
@@ -60,7 +62,7 @@ import kotlin.time.Duration.Companion.seconds
  */
 class OcppSession(
     val stationId: String,
-    private val transmit: suspend (String) -> Unit,
+    private val transmit: OcppTransmit,
     private val onCall: OcppCallHandler,
     private val eventSink: OcppEventSink,
     private val ledger: InboundCallLedger,
@@ -90,7 +92,9 @@ class OcppSession(
      * rather than rejecting is deliberate: handing callers a "not now" would make every call
      * site write the same retry loop.
      *
-     * Never throws. Every outcome is an [OcppResult].
+     * Never throws. Every outcome is an [OcppResult] — including a transport that has gone
+     * away, which comes back as [OcppResult.NotConnected]. The reason stays with the transport;
+     * the session does not carry it up, because callers act on the outcome, not the wording.
      */
     suspend fun call(call: OcppCall): OcppResult {
         if (closed) return OcppResult.NotConnected(stationId)
@@ -100,11 +104,9 @@ class OcppSession(
             val waiter = PendingCall(call.action, CompletableDeferred())
             pending[messageId] = waiter
 
-            try {
-                emit(OcppFrame.Call(messageId, call.action, call.payload), call.action)
-            } catch (e: Throwable) {
+            if (emit(OcppFrame.Call(messageId, call.action, call.payload), call.action) is TransmitOutcome.Gone) {
                 pending.remove(messageId)
-                throw e
+                return@withLock OcppResult.NotConnected(stationId)
             }
 
             val result = withTimeoutOrNull(callTimeout) { waiter.response.await() }
@@ -119,17 +121,16 @@ class OcppSession(
      * It expects no response, so the §4.1.1 synchronicity rule does not apply — **it goes out
      * immediately even with a CALL pending.**
      *
-     * Throws once [close] has run. [call] can report that as an [OcppResult.NotConnected] because
-     * it returns one; this returns a messageId, and handing back an id for a frame that never
-     * left would be a lie the caller cannot detect.
+     * A closed session and a dead transport are both [TransmitOutcome.Gone]. Returning the
+     * messageId of a frame that never left would be a lie the caller cannot detect, so the id
+     * is not the return value — the frame is the last OUTBOUND record for this station in the
+     * event log, written before the attempt either way.
      *
-     * @return the messageId that was issued, for matching against the event log.
+     * @return whether the frame left this machine.
      */
-    suspend fun send(action: String, payload: ObjectNode): String {
-        check(!closed) { "session is closed: $stationId" }
-        val messageId = MessageIds.newId()
-        emit(OcppFrame.Send(messageId, action, payload), action)
-        return messageId
+    suspend fun send(action: String, payload: ObjectNode): TransmitOutcome {
+        if (closed) return TransmitOutcome.Gone("session is closed: $stationId")
+        return emit(OcppFrame.Send(MessageIds.newId(), action, payload), action)
     }
 
     /**
@@ -165,6 +166,15 @@ class OcppSession(
      * what keeps a closed session from becoming a half-dead peer: one that still answers the
      * other side's requests while [call] refuses to originate anything. No real station behaves
      * that way, and a test tool that can produce it will eventually be believed.
+     *
+     * ### An answer that cannot be delivered is dropped on purpose
+     *
+     * Every reply on this path goes out through [emitRaw], which may report
+     * [TransmitOutcome.Gone]. Nothing is retried and nothing is raised. The connection that
+     * carried the question is the only one that can carry the answer, and it is no longer there;
+     * what survives is the [ledger] entry, so the peer's retransmission after reconnect gets the
+     * same answer back byte for byte (Part 4 §4.1.4). Raising instead would land in whatever
+     * coroutine the consumer reads frames on — which is where a failure goes to be lost.
      */
     suspend fun receive(text: String) {
         if (closed) return
@@ -324,7 +334,7 @@ class OcppSession(
         is OcppFrame.CallResultError -> null
     }
 
-    private suspend fun emit(frame: OcppFrame, action: String?) =
+    private suspend fun emit(frame: OcppFrame, action: String?): TransmitOutcome =
         emitRaw(codec.encode(frame), action, frame.messageId)
 
     /**
@@ -332,11 +342,12 @@ class OcppSession(
      *
      * Recording comes first. Sent-but-unrecorded is worse than recorded-but-unsent: the former
      * makes state unreconstructible from the log, while the latter is recoverable by
-     * retransmission.
+     * retransmission. So a [TransmitOutcome.Gone] leaves a record of a frame that never left,
+     * and that is the direction this is meant to fail in.
      */
-    private suspend fun emitRaw(text: String, action: String?, messageId: String) {
+    private suspend fun emitRaw(text: String, action: String?, messageId: String): TransmitOutcome {
         eventSink.append(stationId, MessageDirection.OUTBOUND, action, messageId, text, clock.instant())
-        transmit(text)
+        return transmit(text)
     }
 
     private fun callError(messageId: String, code: RpcErrorCode, description: String) =

@@ -15,6 +15,7 @@ import dev.swapve.ocpp.session.OcppEventRecord
 import dev.swapve.ocpp.session.OcppResult
 import dev.swapve.ocpp.session.OcppSession
 import dev.swapve.ocpp.session.StationSerializer
+import dev.swapve.ocpp.session.TransmitOutcome
 import dev.swapve.ocpp.swap.BatteryRejectionReason
 import dev.swapve.ocpp.swap.BatterySwapWire
 import dev.swapve.ocpp.swap.DeviceModelVariables
@@ -157,7 +158,7 @@ class StationSimulator(
      */
     private val session = OcppSession(
         stationId = config.stationId,
-        transmit = { text -> connectedTransport().send(text) },
+        transmit = { text -> transmitOrGone(text) },
         onCall = { _, call -> handleInboundCall(call) },
         eventSink = eventLog,
         ledger = InboundCallLedger(),
@@ -1008,6 +1009,23 @@ class StationSimulator(
         checkNotNull(slot.transactionId) { "충전 트랜잭션이 없는 슬롯: ${slot.config.slotId}" }
 
     private fun nextTxSeqNo(slot: SimSlot): Int = slot.txSeqNo++
+
+    /**
+     * 전송이 있으면 보내고, 없거나 실패하면 [TransmitOutcome.Gone] 이다.
+     *
+     * **던지지 않는다.** 끊긴 채로 보내려는 것은 이 시뮬레이터에서 정상 사건이다 — F6 은
+     * 일부러 끊고, 사람은 콘솔에서 아무 때나 조작을 누른다. 예외로 알리면 `OcppSession.call`
+     * 이 "모든 결과를 값으로 돌려준다"는 약속을 지킬 수 없다.
+     */
+    private suspend fun transmitOrGone(text: String): TransmitOutcome {
+        val transport = this.transport ?: return TransmitOutcome.Gone("연결되지 않았다: ${config.stationId}")
+        return try {
+            transport.send(text)
+            TransmitOutcome.Delivered
+        } catch (failure: Exception) {
+            TransmitOutcome.Gone("전송이 실패했다: ${config.stationId} — ${failure.message ?: failure.toString()}")
+        }
+    }
 
     private fun connectedTransport(): StationTransport =
         transport ?: error("연결되지 않았다: ${config.stationId}")

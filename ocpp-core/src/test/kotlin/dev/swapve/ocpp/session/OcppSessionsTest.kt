@@ -30,7 +30,7 @@ class OcppSessionsTest {
         val firstSent = mutableListOf<String>()
         val first = sessions.open(
             stationId = "ST-1",
-            transmit = { firstSent += it },
+            transmit = { firstSent += it; TransmitOutcome.Delivered },
             onCall = { _, _ -> handled++; InboundResponse.Respond.empty() },
         )
 
@@ -44,7 +44,7 @@ class OcppSessionsTest {
         val secondSent = mutableListOf<String>()
         val second = sessions.open(
             stationId = "ST-1",
-            transmit = { secondSent += it },
+            transmit = { secondSent += it; TransmitOutcome.Delivered },
             onCall = { _, _ -> handled++; InboundResponse.Respond.empty() },
         )
         second.receive(batterySwapCall(messageId))
@@ -61,8 +61,8 @@ class OcppSessionsTest {
         val sentA = mutableListOf<String>()
         val sentB = mutableListOf<String>()
 
-        val a = sessions.open("ST-A", transmit = { sentA += it }, onCall = { _, _ -> handled++; InboundResponse.Respond.empty() })
-        val b = sessions.open("ST-B", transmit = { sentB += it }, onCall = { _, _ -> handled++; InboundResponse.Respond.empty() })
+        val a = sessions.open("ST-A", transmit = { sentA += it; TransmitOutcome.Delivered }, onCall = { _, _ -> handled++; InboundResponse.Respond.empty() })
+        val b = sessions.open("ST-B", transmit = { sentB += it; TransmitOutcome.Delivered }, onCall = { _, _ -> handled++; InboundResponse.Respond.empty() })
 
         // 원장 하나를 공유해도 키에 stationId 가 들어가므로 섞이지 않는다.
         a.receive(batterySwapCall("same-id"))
@@ -77,7 +77,7 @@ class OcppSessionsTest {
     fun `팩토리가 연 세션도 손으로 조립한 것과 같은 성질을 갖는다`() = runTest {
         val sessions = OcppSessions(clock = TEST_CLOCK, eventSink = InMemoryOcppEventLog(), validator = sharedValidator)
         val sent = mutableListOf<String>()
-        val session = sessions.open("ST-1", transmit = { sent += it }, onCall = { _, _ -> InboundResponse.Respond.empty() })
+        val session = sessions.open("ST-1", transmit = { sent += it; TransmitOutcome.Delivered }, onCall = { _, _ -> InboundResponse.Respond.empty() })
 
         // 스키마를 통과하지 못한 CALL 은 CALLERROR 로 답한다 — 세션의 판정이 그대로 산다.
         session.receive(callText("m-1", BatterySwapWire.BATTERY_SWAP, emptyObj()))
