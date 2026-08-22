@@ -8,6 +8,17 @@ plugins {
 dependencies {
     implementation(project(":ocpp-core"))
     implementation(project(":swap-domain"))
+
+    // 가짜 CSMS 앞에서 CALL 타임아웃(30초)을 시험하려면 가상 시간이 필요하다. `ocpp-core` 가
+    // 같은 이유로 이미 쓰는 좌표이며, 시험 소스에만 붙으므로
+    // `checkNoForbiddenDependencies`(compileClasspath) 의 대상이 아니다.
+    testImplementation(libs.kotlinx.coroutines.test)
+}
+
+// runTest / currentTime — 가상 시간 API 는 아직 실험 단계로 표시돼 있다.
+// `ocpp-core` 와 같은 모양으로 시험 소스에서만 opt-in 한다.
+tasks.named<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>("compileTestKotlin") {
+    compilerOptions.optIn.add("kotlinx.coroutines.ExperimentalCoroutinesApi")
 }
 
 application {
