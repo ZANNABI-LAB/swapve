@@ -137,7 +137,8 @@ class OcppSession(
      * The connection ended. Wakes every awaiting CALL with [OcppResult.NotConnected].
      *
      * **This session is finished — the flag is one-way and every entry point honours it.**
-     * [call] answers [OcppResult.NotConnected], [send] throws, and [receive] drops the line.
+     * [call] answers [OcppResult.NotConnected], [send] answers [TransmitOutcome.Gone], and
+     * [receive] drops the line. All three report it as a value; none of them throw.
      * A session belongs to one connection: when the peer comes back, open a new one rather than
      * putting a fresh transport under this object. Reusing it would leave the outbound half dead
      * and the inbound half alive, which is a state no station has.

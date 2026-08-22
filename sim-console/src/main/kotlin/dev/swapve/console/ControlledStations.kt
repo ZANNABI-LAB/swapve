@@ -500,10 +500,20 @@ class ControlledStation(val spec: StationSpec) : AutoCloseable {
         }
     }
 
+    /**
+     * 내린다.
+     *
+     * **표시와 종료가 락 안에 함께 있어야 한다.** `detached` 를 밖에서 세우면, 락 안에서
+     * 그 표시를 확인하고 [worker] 에 넣으려는 요청이 그 사이를 지나 **이미 닫힌 실행기**에
+     * 던지게 된다 — `RejectedExecutionException` 이 404 대신 500 으로 나가고, [start] 쪽에서는
+     * `progress` 가 `RUNNING` 에 박혀 이후 조작이 영영 409 가 된다.
+     *
+     * `shutdownNow()` 는 인터럽트만 걸고 곧바로 돌아오므로 락을 오래 쥐지 않는다.
+     */
     override fun close() {
-        detached = true
-        worker.shutdownNow()
         synchronized(lock) {
+            detached = true
+            worker.shutdownNow()
             simulator?.close()
             simulator = null
         }
@@ -516,9 +526,11 @@ class ControlledStation(val spec: StationSpec) : AutoCloseable {
      *
      * 두 자리가 시뮬레이터의 값을 그대로 옮기지 못한다.
      *
-     * - `subprotocol` 은 연결이 있어야 답할 수 있다 — 없으면 `StationSimulator` 가 예외를
-     *   던진다. 관측이 상태를 무너뜨려서는 안 되므로 `isConnected` 로 갈라 `null` 로 둔다.
-     *   붙지 않은 스테이션의 협상 결과를 아는 척하는 것보다 모른다고 답하는 편이 맞다.
+     * - `subprotocol` 은 붙어 있지 않으면 `null` 이다. 아는 척하는 것보다 모른다고 답하는
+     *   편이 맞다. **여기서 갈라 주지 않는다** — 한때 `isConnected` 로 먼저 걸렀는데, 그
+     *   둘이 전송을 각각 읽으므로 사이에 끊기면 관측이 예외로 끝났다. 스냅샷은 HTTP
+     *   스레드에서 뜨고 조작은 작업 스레드에서 도니 실제로 벌어지는 순서다. 판정을
+     *   `StationSimulator` 안의 한 번 읽기로 옮겼다.
      * - `chargingSuspended` 는 시뮬레이터가 없으면 `false` 다. 급전 자체가 없는 것이지
      *   멈춰 있는 것이 아니다.
      *
@@ -556,7 +568,7 @@ class ControlledStation(val spec: StationSpec) : AutoCloseable {
                     chargingSuspended = simulator?.isChargingSuspended(slot.slotId) == true,
                 )
             },
-            subprotocol = simulator?.takeIf { it.isConnected }?.subprotocol,
+            subprotocol = simulator?.subprotocol,
             events = simulator?.eventLog?.of(spec.stationId).orEmpty()
                 .takeLast(StationSnapshot.EVENT_TAIL)
                 .asReversed()

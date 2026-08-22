@@ -251,6 +251,10 @@ function disabledReason(station, op, form) {
   if (op === "connect" || op === "reconnect") {
     return station.connected ? "이미 붙어 있다" : null;
   }
+  // 상대가 먼저 닫으면 소켓은 죽었는데 전송 객체는 남는다. 그때 connected 는 거짓이지만
+  // connect/reconnect 는 서버에서 "이미 연결돼 있다"로 막히므로, disconnect 를 함께 막으면
+  // 화면에서 되살릴 길이 없어진다. 붙어 있지 않을 때 눌러도 하는 일이 없을 뿐이다.
+  if (op === "disconnect") return null;
   if (!station.connected) return "붙어 있지 않다 — 먼저 connect 를 걸어야 한다";
 
   if (op === "insertBatteries") {

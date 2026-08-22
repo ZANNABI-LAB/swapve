@@ -24,6 +24,7 @@ import dev.swapve.ocpp.swap.VariableRef
 import dev.swapve.ocpp.swap.VariableStatus
 import dev.swapve.ocpp.swap.VariableWrite
 import dev.swapve.swap.SlotState
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withTimeout
@@ -195,8 +196,15 @@ class StationSimulator(
 
     val isConnected: Boolean get() = transport?.isOpen == true
 
-    /** 협상된 서브프로토콜. `ocpp2.1` 이어야 한다 (Part 4 §3.1.2). */
-    val subprotocol: String get() = connectedTransport().subprotocol
+    /**
+     * 협상된 서브프로토콜. `ocpp2.1` 이어야 한다 (Part 4 §3.1.2). 붙어 있지 않으면 `null` 이다.
+     *
+     * **던지지 않는다.** 예전에는 [connectedTransport] 를 거쳐 미연결이면 예외였고, 부르는
+     * 쪽이 [isConnected] 로 먼저 갈랐다. 그 둘은 [transport] 를 **각각** 읽으므로 사이에
+     * 끊기면 관측이 예외로 끝난다 — 콘솔의 스냅샷은 HTTP 스레드에서 뜨고 조작은 작업
+     * 스레드에서 돌므로 실제로 벌어질 수 있는 순서다. 여기서 한 번만 읽어 그 창을 없앤다.
+     */
+    val subprotocol: String? get() = transport?.takeIf { it.isOpen }?.subprotocol
 
     override fun close() {
         closed = true
@@ -1033,12 +1041,22 @@ class StationSimulator(
      * **던지지 않는다.** 끊긴 채로 보내려는 것은 이 시뮬레이터에서 정상 사건이다 — F6 은
      * 일부러 끊고, 사람은 콘솔에서 아무 때나 조작을 누른다. 예외로 알리면 `OcppSession.call`
      * 이 "모든 결과를 값으로 돌려준다"는 약속을 지킬 수 없다.
+     *
+     * ### 취소는 예외다 — 말 그대로
+     *
+     * [CancellationException] 만은 다시 던진다. 취소는 실패가 아니라 **호출자가 그만두라고
+     * 한 것**이고, [TransmitOutcome.Gone] 으로 바꾸면 코루틴이 풀리지 않은 채 부르는 쪽은
+     * 소켓이 죽은 줄 안다. `kotlinx.coroutines.CancellationException` 이
+     * [IllegalStateException] 이라 아래 `Exception` 에 그냥 걸리므로, **catch 순서가 곧
+     * 규칙이다** — 위에 두지 않으면 조용히 삼켜진다.
      */
     private suspend fun transmitOrGone(text: String): TransmitOutcome {
         val transport = this.transport ?: return TransmitOutcome.Gone("연결되지 않았다: ${config.stationId}")
         return try {
             transport.send(text)
             TransmitOutcome.Delivered
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (failure: Exception) {
             TransmitOutcome.Gone("전송이 실패했다: ${config.stationId} — ${failure.message ?: failure.toString()}")
         }
