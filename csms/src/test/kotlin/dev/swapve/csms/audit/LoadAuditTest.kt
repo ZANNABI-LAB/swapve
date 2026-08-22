@@ -189,7 +189,7 @@ class LoadAuditTest {
     }
 
     private fun countConnected(): Int =
-        sessions.connectedStationIds.count { it in runStationIds }
+        sessions.registeredStationIds.count { it in runStationIds }
 
     private companion object {
         /** 접속 관측을 기다리는 상한. 넘기면 그냥 관측한 수로 단언에 들어가 실패로 남는다. */

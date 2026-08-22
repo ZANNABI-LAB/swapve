@@ -4,6 +4,7 @@ import dev.swapve.swap.IdToken
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -112,6 +113,32 @@ class StationTransportSeamTest {
             /** 실제 협상값과 같은 것을 답한다 (Part 4 §3.1.2). */
             const val SUBPROTOCOL = WebSocketTransport.SUBPROTOCOL
         }
+    }
+
+    /**
+     * ★ **닫은 시뮬레이터는 다시 붙지 않는다.**
+     *
+     * `close()` 는 `AutoCloseable` 이다 — "스테이션 전원을 내린다"가 아니라 "이 객체를 그만
+     * 쓴다"이고, 세션까지 닫는다. 막지 않으면 `reconnect()` 의 검사가 `transport == null`
+     * 하나뿐이라 **재접속이 성공하고**, 소켓은 열렸는데 아무것도 보내지 못하는 스테이션이
+     * 된다. `isConnected` 는 참인데 벙어리다.
+     *
+     * 이 검사는 순서 게이트가 아니다. 순서 게이트였다면 `authorize()` 없는
+     * `insertBatteries()`(=F5)도 막았을 것이고, 그건 이 시뮬레이터가 시험 도구인 이유를
+     * 없앤다. 여기서 묻는 것은 프로토콜 순서가 아니라 **객체가 살아 있는가**다.
+     */
+    @Test
+    fun `닫은 시뮬레이터는 다시 붙지 않는다`() = runBlocking {
+        val factory = RecordingFactory()
+        val station = simulator(factory)
+
+        station.connect()
+        station.close()
+
+        assertFailsWith<IllegalStateException> { station.reconnect() }
+        assertFailsWith<IllegalStateException> { station.connect() }
+        assertFalse(station.isConnected, "닫혔는데 붙어 있다")
+        assertEquals(1, factory.opened.size, "닫힌 뒤에 전송이 또 열렸다")
     }
 
     // ------------------------------------------------------------------ 공통

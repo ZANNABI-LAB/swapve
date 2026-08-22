@@ -30,7 +30,7 @@ interface StationCommandBus {
  * The connected sessions.
  *
  * [sessionOf] being `internal` is the point — **session objects never leave this module**. What
- * the layer above can reach is [StationCommandBus] and [isConnected], nothing else.
+ * the layer above can reach is [StationCommandBus] and [isRegistered], nothing else.
  *
  * Thread-safe.
  */
@@ -53,9 +53,22 @@ class SessionRegistry {
      */
     fun unregister(session: OcppSession): Boolean = sessions.remove(session.stationId, session)
 
-    fun isConnected(stationId: String): Boolean = sessions.containsKey(stationId)
+    /**
+     * Whether a session for that station is registered here.
+     *
+     * **Not the same as being able to reach it.** A socket can die between the last frame and
+     * the teardown that unregisters this session, and nothing in this class can see that. The
+     * authoritative answer to *"can I send to this station"* is what [StationCommandBus.send]
+     * returns — [OcppResult.NotConnected] covers both "no session" and "the transport is gone"
+     * (see [TransmitOutcome]).
+     *
+     * Named for what it checks. It was called `isConnected`, which claimed more than a
+     * `ConcurrentHashMap` lookup can know.
+     */
+    fun isRegistered(stationId: String): Boolean = sessions.containsKey(stationId)
 
-    val connectedStationIds: Set<String> get() = sessions.keys.toSet()
+    /** The stations with a registered session. Carries the same caveat as [isRegistered]. */
+    val registeredStationIds: Set<String> get() = sessions.keys.toSet()
 
     internal fun sessionOf(stationId: String): OcppSession? = sessions[stationId]
 }

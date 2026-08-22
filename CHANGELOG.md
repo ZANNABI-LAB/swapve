@@ -31,6 +31,12 @@ repository.
   Making the boundary total also makes it composable — retry, metrics or backpressure can wrap
   an `OcppTransmit`, which a throwing boundary cannot support.
 
+- **`SessionRegistry.isConnected` is now `isRegistered`**, and `connectedStationIds` is
+  `registeredStationIds`. Both only ever asked whether a session is in the map, which is not the
+  same as being able to reach the station — a socket can die between the last frame and the
+  teardown that unregisters it. The authoritative answer is what `StationCommandBus.send`
+  returns.
+
 ### Fixed
 
 - **A closed `OcppSession` now refuses inbound frames as well as outbound ones.** `closed` was

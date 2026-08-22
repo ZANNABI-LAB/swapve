@@ -55,11 +55,11 @@ class StationCommandBusTest {
         val bus: StationCommandBus = LocalStationCommandBus(registry)
         val connection = TestConnection("ST-1")
         registry.register(connection.session)
-        assertTrue(registry.isConnected("ST-1"))
+        assertTrue(registry.isRegistered("ST-1"))
 
         connection.session.close()
         assertTrue(registry.unregister(connection.session))
-        assertFalse(registry.isConnected("ST-1"))
+        assertFalse(registry.isRegistered("ST-1"))
 
         assertIs<OcppResult.NotConnected>(bus.send("ST-1", OcppCall("Heartbeat", emptyObj())))
     }
@@ -99,8 +99,8 @@ class StationCommandBusTest {
 
         // 옛 연결의 정리가 뒤늦게 도착한다.
         assertFalse(registry.unregister(before.session))
-        assertTrue(registry.isConnected("ST-1"), "살아 있는 새 세션이 지워졌다")
-        assertEquals(setOf("ST-1"), registry.connectedStationIds)
+        assertTrue(registry.isRegistered("ST-1"), "살아 있는 새 세션이 지워졌다")
+        assertEquals(setOf("ST-1"), registry.registeredStationIds)
     }
 
     @Test

@@ -129,6 +129,20 @@ class StationSimulator(
 
     private var transport: StationTransport? = null
 
+    /**
+     * [close] 가 돌았는가.
+     *
+     * **순서 게이트가 아니라 객체 수명이다.** 이 시뮬레이터의 다른 검사들은 전부 스테이션
+     * 안의 물리적 사실을 묻고(슬롯이 비었는가, 연결이 있는가) 호출 순서는 묻지 않는다 —
+     * `authorize()` 없이 `insertBatteries()` 가 통해야 F5 가 성립하기 때문이다. 이 플래그는
+     * 그 축이 아니다. `AutoCloseable` 을 닫은 뒤 다시 쓰는 것을 막을 뿐이고, 같은 종류의
+     * 검사가 `ControlledStation` 에도 이미 있다(`check(!detached)`).
+     *
+     * 막지 않으면 `close()` 뒤 `reconnect()` 가 성공해 **붙었지만 완전히 벙어리인**
+     * 스테이션이 된다. 세션이 닫혀 아무것도 보내지 못하는데 `isConnected` 는 참이다.
+     */
+    private var closed = false
+
     private var eventIdSeq = 0
     private var notifySeqNo = 0
 
@@ -171,6 +185,7 @@ class StationSimulator(
 
     /** CSMS 에 붙는다. `{csmsUrl}/{stationId}` 로 간다 (Part 4 §3.1.1). */
     suspend fun connect() {
+        check(!closed) { "이미 닫힌 시뮬레이터다: ${config.stationId}" }
         check(transport == null) { "이미 연결돼 있다: ${config.stationId}" }
         transport = openTransport.open(
             url = config.connectUrl,
@@ -184,6 +199,7 @@ class StationSimulator(
     val subprotocol: String get() = connectedTransport().subprotocol
 
     override fun close() {
+        closed = true
         session.close()
         transport?.close()
         transport = null
@@ -697,6 +713,7 @@ class StationSimulator(
 
     /** 끊긴 뒤 다시 붙는다. 멱등 원장은 CSMS 쪽에 남아 있으므로 재전송이 그대로 잡힌다. */
     suspend fun reconnect() {
+        check(!closed) { "이미 닫힌 시뮬레이터다: ${config.stationId}" }
         check(transport == null) { "아직 끊기지 않았다: ${config.stationId}" }
         transport = openTransport.open(
             url = config.connectUrl,
