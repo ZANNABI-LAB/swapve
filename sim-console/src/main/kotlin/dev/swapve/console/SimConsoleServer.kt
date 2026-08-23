@@ -335,6 +335,7 @@ class SimConsoleServer(
             .put("requestId", snapshot.requestId)
             .put("messageCount", snapshot.messageCount)
             .put("subprotocol", snapshot.subprotocol)
+            .put("lastTransmitFailure", snapshot.lastTransmitFailure)
             .set<ObjectNode>("slots", slots)
             .set<ObjectNode>("events", events)
     }

@@ -424,6 +424,115 @@ class SimConsoleControlTest {
         assertContains(body.path("error").asText(), "disconnect", message = "고를 수 있는 조작이 안내되지 않는다")
     }
 
+    /**
+     * ★ **나가지 못한 전송이 스냅샷에 남는다** — 그 한 칸이 아니면 어디에도 없다.
+     *
+     * ### 이벤트 로그로는 만들 수 없다
+     *
+     * `OcppSession.emitRaw` 는 **보내기 전에** 적는다 (그쪽 KDoc: 기록되고 안 나간 것이
+     * 나가고 기록 안 된 것보다 낫다). 그래서 `TransmitOutcome.Gone` 이어도 OUTBOUND 기록은
+     * 남고, 그 기록은 배달된 프레임과 **글자 하나 다르지 않다.** 아래 (1)(2) 가 그 사실을
+     * 그대로 단언한다 — `lastTransmitFailure` 가 파생이 아니라 새 관측인 근거다.
+     *
+     * ### `connected` 가 답하는 것
+     *
+     * `transport?.isOpen` 하나다 — **지금 소켓이 있는가**이지 방금 보낸 것이 나갔는가가
+     * 아니다. (4) 가 그 구분을 경합 없이 만든다: 다시 붙이면 `connected` 는 참으로 돌아오지만
+     * 마지막 전송은 여전히 나가지 못한 그것이고, 화면이 보여줄 것은 그 창이다.
+     */
+    @Test
+    fun `나가지 못한 전송이 스냅샷에 남는다`() {
+        val stationId = "CS-CONSOLE-OP-GONE"
+        val attached = attach(stationId)
+        val beforeGone = attached.path("messageCount").asInt()
+        assertTrue(attached.path("lastTransmitFailure").isNull, "붙자마자 전송이 실패해 있다")
+
+        // 소켓만 없앤다. 세션도 슬롯도 그대로라 다음 조작은 정상으로 시작해 전송에서만 죽는다.
+        val (disconnectStatus, disconnected) = op(stationId, """{"op":"disconnect"}""")
+        assertEquals(200, disconnectStatus, "끊기지 않았다: ${disconnected.path("error").asText()}")
+        assertEquals(false, disconnected.path("connected").asBoolean())
+
+        val (authorizeStatus, failure) = op(stationId, """{"op":"authorize"}""")
+        assertEquals(422, authorizeStatus, "전송이 죽었는데 조작이 통했다")
+        assertContains(failure.path("error").asText(), "보낼 연결이 없다")
+
+        val gone = station(stationId)
+
+        // (1) 나가지 못했는데도 기록은 남았다.
+        assertTrue(
+            gone.path("messageCount").asInt() > beforeGone,
+            "나가지 못한 프레임이 기록되지도 않았다 — emitRaw 의 순서가 바뀌었다",
+        )
+        val recorded = gone.path("events").first()
+        assertEquals("OUTBOUND", recorded.path("direction").asText())
+        assertEquals("Authorize", recorded.path("action").asText())
+
+        // (2) 그 기록은 **배달된 프레임과 모양이 같다.** 실린 칸이 넷뿐이라 결과를 담을 자리가 없다.
+        assertEquals(
+            listOf("action", "direction", "messageId", "occurredAt", "seq"),
+            recorded.fieldNames().asSequence().sorted().toList(),
+            "이벤트에 전송 결과를 담을 칸이 생겼다",
+        )
+
+        // (3) ★ 그래서 스냅샷이 따로 말한다. 각본의 자리(note·error·progress)는 그대로 침묵한다 —
+        //     조작은 각본이 아니고, 전송 실패를 각본의 실패로 적으면 둘이 뒤섞인다.
+        assertContains(gone.path("lastTransmitFailure").asText(), "연결되지 않았다")
+        assertContains(gone.path("lastTransmitFailure").asText(), stationId)
+        assertTrue(gone.path("note").isNull, "각본이 아닌데 note 가 있다: ${gone.path("note")}")
+        assertTrue(gone.path("error").isNull, "각본이 아닌데 error 가 있다: ${gone.path("error")}")
+        assertEquals("ATTACHED", gone.path("progress").asText(), "조작은 각본의 진행을 건드리지 않는다")
+
+        // (4) 다시 붙이면 connected 는 참으로 돌아온다. 소켓을 여는 것은 프레임을 보내는 것이
+        //     아니므로 마지막 전송은 그대로 실패한 그것이다 — 붙어 있는데 전송은 실패해 있는
+        //     그 창이 여기서 실제로 관측된다.
+        val (connectStatus, reconnected) = op(stationId, """{"op":"connect"}""")
+        assertEquals(200, connectStatus, "다시 붙지 못했다: ${reconnected.path("error").asText()}")
+
+        val afterReconnect = station(stationId)
+        assertTrue(afterReconnect.path("connected").asBoolean(), "다시 붙었는데 연결이 없다")
+        assertEquals(
+            recorded.path("seq").asLong(),
+            afterReconnect.path("events").first().path("seq").asLong(),
+            "다시 붙는 것만으로 프레임이 오갔다",
+        )
+        assertContains(
+            afterReconnect.path("lastTransmitFailure").asText(),
+            "연결되지 않았다",
+            message = "connected 가 참이 되자 전송 실패가 지워졌다 — 소켓과 전송을 같은 것으로 본다",
+        )
+    }
+
+    /**
+     * ★ **`lastTransmitFailure` 는 관측이지 게이트가 아니다.**
+     *
+     * 실려 있는 동안에도 조작은 그대로 통해야 한다. 이 값을 보고 거절하기 시작하면 그 순간
+     * 콘솔이 순서 게이트를 하나 갖게 되고, 그건 `docs/VIRTUAL-STATION.md` §3 이 일부러 열어
+     * 둔 문(F5)을 닫는 일이다. **그리고 마지막 하나만 남는다** — 성공한 전송이 지운다.
+     * 지우지 않으면 한참 전에 끊겼다 되살아난 스테이션이 화면에서 영영 고장 난 채로 남는다.
+     */
+    @Test
+    fun `전송 실패가 실려 있어도 조작을 막지 않고 성공하면 지워진다`() {
+        val stationId = "CS-CONSOLE-OP-GONE-CLEARS"
+        attach(stationId)
+
+        op(stationId, """{"op":"disconnect"}""")
+        op(stationId, """{"op":"authorize"}""")
+        assertTrue(
+            station(stationId).path("lastTransmitFailure").isTextual,
+            "전송이 죽었는데 스냅샷이 말하지 않는다",
+        )
+
+        op(stationId, """{"op":"connect"}""")
+
+        // 실패가 실린 채로 건 조작이다. 200 이 아니면 이 값이 게이트가 된 것이다.
+        val (status, authorized) = op(stationId, """{"op":"authorize"}""")
+        assertEquals(200, status, "전송 실패가 조작을 막았다: ${authorized.path("error").asText()}")
+        assertTrue(
+            authorized.path("lastTransmitFailure").isNull,
+            "나간 뒤에도 실패가 남아 있다: ${authorized.path("lastTransmitFailure")}",
+        )
+    }
+
     // ------------------------------------------------------------------ 오류 처리
 
     @Test
@@ -509,6 +618,12 @@ class SimConsoleControlTest {
     /** 조작 한 건. 각본과 달리 응답이 곧 결과라 폴링할 것이 없다. */
     private fun op(stationId: String, body: String): Pair<Int, JsonNode> =
         post("/api/stations/$stationId/op", body)
+
+    /** 스테이션 한 대의 지금 모습. 각본이 없는 조작 시험은 폴링할 것이 없어 한 번만 읽는다. */
+    private fun station(stationId: String): JsonNode = assertNotNull(
+        state().path("stations").firstOrNull { it.path("stationId").asText() == stationId },
+        "$stationId 이 목록에 없다",
+    )
 
     private fun state(): JsonNode = MAPPER.readTree(
         http.send(

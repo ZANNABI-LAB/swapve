@@ -457,6 +457,13 @@ function stationCard(station) {
       station.idToken + "\",\"type\":\"" + station.idTokenType + "\"}}'",
       "hint"));
   }
+  // 마지막으로 시도한 전송이 나가지 못했다. **보여 주기만 한다** — 이 값으로 버튼을
+  // 비활성으로 만들지 않는다 (disabledReason 은 이것을 읽지 않는다). 비활성은 서버가 확실히
+  // 거절할 사실에만 쓰고, 전송 실패는 다시 눌러 볼 수 있는 상황이다. 붙어 있어도 뜰 수
+  // 있다는 것이 이 줄의 요점이다 — connected 는 소켓을 답하지 전송의 성패를 답하지 않는다.
+  if (station.lastTransmitFailure) {
+    card.appendChild(el("div", "마지막 전송이 나가지 못했습니다: " + station.lastTransmitFailure, "error"));
+  }
   if (station.note) card.appendChild(el("div", station.note, "note"));
   if (station.error) card.appendChild(el("div", station.error, "error"));
 

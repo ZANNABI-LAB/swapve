@@ -265,6 +265,12 @@ data class StationEvent(
  * @param subprotocol 협상된 서브프로토콜 (`ocpp2.1`). 붙어 있지 않으면 `null` 이다.
  * @param events 최근 프레임의 꼬리 — **최신이 앞**이다. [messageCount] 가 전체 수고
  *   이쪽은 그중 마지막 [StationSnapshot.EVENT_TAIL] 건이다.
+ * @param lastTransmitFailure ★ 마지막으로 시도한 전송이 나가지 못했다면 그 사유
+ *   ([StationSimulator.lastTransmitFailure] 그대로). [events] 에서 파생되지 않는다 — 세션이
+ *   보내기 **전에** 적으므로 나간 프레임과 나가지 못한 프레임의 기록이 같기 때문이다.
+ *   [connected] 로도 갈리지 않는다: 그쪽은 소켓이 있는가를 답하지 방금 보낸 것이 나갔는가를
+ *   답하지 않아, 상대가 먼저 닫은 창에서는 참인 채로 전송만 실패한다. **읽기 전용이다** —
+ *   이 값으로 조작을 거절하는 순간 순서 게이트가 되고, 그 선은 저쪽 KDoc 이 그어 두었다.
  */
 data class StationSnapshot(
     val stationId: String,
@@ -282,6 +288,7 @@ data class StationSnapshot(
     val slots: List<SlotSnapshot>,
     val subprotocol: String?,
     val events: List<StationEvent>,
+    val lastTransmitFailure: String?,
 ) {
     companion object {
         /**
@@ -581,6 +588,9 @@ class ControlledStation(val spec: StationSpec) : AutoCloseable {
                         occurredAt = it.occurredAt,
                     )
                 },
+            // 시뮬레이터가 들고 있는 그 값이다. 콘솔이 조작 결과로 따로 세우지 않는다 —
+            // 실패는 수동 조작만이 아니라 인바운드 응답에서도 나므로 콘솔은 다 보지 못한다.
+            lastTransmitFailure = simulator?.lastTransmitFailure,
         )
     }
 

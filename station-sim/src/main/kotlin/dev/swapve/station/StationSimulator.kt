@@ -748,6 +748,37 @@ class StationSimulator(
     /** 슬롯에서 도는 충전 트랜잭션 식별자. 교환 트랜잭션과 무관하다. */
     fun chargingTransactionAt(slotId: Int): String? = slotOf(slotId).transactionId
 
+    /**
+     * 마지막으로 시도한 전송이 나가지 못했다면 그 사유. 나갔으면 `null` 이다.
+     *
+     * ### 이벤트 로그에서 파생되지 않아서 여기 있다
+     *
+     * `OcppSession.emitRaw` 는 **보내기 전에** 적는다 (기록되고 안 나간 것이 나가고 기록
+     * 안 된 것보다 낫다). 그래서 `OcppEventRecord` 에는 결과 칸이 없고, 나간 프레임과 나가지
+     * 못한 프레임의 기록이 **글자 하나 다르지 않다.** "답이 돌아오지 않았다"로 되짚을 수도
+     * 없다 — 그건 아직 응답 전인 CALL·타임아웃과 구분되지 않고, SEND 와 CALLRESULT 는 원래
+     * 답이 없다. 로그에 결과를 적게 고치는 길은 `ocpp-core` 의 그 설계를 뒤집는 것이라
+     * 택하지 않았다. 그러니 이 한 칸이 유일한 관측 지점이다.
+     *
+     * ### ★ 읽기 전용 관측이다 — 이 값으로 아무것도 막지 않는다
+     *
+     * 이 시뮬레이터의 검사는 전부 스테이션 안의 **물리적 사실**을 묻지 우리가 부른 순서를
+     * 묻지 않는다. `authorize()` 없이 `insertBatteries()` 가 통해야 F5 가 성립하기 때문이다
+     * (docs/VIRTUAL-STATION.md §3). 여기 담기는 것은 순서가 아니라 **전송의 사실**이라 그
+     * 금지에 걸리지 않는다 — 다만 그건 아무도 이 값을 보고 조작을 거절하지 않는 동안만이다.
+     * 어떤 `check()` 도, 콘솔의 어떤 분기도, 화면의 어떤 비활성 판정도 이 값을 읽어서는
+     * 안 된다. 읽는 순간 이것은 순서 게이트가 되고 F5 가 죽는다. 보여 주기만 한다.
+     *
+     * ### 마지막 하나다 — 쌓이지 않는다
+     *
+     * 성공한 전송이 이 값을 지운다. 실패만 쌓으면 한참 전에 끊겼다 되살아난 스테이션이
+     * 화면에서 영영 고장 난 채로 남는다. `@Volatile` 인 이유는 전송이 작업 스레드에서
+     * 돌고 관측은 HTTP 스레드에서 뜨기 때문이다.
+     */
+    @Volatile
+    var lastTransmitFailure: String? = null
+        private set
+
     // ------------------------------------------------------------------ 내부
 
     /**
@@ -1051,15 +1082,24 @@ class StationSimulator(
      * 규칙이다** — 위에 두지 않으면 조용히 삼켜진다.
      */
     private suspend fun transmitOrGone(text: String): TransmitOutcome {
-        val transport = this.transport ?: return TransmitOutcome.Gone("연결되지 않았다: ${config.stationId}")
+        val transport = this.transport
+            ?: return gone("연결되지 않았다: ${config.stationId}")
         return try {
             transport.send(text)
+            lastTransmitFailure = null
             TransmitOutcome.Delivered
         } catch (cancelled: CancellationException) {
+            // 취소는 전송의 실패가 아니다. 관측을 건드리지 않고 그대로 올린다.
             throw cancelled
         } catch (failure: Exception) {
-            TransmitOutcome.Gone("전송이 실패했다: ${config.stationId} — ${failure.message ?: failure.toString()}")
+            gone("전송이 실패했다: ${config.stationId} — ${failure.message ?: failure.toString()}")
         }
+    }
+
+    /** 나가지 못한 사실을 [lastTransmitFailure] 에 남기고 그 사유를 그대로 결과로 만든다. */
+    private fun gone(reason: String): TransmitOutcome {
+        lastTransmitFailure = reason
+        return TransmitOutcome.Gone(reason)
     }
 
     private fun connectedTransport(): StationTransport =
