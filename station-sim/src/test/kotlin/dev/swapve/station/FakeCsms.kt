@@ -370,9 +370,11 @@ fun testConfig(
 fun stationOn(
     csms: FakeCsms,
     config: StationSimConfig = testConfig(csms.stationId),
+    faults: FaultInjection = FaultInjection.None,
 ): StationSimulator = StationSimulator(
     config = config,
     clock = FAKE_CSMS_CLOCK,
+    faults = faults,
     validator = fakeCsmsValidator,
     openTransport = csms,
 )

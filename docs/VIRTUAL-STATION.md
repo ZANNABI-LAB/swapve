@@ -151,6 +151,21 @@ for inbound `BatterySwap` frames; the F3 test finds its rejection by reading the
 response payload it recovers from the log. Nothing is asserted against a flag that the simulator set
 about itself.
 
+That the log is the only record is also what decides whether a half-finished insertion can be
+recovered, and the answer depends on *where* it died. `insertBatteries()` reports each slot and opens
+each charging transaction first, and sends one `BatterySwap(BatteryIn)` last; from outside, a failure
+in either part is the same thrown exception. If the transport dies during the slot reports, the
+`BatterySwap` frame was never built, nothing about it is in the log, and
+`resendLastBatterySwap(sameMessageId = false)` fails outright — there is nothing to re-send, and
+calling `insertBatteries()` again is refused because the slot now holds a battery. If instead the
+transport dies on the `BatterySwap` itself, the slot reports and transactions already reached the
+CSMS and the frame *is* in the log, because `OcppSession.emitRaw` records before
+it transmits — a `TransmitOutcome.Gone` leaves behind a record of a frame that never left. Once the
+line is back, `resendLastBatterySwap(sameMessageId = false)` re-sends that recorded payload under a
+fresh messageId: the CSMS receives the same `requestId` and the same battery set, and because the
+messageId is new the idempotency ledger does not intercept it. Both paths are pinned down in
+`StationFailurePathTest`.
+
 ## 5. Limits
 
 **It has never been connected to physical hardware or to a third-party CSMS.** Every run in this
