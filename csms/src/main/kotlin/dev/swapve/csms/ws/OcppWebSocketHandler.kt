@@ -119,7 +119,7 @@ class OcppWebSocketHandler(
             callTimeout = properties.callTimeout.toKotlinDuration(),
         )
 
-        connections[session.id] = StationConnection(principal, ocppSession, scope)
+        connections[session.id] = StationConnection(principal, ocppSession, transport, scope)
 
         // 같은 스테이션의 이전 연결이 남아 있으면 그 세션을 깨운다. 기다리던 CALL 들이
         // NotConnected 로 돌아간다. 멱등 원장은 건드리지 않는다 — 재전송이 오면 저장된 응답을
@@ -127,12 +127,30 @@ class OcppWebSocketHandler(
         sessions.register(ocppSession)?.let { previous ->
             log.info("같은 스테이션의 이전 세션을 대체한다: station={}", principal.stationId)
             previous.close()
+            closeTransportOf(previous)
         }
 
         log.info(
             "연결 수립: station={} auth={} subprotocol={}",
             principal.stationId, principal.authMethod, session.acceptedProtocol,
         )
+    }
+
+    /**
+     * 교체된 [previous] 세션이 타고 있던 WebSocket 을 닫는다.
+     *
+     * 세션만 닫으면 소켓은 열린 채 남는다. 닫힌 세션의 [OcppSession.receive] 는 프레임을
+     * 회신 없이 버리므로 그 소켓은 조용한 블랙홀이 되고, 상대는 타임아웃까지 기다린다.
+     */
+    private fun closeTransportOf(previous: OcppSession) {
+        // stationId 가 아니라 세션 동일성으로 찾는다 — 방금 등록한 새 연결이 같은 stationId 라서다.
+        val stale = connections.values.firstOrNull { it.ocppSession === previous } ?: return
+        try {
+            stale.transport.close(REPLACED)
+        } catch (failure: Exception) {
+            // 이미 죽은 소켓일 수 있다. 옛 연결 정리 실패가 새 연결 수립을 깨뜨리면 안 된다.
+            log.warn("교체된 연결의 소켓을 닫지 못했다: station={}", previous.stationId, failure)
+        }
     }
 
     override fun handleTextMessage(session: WebSocketSession, message: TextMessage) {
@@ -176,10 +194,14 @@ class OcppWebSocketHandler(
      *
      * [scope] 는 연결의 생명주기와 같다. 종료 시 취소되므로 처리 중이던 CALL 은 중단되고,
      * M4 가 멱등 원장의 흔적을 지운다 — 재접속 후 재전송하면 다시 처리된다.
+     *
+     * [transport] 를 들고 있는 이유는 교체된 연결의 소켓을 닫기 위해서다. 송신과 닫기가
+     * 겹치지 않게 원본이 아니라 직렬화 데코레이터를 그대로 쥔다.
      */
     private class StationConnection(
         val principal: StationPrincipal,
         val ocppSession: OcppSession,
+        val transport: WebSocketSession,
         val scope: CoroutineScope,
     )
 
@@ -189,5 +211,8 @@ class OcppWebSocketHandler(
 
         /** 송신 버퍼 상한 = 텍스트 프레임 상한 × 이 값. */
         const val SEND_BUFFER_FACTOR = 8
+
+        /** 교체로 닫는 것은 정상 종료다 — 상대가 재접속을 정당하게 한 것이고 우리가 옛 연결을 정리한다. */
+        val REPLACED: CloseStatus = CloseStatus.NORMAL.withReason("replaced by a new connection")
     }
 }

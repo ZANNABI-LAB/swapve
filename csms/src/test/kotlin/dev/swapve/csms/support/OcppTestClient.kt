@@ -6,6 +6,7 @@ import java.net.http.WebSocket
 import java.time.Duration
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CompletionStage
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
 
@@ -22,6 +23,7 @@ import java.util.concurrent.TimeUnit
 class OcppTestClient private constructor(
     private val webSocket: WebSocket,
     private val inbox: LinkedBlockingQueue<String>,
+    private val closed: CountDownLatch,
 ) : AutoCloseable {
 
     /** 서버가 101 에 실어 답한 서브프로토콜 (Part 4 §3.3). 협상되지 않았으면 빈 문자열이다. */
@@ -40,6 +42,15 @@ class OcppTestClient private constructor(
     fun receiveOrNull(timeout: Duration): String? = inbox.poll(timeout.toMillis(), TimeUnit.MILLISECONDS)
 
     val isOpen: Boolean get() = !webSocket.isInputClosed && !webSocket.isOutputClosed
+
+    /**
+     * 상대가 이 연결을 닫기를 기다린다. 닫혔으면 참, 시간 안에 닫히지 않았으면 거짓이다.
+     *
+     * 서버가 닫기로 결정한 시점과 그 프레임이 여기 도착하는 시점은 다르다. 그래서 [isOpen] 을
+     * 곧바로 보지 않고 기다린다.
+     */
+    fun awaitClosed(timeout: Duration = DEFAULT_TIMEOUT): Boolean =
+        closed.await(timeout.toMillis(), TimeUnit.MILLISECONDS)
 
     override fun close() {
         runCatching { webSocket.sendClose(WebSocket.NORMAL_CLOSURE, "bye").join() }
@@ -62,6 +73,7 @@ class OcppTestClient private constructor(
             subprotocols: List<String> = listOf("ocpp2.1"),
         ): OcppTestClient {
             val inbox = LinkedBlockingQueue<String>()
+            val closed = CountDownLatch(1)
             val builder = HttpClient.newHttpClient().newWebSocketBuilder()
             if (subprotocols.isNotEmpty()) {
                 builder.subprotocols(subprotocols.first(), *subprotocols.drop(1).toTypedArray())
@@ -69,14 +81,17 @@ class OcppTestClient private constructor(
 
             val webSocket = builder
                 .connectTimeout(DEFAULT_TIMEOUT)
-                .buildAsync(URI.create("ws://localhost:$port$rawPath"), CollectingListener(inbox))
+                .buildAsync(URI.create("ws://localhost:$port$rawPath"), CollectingListener(inbox, closed))
                 .join()
 
-            return OcppTestClient(webSocket, inbox)
+            return OcppTestClient(webSocket, inbox, closed)
         }
     }
 
-    private class CollectingListener(private val inbox: LinkedBlockingQueue<String>) : WebSocket.Listener {
+    private class CollectingListener(
+        private val inbox: LinkedBlockingQueue<String>,
+        private val closed: CountDownLatch,
+    ) : WebSocket.Listener {
 
         private val partial = StringBuilder()
 
@@ -88,6 +103,16 @@ class OcppTestClient private constructor(
             }
             webSocket.request(1)
             return CompletableFuture.completedFuture(null)
+        }
+
+        override fun onClose(webSocket: WebSocket, statusCode: Int, reason: String): CompletionStage<*>? {
+            closed.countDown()
+            return null
+        }
+
+        // 상대가 닫기 프레임 없이 끊어도 연결이 끝난 것은 마찬가지다.
+        override fun onError(webSocket: WebSocket, error: Throwable) {
+            closed.countDown()
         }
     }
 }
