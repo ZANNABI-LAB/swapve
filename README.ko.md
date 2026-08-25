@@ -259,7 +259,7 @@ battery swap **via a smartphone app, e.g. by scanning a QR code**"*. 즉
 | [docs/LAYERS.md](docs/LAYERS.md) | **층 경계** — 코덱은 I/O 무관, 세션은 코루틴 전용. 라이브러리로 쓸 때 떠안는 것 |
 | [docs/API.md](docs/API.md) | REST 계약 전문과 설계 근거 |
 | [docs/CONFIGURATION.md](docs/CONFIGURATION.md) | 스테이션 인증 · REST 인증 · TLS |
-| [docs/CONFORMANCE.md](docs/CONFORMANCE.md) | 적합성 케이스 · 성공 기준 S1~S7 · 감사 출력 |
+| [docs/CONFORMANCE.md](docs/CONFORMANCE.md) | 적합성 케이스 · 성공 기준 S1~S7 · 감사 출력 · 자체 검증의 한계 |
 | [docs/PUBLISHING.md](docs/PUBLISHING.md) | Maven Central 배포 절차와 그 앞에 두는 리허설 |
 
 > `docs/` 의 문서는 **영문 단일본**입니다. 1,100줄을 두 언어로 유지하면 반드시 어긋나기

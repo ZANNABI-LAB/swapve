@@ -166,6 +166,17 @@ fresh messageId: the CSMS receives the same `requestId` and the same battery set
 messageId is new the idempotency ledger does not intercept it. Both paths are pinned down in
 `StationFailurePathTest`.
 
+**One field is the exception to that rule**, and it exists because of the write-before-transmit
+order just described. `OcppSession.emitRaw` records a frame *before* it goes out, so
+`OcppEventRecord` has no outcome column and **the record of a frame that left and one that never
+left are identical, character for character.** Nor can the difference be inferred from "no reply came
+back" — that is indistinguishable from a CALL still in flight or timed out, and SEND and CALLRESULT
+have no reply to begin with. So `StationSimulator.lastTransmitFailure` holds the reason the last
+attempted transmission did not go out (`null` if it did), and a successful transmission clears it.
+It is a **read-only observation**: nothing in the simulator, the console, or the API reads it to
+refuse an operation. The moment anything does, it becomes an ordering gate and F5 — which requires
+`insertBatteries()` to work without `authorize()` (§3) — dies.
+
 ## 5. Limits
 
 **It has never been connected to physical hardware or to a third-party CSMS.** Every run in this

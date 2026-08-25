@@ -272,7 +272,7 @@ why the metrics avoid Micrometer) is in **[docs/API.md](docs/API.md)**.
 | [docs/VIRTUAL-STATION.md](docs/VIRTUAL-STATION.md) | **Simulator operations, layered** — which calls are physical acts, which are protocol reports, which are just scripts (module boundaries are LAYERS.md) |
 | [docs/API.md](docs/API.md) | Full REST contract and design record |
 | [docs/CONFIGURATION.md](docs/CONFIGURATION.md) | Station authentication · REST authentication · TLS |
-| [docs/CONFORMANCE.md](docs/CONFORMANCE.md) | Conformance cases · success criteria S1–S7 · audit output |
+| [docs/CONFORMANCE.md](docs/CONFORMANCE.md) | Conformance cases · success criteria S1–S7 · audit output · limits of self-verification |
 | [docs/PUBLISHING.md](docs/PUBLISHING.md) | How releases reach Maven Central — and the rehearsal that must pass first |
 
 > The documents under `docs/` are **English only**, deliberately — keeping 1,100 lines in two

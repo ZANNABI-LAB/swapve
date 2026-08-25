@@ -101,3 +101,54 @@ stationId, and a successful registration records `StationPrincipal.authMethod = 
 local-experiment `NONE` profile records `authMethod = NONE` on the same type (for how to configure
 it see [CONFIGURATION.md](CONFIGURATION.md)). Certificate issuance, CSRs, and key stores are out of
 scope.
+
+## Limits of self-verification
+
+Everything above is this repository checking itself. The CSMS and the simulator are built on the
+**same `ocpp-core`**, so a defect in core shows up symmetrically on both sides and the end-to-end
+tests stay green. `EnergyLimitReached` was once guessed as `EVCommunicationLost`, and every test
+passed, because both ends read the same wrong constant. That is the failure mode this section is
+about, and it is worth being precise about which layers have an outside referee and which only have
+a stand-in.
+
+| Layer | External referee | What stands in for one |
+|---|---|---|
+| Payload ↔ schema | ✅ yes | The 181 official JSON schemas under `schemas/`. `SchemaCrossCheckTest` validates every message in both directions; `WireContractTest` looks our own constants up in the schema `enum`s |
+| OCPP-J framing · correlation | ❌ no | `OcppFrameCodecTest` decodes the Part 4 §4.2.1–4.2.4 example frames verbatim; `ProtocolContractTest` asserts against string literals rather than production constants |
+| Timeouts · reconnection | ❌ no | `OcppSessionTimeoutTest` pins Part 4 §4.1.1 behaviour, but the reading of the specification is ours and is shared by both ends |
+
+**What the literal assertions buy — and what they do not.** `ProtocolContractTest` writes its
+expectations as string literals in the test file instead of referencing `BatterySwapWire` or
+`AvailabilityState`, because comparing a constant to itself is not a comparison. This does **not**
+create an external referee — the literals were transcribed by us too. What it buys is exactly one
+thing: the expected value and the production constant now live in two separate places, so quietly
+changing the constant turns a test red.
+
+**Where the literals come from.** The specification PDFs are not in this repository — no tracked
+file is one. The literals were transcribed from Part 6 Tool validation into the comments that sit
+next to them, and cross-checked against the schema `enum`s where a schema has one. Four fields have
+no `enum` to check against: `component.name`, `variable.name`, `SecurityEventNotification.type`, and
+`idToken.type` are free-form strings in the schemas, so for those the only evidence is the comments
+in `ProtocolContractTest`. Note also what `WireContractTest` cannot see even where an `enum` exists:
+it catches a value the standard does not allow, but not **the wrong choice among allowed values** —
+that requires reading the specification text.
+
+**Never connected to a third-party CSMS.** Every run here is this simulator against this CSMS; see
+also [VIRTUAL-STATION.md §5](VIRTUAL-STATION.md#5-limits). The parts that would benefit most from
+being pointed at someone else's implementation are the ordinary ones — BootNotification, Heartbeat,
+NotifyEvent, TransactionEvent, and OCPP-J framing exist in every OCPP 2.x product, so there is real
+interoperability to confirm there. Block S is not in that position: Battery Swap is new in 2.1 and a
+counterpart to test against may simply not exist yet. Formal certification is a separate matter and
+is covered above, under the Battery Swap cases.
+
+**Observation is derived from the log — with one exception.** Nothing here is asserted against a
+flag the simulator set about itself; every claim is read back out of the event log
+([VIRTUAL-STATION.md §4](VIRTUAL-STATION.md#4-observation-is-derived-from-the-event-log)). The one
+field outside that rule is `StationSimulator.lastTransmitFailure`, and the reason is structural:
+`OcppSession.emitRaw` records before it transmits, so the log entry for a frame that never left is
+identical to one for a frame that did; and "no reply came back" cannot substitute, because it does
+not distinguish a CALL still in flight or timed out, and SEND and CALLRESULT have no reply at all.
+It is read-only in the sense that decides the design: the console does display it and the snapshot
+API does carry it, but nothing consults it to *refuse* an operation — not a `check()`, not the
+console's `disabledReason`, not an API path — so it reports a transmission failure without becoming
+a gate on the call order.
