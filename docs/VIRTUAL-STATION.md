@@ -9,6 +9,15 @@
 > them in a different order, or leaving one out, is a supported thing to do. That is the difference
 > between a station you can drive and a recording you can replay.
 
+![The control console with one station attached](assets/console-overview.png)
+
+<sub>**The console is that station made visible.** The screen is still in Korean; reading it: the
+header says *"SwapVe — simulator control console. This drives station simulators; it is not a
+management server. Swap history and metrics live in the CSMS REST API."* The form attaches a station
+— CSMS URL, stationId, slot count (`=EVSE`), set size, `SwapOrder`, authorization token. The
+attached station sits below it, and at the foot of the page are the F1–F6 failure scenarios with
+what each is expected to do. Localizing the runtime strings is still open.</sub>
+
 ---
 
 ## 1. Three layers of operation
@@ -122,6 +131,19 @@ FaultScenario.F5 -> simulator.insertBatteries()
 The station does not object, because a real station with a stuck relay or a bad firmware build
 would not object either. Refusing to send it would mean the CSMS can never be tested against it.
 
+![Before the swap — insertBatteries is live although authorize has never been pressed](assets/console-attached.png)
+
+![After the swap completes — the slots are inverted, and so is what can be pressed](assets/console-completed.png)
+
+<sub>**The console says the same thing this section does.** Above the operation buttons it reads
+*"순서를 검사하지 않습니다. authorize 없이 insertBatteries 를 누르는 것이 곧 F5 입니다"* — *the
+order is not checked; pressing insertBatteries without authorize is exactly F5.* In the first
+picture the dispense slots 3–4 hold `BAT-FULL-3/4` and **`insertBatteries` is enabled even though
+`authorize` has never been pressed.** In the second the swap has completed: slots 1–2 now hold the
+discharged `BAT-USED-1/2` (SoC 12% / 13%), the dispense slots are empty, and what is greyed out has
+moved with them — `insertBatteries` and `removeBatteries` are out, `advanceCharging` is in. **What
+the console disables tracks physical facts, never call order.**</sub>
+
 What the CSMS does with it is the actual test: it **answers normally and records the anomaly**.
 `BatterySwapResponse` has no field for refusing, so the response goes back clean and an
 `AnomalyReason.NOT_AUTHORIZED` is written alongside it; the log replay likewise declines to open a
@@ -139,6 +161,13 @@ cannot express — a sequence that dies halfway through, which is F6.
 There are no status flags added for the benefit of tests. Everything a test wants to know about what
 happened on the wire is derived from `eventLog`, which holds every frame in both directions
 verbatim.
+
+![The event log — seq, direction, action, timestamp, and no outcome column](assets/console-event-log.png)
+
+<sub>The columns are **seq · direction · action · time** (`보냄` outbound, `받음` inbound). Reading
+up from the bottom: `BootNotification`, four `NotifyEvent` pairs, a `SecurityEventNotification`, then
+`TransactionEvent`. **There is no outcome column** — that absence is the subject of the end of this
+section.</sub>
 
 `repliesTo(messageId)` is the smallest example: it counts inbound frames carrying a given messageId.
 `resendLastBatterySwap(sameMessageId = true)` bypasses `OcppSession` — the session always mints a
@@ -176,6 +205,15 @@ attempted transmission did not go out (`null` if it did), and a successful trans
 It is a **read-only observation**: nothing in the simulator, the console, or the API reads it to
 refuse an operation. The moment anything does, it becomes an ordering gate and F5 — which requires
 `insertBatteries()` to work without `authorize()` (§3) — dies.
+
+![The console reporting a transmission that never left](assets/console-transmit-failure.png)
+
+<sub>The red line reads *"마지막 전송이 나가지 못했습니다: 연결되지 않았다: CS001"* — *the last
+transmission did not go out: not connected: CS001.* It is the only thing on the screen that says so.
+The event log above it recorded that `Authorize` frame exactly as it records a delivered one, and
+the badge had to be driven to `끊김` (disconnected) before the operation buttons greyed out — the
+badge answers whether a socket exists, not whether the last frame left. Reproduced the way
+`SimConsoleControlTest` does it: `disconnect`, then `authorize`, over the console's REST API.</sub>
 
 ## 5. Limits
 
