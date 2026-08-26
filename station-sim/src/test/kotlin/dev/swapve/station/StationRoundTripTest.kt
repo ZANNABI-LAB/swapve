@@ -93,6 +93,34 @@ class StationRoundTripTest {
         }
     }
 
+    /**
+     * ★ **협상 결과는 관측 대상이지 관문이 아니다.**
+     *
+     * 스테이션은 `ocpp2.1` 과 `ocpp2.0.1` 을 순서대로 제시하고, 무엇이 될지는 상대가 고른다.
+     * 상대가 2.0.1 을 골랐다고 해서 우리가 2.1 짜리 조작을 스스로 막으면, 그 CSMS 가
+     * `BatterySwap` 을 받고 어떻게 굴러가는지는 **아무도 볼 수 없게 된다** — 시험 도구가
+     * 시험을 거절하는 꼴이다. 그래서 여기서는 협상값이 그대로 비치는 것과, 그 위에서
+     * `BatterySwap(BatteryIn)` 이 실제로 나가는 것을 한 시험에서 함께 붙잡는다.
+     */
+    @Test
+    fun `2·0·1 로 협상돼도 그 값이 그대로 비치고 조작은 막히지 않는다`() = runTest {
+        val csms = FakeCsms("CS-2001").apply { negotiatedSubprotocol = "ocpp2.0.1" }
+
+        stationOn(csms).use { station ->
+            station.connect()
+
+            assertEquals("ocpp2.0.1", station.subprotocol, "상대가 고른 것을 그대로 내보인다")
+
+            station.boot()
+            station.authorize()
+            station.insertBatteries()
+
+            val swaps = csms.received(BatterySwapWire.BATTERY_SWAP).map(::callPayloadOf)
+            assertEquals(1, swaps.size, "2.0.1 위에서도 BatterySwap 은 나간다")
+            assertEquals(BatterySwapWire.BATTERY_IN, swaps.single().path("eventType").asText())
+        }
+    }
+
     // ------------------------------------------------------------------ CSMS → 스테이션
 
     @Test

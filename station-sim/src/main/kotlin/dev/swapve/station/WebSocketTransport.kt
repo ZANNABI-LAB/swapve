@@ -67,8 +67,15 @@ class WebSocketTransport private constructor(
 
     companion object {
 
-        /** OCPP 2.1 의 WebSocket 서브프로토콜 (Part 4 §3.1.2). */
-        const val SUBPROTOCOL = "ocpp2.1"
+        /**
+         * 핸드셰이크에서 제시하는 서브프로토콜들 — **앞이 최우선**이다 (Part 4 §3.1.2).
+         *
+         * 우리가 무엇을 할 수 있는지를 말할 뿐, 무엇이 될지는 서버가 고른다. 고른 결과는
+         * [subprotocol] 로 그대로 관측되고, 그 값이 시뮬레이터의 어떤 조작도 막지 않는다 —
+         * 2.0.1 로 협상된 선로에 2.1 짜리 `BatterySwap` 을 실어 보내는 것은 막아야 할 사고가
+         * 아니라 상대 CSMS 를 시험하는 방법이다.
+         */
+        val SUBPROTOCOLS: List<String> = listOf("ocpp2.1", "ocpp2.0.1")
 
         private val CONNECT_TIMEOUT: Duration = Duration.ofSeconds(10)
 
@@ -87,7 +94,7 @@ class WebSocketTransport private constructor(
             val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
             val builder = HttpClient.newHttpClient()
                 .newWebSocketBuilder()
-                .subprotocols(SUBPROTOCOL)
+                .subprotocols(SUBPROTOCOLS.first(), *SUBPROTOCOLS.drop(1).toTypedArray())
                 .connectTimeout(CONNECT_TIMEOUT)
 
             if (authorization != null) {

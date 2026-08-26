@@ -112,6 +112,15 @@ class FakeCsms(
      */
     var onStationCall: suspend (OcppCall) -> InboundResponse = { defaultResponse(it) }
 
+    /**
+     * 이 CSMS 가 핸드셰이크에서 **고른** 서브프로토콜.
+     *
+     * 실제 소켓이 없으니 협상도 없다 — 그래서 서버가 무엇을 골랐는지는 시험이 정한다.
+     * 기본값은 스테이션이 최우선으로 제시하는 것이라 아무것도 바꾸지 않은 시험은 지금까지와
+     * 똑같이 돈다.
+     */
+    var negotiatedSubprotocol: String = WebSocketTransport.SUBPROTOCOLS.first()
+
     private val ledger = InboundCallLedger()
     private val serializer = StationSerializer()
 
@@ -166,8 +175,8 @@ class FakeCsms(
         override var isOpen: Boolean = true
             private set
 
-        /** 실제 협상값과 같은 것을 답한다 (Part 4 §3.1.2). */
-        override val subprotocol: String get() = WebSocketTransport.SUBPROTOCOL
+        /** 이 CSMS 가 고른 것을 답한다 (Part 4 §3.1.2). */
+        override val subprotocol: String get() = negotiatedSubprotocol
 
         override suspend fun send(text: String) {
             when (mode) {

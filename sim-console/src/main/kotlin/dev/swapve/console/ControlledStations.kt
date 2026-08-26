@@ -262,7 +262,7 @@ data class StationEvent(
 /**
  * 스테이션 한 대의 현재 모습. `GET /api/state` 가 이것을 그대로 싣는다.
  *
- * @param subprotocol 협상된 서브프로토콜 (`ocpp2.1`). 붙어 있지 않으면 `null` 이다.
+ * @param subprotocol CSMS 가 핸드셰이크에서 고른 서브프로토콜. 붙어 있지 않으면 `null` 이다.
  * @param events 최근 프레임의 꼬리 — **최신이 앞**이다. [messageCount] 가 전체 수고
  *   이쪽은 그중 마지막 [StationSnapshot.EVENT_TAIL] 건이다.
  * @param lastTransmitFailure ★ 마지막으로 시도한 전송이 나가지 못했다면 그 사유

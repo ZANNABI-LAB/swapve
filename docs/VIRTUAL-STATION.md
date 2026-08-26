@@ -57,7 +57,7 @@ All 24 public functions and 4 public properties of `StationSimulator`, with noth
 
 | Operation | What changes inside the station | What goes on the wire |
 |---|---|---|
-| `connect()` | transport opens | WebSocket handshake to `{csmsUrl}/{stationId}`, `ocpp2.1` negotiated |
+| `connect()` | transport opens | WebSocket handshake to `{csmsUrl}/{stationId}`, offering `ocpp2.1` then `ocpp2.0.1` and taking whichever the server picks |
 | `disconnect()` | transport drops; session, slots, and `requestId` survive | nothing — the socket just closes |
 | `reconnect()` | transport reopens on the same session and slots | handshake only |
 | `close()` | session closes and transport drops; the simulator is finished | nothing |
@@ -93,7 +93,7 @@ All 24 public functions and 4 public properties of `StationSimulator`, with noth
 | `config` | the `StationSimConfig` this simulator was built from |
 | `eventLog` | every frame sent and received, verbatim ([§4](#4-observation-is-derived-from-the-event-log)) |
 | `isConnected` | whether the transport is open; `false` rather than throwing when there is none |
-| `subprotocol` | the negotiated subprotocol, expected to be `ocpp2.1`. **Throws if not connected** — unlike `isConnected`, this asks the transport |
+| `subprotocol` | whatever the server picked in the handshake, reported verbatim ([§3](#3-there-is-no-ordering-gate-and-that-is-deliberate)). **Throws if not connected** — unlike `isConnected`, this asks the transport |
 | `slotState(slotId)` | `EMPTY` or `HOLDS_BATTERY`, in domain vocabulary — `Available`/`Occupied` never leaves the wire boundary |
 | `batteryAt(slotId)` | the battery in the slot, or `null` |
 | `chargingTransactionAt(slotId)` | the slot's charging transaction id, or `null`. Unrelated to the swap's `requestId` |
@@ -150,6 +150,13 @@ What the CSMS does with it is the actual test: it **answers normally and records
 swap that arrived without authorization. `FailureScenarioTest` asserts both halves — that the
 anomaly is recorded, *and* that the `BatterySwapResponse` came back with no CALLERROR frames
 anywhere in the exchange.
+
+**The negotiated subprotocol is not a gate either.** The station offers `ocpp2.1` first and
+`ocpp2.0.1` second, and the server picks one; the result is reported verbatim through
+`subprotocol` and nothing else in the simulator reads it. So a CSMS that answers `ocpp2.0.1` still
+receives `BatterySwap` and the rest of the 2.1 swap vocabulary, because that is the interesting
+test — what does *that* CSMS do when a 2.1-only message arrives on a connection it negotiated down?
+Refusing to send it would answer the question with silence.
 
 The same reasoning covers the other configuration-driven scenarios: F1 (no battery available) and F3
 (unregistered battery) are reproduced by *how the station is configured*, not by a switch in the

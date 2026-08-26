@@ -110,8 +110,8 @@ class StationTransportSeamTest {
         }
 
         companion object {
-            /** 실제 협상값과 같은 것을 답한다 (Part 4 §3.1.2). */
-            const val SUBPROTOCOL = WebSocketTransport.SUBPROTOCOL
+            /** 최우선으로 제시하는 것이 협상됐다고 답한다 (Part 4 §3.1.2). */
+            val SUBPROTOCOL = WebSocketTransport.SUBPROTOCOLS.first()
         }
     }
 
