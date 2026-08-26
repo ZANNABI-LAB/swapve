@@ -464,6 +464,15 @@ function stationCard(station) {
   if (station.lastTransmitFailure) {
     card.appendChild(el("div", "마지막 전송이 나가지 못했습니다: " + station.lastTransmitFailure, "error"));
   }
+  // CSMS 가 모른다고 답한 action 들. 위 줄과 달리 **쌓인다** — 상대가 그것을 모른다는 사실은
+  // 나중에 거짓이 되지 않는다. 여기도 보여 주기만 한다: disabledReason 은 이 목록을 읽지
+  // 않는다. 모른다고 했으니 다음부터 보내지 않는 것은 시험계가 시험 대상에 맞춰 조용해지는
+  // 일이고, 그러면 그 답이 틀렸을 때 화면에 아무것도 남지 않는다.
+  if (station.unsupportedActions && station.unsupportedActions.length) {
+    card.appendChild(el("div",
+      "CSMS 가 모른다고 답한 action (통보라 넘어갔습니다): " + station.unsupportedActions.join(", "),
+      "note"));
+  }
   if (station.note) card.appendChild(el("div", station.note, "note"));
   if (station.error) card.appendChild(el("div", station.error, "error"));
 

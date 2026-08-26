@@ -93,7 +93,8 @@ All 24 public functions and 4 public properties of `StationSimulator`, with noth
 | `config` | the `StationSimConfig` this simulator was built from |
 | `eventLog` | every frame sent and received, verbatim ([§4](#4-observation-is-derived-from-the-event-log)) |
 | `isConnected` | whether the transport is open; `false` rather than throwing when there is none |
-| `subprotocol` | whatever the server picked in the handshake, reported verbatim ([§3](#3-there-is-no-ordering-gate-and-that-is-deliberate)). **Throws if not connected** — unlike `isConnected`, this asks the transport |
+| `subprotocol` | whatever the server picked in the handshake, reported verbatim ([§3](#3-there-is-no-ordering-gate-and-that-is-deliberate)); `null` when there is no open transport |
+| `unsupportedActions` | the actions the peer answered `NotImplemented`/`NotSupported` to, in the order they were first sent ([§4](#4-observation-is-derived-from-the-event-log)) |
 | `slotState(slotId)` | `EMPTY` or `HOLDS_BATTERY`, in domain vocabulary — `Available`/`Occupied` never leaves the wire boundary |
 | `batteryAt(slotId)` | the battery in the slot, or `null` |
 | `chargingTransactionAt(slotId)` | the slot's charging transaction id, or `null`. Unrelated to the swap's `requestId` |
@@ -222,13 +223,42 @@ the badge had to be driven to `끊김` (disconnected) before the operation butto
 badge answers whether a socket exists, not whether the last frame left. Reproduced the way
 `SimConsoleControlTest` does it: `disconnect`, then `authorize`, over the console's REST API.</sub>
 
+**A second field follows the same rule, for a different absence.** `unsupportedActions` accumulates
+every action the peer answered `NotImplemented` or `NotSupported` to. The log does hold that
+CALLERROR, but it does not say what the simulator did with it — whether the scenario stopped there
+or carried on — and that is the part worth reading. Only calls whose response body nobody reads are
+carried on from: the slot-status `NotifyEvent`, `SecurityEventNotification`, `TransactionEvent` and
+`NotifyReport` announce a fact the station already knows, and what happens next is decided locally
+(`transactionId` and `seqNo` are the simulator's own, and `TransactionEventResponse.idTokenInfo` is
+never read). `BootNotification` and `Authorize` read their `status` to decide what follows, and
+`BatterySwap` is the exchange this tool exists to test — a rejection there is the scenario failing,
+and is still an exception. So is any other error code on a tolerated call: `InternalError` means a
+known action failed mid-handling, which is not the same claim as "I do not know this action".
+
+Unlike `lastTransmitFailure`, this one **accumulates and is never cleared**. A transmission failure
+can stop being true — the line comes back — so keeping only the last one avoids leaving a recovered
+station looking broken forever. That a peer does not know an action does not stop being true within
+a session, so there is nothing to clear on, and a repeat of the same action leaves one entry rather
+than two. It is a **read-only observation** on the same terms as `lastTransmitFailure`: nothing may
+read it to skip a later send. Remembering what the peer cannot do and going quiet about it is a test
+harness adjusting itself to the answer it is supposed to be checking — if that answer is wrong,
+nobody finds out.
+
 ## 5. Limits
 
-**It has never been connected to physical hardware or to a third-party CSMS.** Every run in this
-repository is this simulator against this CSMS. That is why `openTransport` is an injection point at
-all: the JDK has no server-side WebSocket, so a fake CSMS cannot be stood up, and without that seam
-the simulator would be testable *only* through the real CSMS — where a red test cannot tell you
-which side is wrong.
+**It has never been connected to physical hardware.** Almost every run in this repository is this
+simulator against this CSMS. That is why `openTransport` is an injection point at all: the JDK has
+no server-side WebSocket, so a fake CSMS cannot be stood up, and without that seam the simulator
+would be testable *only* through the real CSMS — where a red test cannot tell you which side is
+wrong.
+
+It has been pointed at one other OCPP 2.0.1 implementation, once, and the result is why
+`unsupportedActions` exists ([§4](#4-observation-is-derived-from-the-event-log)). That peer answered
+`SecurityEventNotification` with a "do not know this action" error, and the whole boot sequence died
+on it, so nothing after that point was ever attempted — including the swap the run was for. One
+observation is not a compatibility claim, and nothing here is tested against a second implementation
+on any regular basis; what it did establish is that a tool built to find out what a peer cannot do
+must not stop at the first thing the peer cannot do.
 
 **Four inbound actions are answered**, and only four: `RequestBatterySwap`, `GetVariables`,
 `SetVariables`, `GetBaseReport`. Everything else returns `NotImplemented` per Part 4 §4.3, rather

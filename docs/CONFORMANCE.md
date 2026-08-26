@@ -133,17 +133,21 @@ in `ProtocolContractTest`. Note also what `WireContractTest` cannot see even whe
 it catches a value the standard does not allow, but not **the wrong choice among allowed values** —
 that requires reading the specification text.
 
-**Never connected to a third-party CSMS.** Every run here is this simulator against this CSMS; see
-also [VIRTUAL-STATION.md §5](VIRTUAL-STATION.md#5-limits). The parts that would benefit most from
+**No interoperability testing against a third-party CSMS.** Every run here is this simulator against
+this CSMS. It has been pointed at one other OCPP 2.0.1 implementation once, by hand — that peer did
+not know `SecurityEventNotification`, which is why the simulator now carries on past an action the
+peer says it does not implement instead of dying on it; see
+[VIRTUAL-STATION.md §5](VIRTUAL-STATION.md#5-limits). A single run is not a compatibility claim and
+nothing in this repository re-runs it. The parts that would benefit most from
 being pointed at someone else's implementation are the ordinary ones — BootNotification, Heartbeat,
 NotifyEvent, TransactionEvent, and OCPP-J framing exist in every OCPP 2.x product, so there is real
 interoperability to confirm there. Block S is not in that position: Battery Swap is new in 2.1 and a
 counterpart to test against may simply not exist yet. Formal certification is a separate matter and
 is covered above, under the Battery Swap cases.
 
-**Observation is derived from the log — with one exception.** Nothing here is asserted against a
+**Observation is derived from the log — with two exceptions.** Nothing here is asserted against a
 flag the simulator set about itself; every claim is read back out of the event log
-([VIRTUAL-STATION.md §4](VIRTUAL-STATION.md#4-observation-is-derived-from-the-event-log)). The one
+([VIRTUAL-STATION.md §4](VIRTUAL-STATION.md#4-observation-is-derived-from-the-event-log)). The first
 field outside that rule is `StationSimulator.lastTransmitFailure`, and the reason is structural:
 `OcppSession.emitRaw` records before it transmits, so the log entry for a frame that never left is
 identical to one for a frame that did; and "no reply came back" cannot substitute, because it does
@@ -152,3 +156,10 @@ It is read-only in the sense that decides the design: the console does display i
 API does carry it, but nothing consults it to *refuse* an operation — not a `check()`, not the
 console's `disabledReason`, not an API path — so it reports a transmission failure without becoming
 a gate on the call order.
+
+The second is `StationSimulator.unsupportedActions`, and its reason is the mirror image: the log
+holds the CALLERROR but not what was done with it, so it cannot say whether the run stopped there or
+went on. It accumulates rather than holding only the last, because a peer's not knowing an action
+does not stop being true the way a dead line does. The same read-only rule applies, and here it
+matters more: skipping a later send because the peer refused an earlier one would be the harness
+quietly conforming to the implementation it is meant to be checking.

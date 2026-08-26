@@ -1,6 +1,7 @@
 package dev.swapve.station
 
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.databind.node.JsonNodeFactory
 import com.fasterxml.jackson.databind.node.ObjectNode
 import dev.swapve.ocpp.rpc.MessageIds
 import dev.swapve.ocpp.rpc.RpcErrorCode
@@ -296,7 +297,7 @@ class StationSimulator(
         } else {
             BatterySwapWire.SECURITY_EVENT_STARTUP
         }
-        call(
+        notify(
             BatterySwapWire.SECURITY_EVENT_NOTIFICATION,
             SimPayloads.securityEvent(securityEvent, clock.instant()),
         )
@@ -384,7 +385,7 @@ class StationSimulator(
     suspend fun reportChargingStarted() {
         config.insertSlots.map(::slotOf).forEach { slot ->
             faults.before(SimStep.TRANSACTION_EVENT, context(slotId = slot.config.slotId))
-            call(
+            notify(
                 BatterySwapWire.TRANSACTION_EVENT,
                 SimPayloads.transactionEvent(
                     eventType = BatterySwapWire.TX_UPDATED,
@@ -450,7 +451,7 @@ class StationSimulator(
         slot.battery = battery.copy(soC = next)
 
         faults.before(SimStep.TRANSACTION_EVENT, context(slotId = slotId))
-        call(
+        notify(
             BatterySwapWire.TRANSACTION_EVENT,
             SimPayloads.transactionEvent(
                 eventType = BatterySwapWire.TX_UPDATED,
@@ -498,7 +499,7 @@ class StationSimulator(
         slot.chargingSuspended = true
 
         faults.before(SimStep.TRANSACTION_EVENT, context(slotId = slot.config.slotId))
-        call(
+        notify(
             BatterySwapWire.TRANSACTION_EVENT,
             SimPayloads.transactionEvent(
                 eventType = BatterySwapWire.TX_UPDATED,
@@ -779,6 +780,36 @@ class StationSimulator(
     var lastTransmitFailure: String? = null
         private set
 
+    /**
+     * 상대가 **모른다고 답한** action 들. 우리가 보낸 순서대로다.
+     *
+     * [notify] 로 보낸 CALL 이 `NotImplemented`/`NotSupported` 로 거부될 때마다 여기 남는다.
+     * 답을 아무도 읽지 않는 통보였으므로 시나리오는 그대로 이어졌고, **이 목록만이 그 사실이
+     * 있었다는 유일한 흔적이다** — 이벤트 로그에는 CALLERROR 한 줄이 남지만 그것이 시나리오를
+     * 멈춘 실패였는지 넘어간 통보였는지는 적혀 있지 않다.
+     *
+     * ### [lastTransmitFailure] 와 달리 **쌓인다**
+     *
+     * 저쪽은 마지막 하나만 남고 성공한 전송이 지운다 — 한참 전에 끊겼다 되살아난 스테이션이
+     * 화면에서 영영 고장 난 채로 남지 않게 하려는 것이다. 이쪽은 반대다. **상대가 그 action 을
+     * 모른다는 사실은 나중에 거짓이 되지 않는다.** 같은 상대와 같은 세션인 동안 두 번째 호출도
+     * 같은 답을 받으므로, 지울 계기가 아예 없다. 그래서 집합이고, 중복은 한 번만 남는다.
+     *
+     * ### ★ 읽기 전용 관측이다 — 이 값으로 아무것도 막지 않는다
+     *
+     * [lastTransmitFailure] 에 그은 선이 그대로 여기에도 있다. 어떤 `check()` 도, 콘솔의 어떤
+     * 분기도, 화면의 어떤 비활성 판정도 이 목록을 읽어서는 안 된다. "모른다고 했으니 다시
+     * 보내지 않는다"는 최적화가 특히 그렇다 — 그건 우리가 상대의 능력을 기억해 두고 행동을
+     * 바꾸는 것이고, 시험계가 시험 대상의 답에 맞춰 조용해지면 그 답이 틀렸을 때 아무도
+     * 모른다. 보여 주기만 한다.
+     *
+     * 콘솔의 스냅샷이 HTTP 스레드에서 읽으므로 삽입 순서를 지키는 집합을 잠금 아래 둔다.
+     */
+    val unsupportedActions: List<String>
+        get() = synchronized(unsupported) { unsupported.toList() }
+
+    private val unsupported = LinkedHashSet<String>()
+
     // ------------------------------------------------------------------ 내부
 
     /**
@@ -789,7 +820,7 @@ class StationSimulator(
      */
     private suspend fun reportSlotStatus(slot: SimSlot) {
         faults.before(SimStep.SLOT_STATUS, context(slotId = slot.config.slotId))
-        call(
+        notify(
             BatterySwapWire.NOTIFY_EVENT,
             SimPayloads.slotStatus(
                 eventId = ++eventIdSeq,
@@ -817,7 +848,7 @@ class StationSimulator(
         slot.chargingSuspended = false
 
         faults.before(SimStep.TRANSACTION_EVENT, context(slotId = slot.config.slotId))
-        call(
+        notify(
             BatterySwapWire.TRANSACTION_EVENT,
             SimPayloads.transactionEvent(
                 eventType = BatterySwapWire.TX_STARTED,
@@ -850,7 +881,7 @@ class StationSimulator(
         val transactionId = requireTransaction(slot)
 
         faults.before(SimStep.TRANSACTION_EVENT, context(slotId = slot.config.slotId))
-        call(
+        notify(
             BatterySwapWire.TRANSACTION_EVENT,
             SimPayloads.transactionEvent(
                 eventType = BatterySwapWire.TX_ENDED,
@@ -871,13 +902,61 @@ class StationSimulator(
     /**
      * CALL 을 보내고 CALLRESULT 페이로드를 받는다.
      *
-     * 보내기 전에 **우리가 만든 페이로드를 공식 `<Action>Request` 스키마로 자기 검증**한다.
-     * 받는 쪽도 검증하지만, 여기서 걸리면 원인이 시뮬레이터라는 사실이 그 자리에서 드러난다.
-     *
      * 응답이 CALLRESULT 가 아니면 예외로 끝낸다. 시뮬레이터는 스테이션 역할이라 "거부당했다"를
      * 삼키고 계속 갈 이유가 없다 — 시나리오가 거기서 실패했다는 사실이 그대로 보여야 한다.
+     *
+     * **답을 읽는 호출과 수용 여부가 시나리오의 전제인 호출이 이쪽이다.** `BootNotification`
+     * 과 `Authorize` 는 응답의 `status` 를 실제로 읽어 다음을 정하고, `BatterySwap` 은 페이로드를
+     * 읽지 않지만 `requestId` 로 열리고 닫히는 그 교환 자체가 이 도구의 시험 대상이다 — 거부를
+     * 넘기면 "교환이 성립했다"가 거짓이 된다. 답을 쓰지 않는 통보는 [notify] 다.
      */
-    private suspend fun call(action: String, payload: ObjectNode): ObjectNode {
+    private suspend fun call(action: String, payload: ObjectNode): ObjectNode =
+        transmitCall(action, payload, toleratingUnsupported = false)
+
+    /**
+     * 응답 본문을 **아무도 읽지 않는** CALL 을 보낸다.
+     *
+     * `NotifyEvent`(슬롯 상태) · `SecurityEventNotification` · `TransactionEvent` · `NotifyReport`
+     * 가 여기 온다. 넷 다 스테이션이 자기가 아는 사실을 알릴 뿐이고, 이어지는 동작은 전부
+     * 로컬에서 정해진다 — `transactionId` 와 `seqNo` 는 시뮬레이터가 스스로 만들고,
+     * `TransactionEventResponse.idTokenInfo` 는 읽지 않는다.
+     *
+     * ### 그래서 "그 action 을 모른다"는 답만은 넘어간다
+     *
+     * 상대가 [RpcErrorCode.NotImplemented] 나 [RpcErrorCode.NotSupported] 로 답하면
+     * [unsupportedActions] 에 남기고 시나리오를 계속한다. 이 값이 필요한 이유는 실측에서
+     * 나왔다: 어떤 OCPP 2.0.1 구현은 `SecurityEventNotification` 을 모른다고 답했고, 부팅
+     * 시퀀스가 **거기서 통째로 죽어** 그 뒤의 교환은 한 번도 시도되지 못했다. 상대가 무엇을
+     * 못 하는지 알아보러 간 도구가 첫 미구현 응답에 멈춰서는 그 목적을 이루지 못한다.
+     *
+     * ### 나머지 거부는 그대로 예외다
+     *
+     * `InternalError` 든 `SecurityError` 든, 표에 없는 문자열이든 마찬가지다
+     * ([OcppResult.Rejected.knownErrorCode] 가 표 밖 코드에 `null` 을 준다). 저것들은 "이 action 을
+     * 모른다"가 아니라 **아는 action 을 처리하다 실패했다**는 뜻이고, 그건 시나리오가 거기서
+     * 실패했다는 사실 그대로다. 타임아웃·연결 없음·스키마 위반도 갈라 주지 않는다.
+     */
+    private suspend fun notify(action: String, payload: ObjectNode) {
+        transmitCall(action, payload, toleratingUnsupported = true)
+    }
+
+    /**
+     * [call] 과 [notify] 의 공통 본체.
+     *
+     * 보내기 전에 **우리가 만든 페이로드를 공식 `<Action>Request` 스키마로 자기 검증**한다.
+     * 받는 쪽도 검증하지만, 여기서 걸리면 원인이 시뮬레이터라는 사실이 그 자리에서 드러난다.
+     * 두 갈래가 이 함수를 함께 쓰는 이유가 그것이다 — 자기 검증 경로가 둘로 갈리면 한쪽만
+     * 고쳐지는 날이 온다.
+     *
+     * @param toleratingUnsupported 미구현 거부를 관측으로 남기고 넘어갈 것인가. [notify] 만
+     *   `true` 다. 넘어간 경우 돌려주는 것은 **빈 노드**다 — 상대는 아무 답도 주지 않았고,
+     *   그 자리를 읽는 호출자가 없어야 관대해질 수 있었기 때문이다.
+     */
+    private suspend fun transmitCall(
+        action: String,
+        payload: ObjectNode,
+        toleratingUnsupported: Boolean,
+    ): ObjectNode {
         val validation = validator.validateCall(action, payload)
         if (validation is PayloadValidation.Invalid) {
             error("시뮬레이터가 만든 ${action}Request 가 공식 스키마를 통과하지 못했다: ${validation.errorDescription}")
@@ -885,7 +964,14 @@ class StationSimulator(
 
         return when (val result = session.call(OcppCall(action, payload))) {
             is OcppResult.Accepted -> result.payload
-            is OcppResult.Rejected -> error("$action 이 거부됐다: ${result.errorCode} ${result.errorDescription}")
+            is OcppResult.Rejected ->
+                if (toleratingUnsupported && result.knownErrorCode in UNSUPPORTED_ACTION_CODES) {
+                    synchronized(unsupported) { unsupported += action }
+                    JsonNodeFactory.instance.objectNode()
+                } else {
+                    error("$action 이 거부됐다: ${result.errorCode} ${result.errorDescription}")
+                }
+
             is OcppResult.InvalidResponse -> error("$action 응답이 스키마를 통과하지 못했다: ${result.errorDescription}")
             is OcppResult.TimedOut -> error("$action 응답이 오지 않았다: messageId=${result.messageId}")
             is OcppResult.NotConnected -> error("$action 을 보낼 연결이 없다: station=${result.stationId}")
@@ -1002,7 +1088,7 @@ class StationSimulator(
         check(pages.isNotEmpty()) { "보고할 변수가 하나도 없다 — 디바이스 모델이 비어 있을 수 없다" }
 
         pages.forEachIndexed { index, page ->
-            call(
+            notify(
                 BatterySwapWire.NOTIFY_REPORT,
                 SimPayloads.notifyReport(
                     requestId = requestId,
@@ -1116,6 +1202,16 @@ class StationSimulator(
          * 어긋나지 않게 하려고만 존재한다.
          */
         val UNREADABLE_REF = VariableRef(component = "Unknown", variable = "Unknown")
+
+        /**
+         * "그 action 을 모른다"는 뜻의 CALLERROR 코드들 (Part 4 §4.3).
+         *
+         * 둘 다인 이유는 표준이 둘을 두었고 구현마다 고르는 것이 다르기 때문이다 —
+         * `NotImplemented` 는 *"요청한 action 이 지원되지 않는다"*, `NotSupported` 는 그중
+         * *"기능은 알지만 이 구성에서는 못 한다"* 쪽이다. [notify] 에게는 같은 결론이다:
+         * 우리가 알린 사실을 상대가 받지 않았고, 그래도 우리 쪽 상태는 변하지 않았다.
+         */
+        val UNSUPPORTED_ACTION_CODES = setOf(RpcErrorCode.NotImplemented, RpcErrorCode.NotSupported)
 
         /**
          * ★ **`NotifyReport` 한 건에 싣는 변수의 최대 개수** (B03).

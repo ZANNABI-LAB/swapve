@@ -320,6 +320,9 @@ class SimConsoleServer(
             )
         }
 
+        val unsupportedActions = array()
+        snapshot.unsupportedActions.forEach { unsupportedActions.add(it) }
+
         return node()
             .put("stationId", snapshot.stationId)
             .put("csmsUrl", snapshot.csmsUrl)
@@ -336,6 +339,7 @@ class SimConsoleServer(
             .put("messageCount", snapshot.messageCount)
             .put("subprotocol", snapshot.subprotocol)
             .put("lastTransmitFailure", snapshot.lastTransmitFailure)
+            .set<ObjectNode>("unsupportedActions", unsupportedActions)
             .set<ObjectNode>("slots", slots)
             .set<ObjectNode>("events", events)
     }
