@@ -224,8 +224,9 @@ In January 2025, OCPP 2.1 formally absorbed the **Battery Swap functional block 
 covering battery exchange for two- and three-wheelers (scooters, e-bikes) as well as full-size EVs.
 
 **"Supports 2.1" is not this project's differentiator.** A re-check in August 2026 found several
-implementations working on 2.1. The claim here is narrower: **no open-source project was found that
-actually handles Block S** — neither on the server side, nor as tooling you can exercise Block S with.
+implementations working on 2.1, and one of them turned out to carry Block S. The claim here is
+narrower than it once was: **one open-source server-side Block S implementation exists, and no
+station-side implementation or Block S test tooling was found besides this one.**
 
 | Project | Role | OCPP 2.1 | Block S |
 |---|---|---|---|
@@ -233,15 +234,20 @@ actually handles Block S** — neither on the server side, nor as tooling you ca
 | [CitrineOS](https://github.com/citrineos/citrineos) | CSMS (TypeScript) | roadmap, under "other topics" | not mentioned |
 | [MaEVe](https://github.com/thoughtworks/maeve-csms) | CSMS (Go) | ❌ 1.6J + 2.0.1 | ❌ |
 | [EVerest libocpp](https://github.com/EVerest/libocpp) | **Charger-side** library (C++) | "in development" | not mentioned |
+| [Java-OCA-OCPP](https://github.com/ChargeTimeEU/Java-OCA-OCPP) | Library (Java) | ✅ 2.1 tree | ✅ **server-side**, undocumented and not in its published artifacts |
 | Solidstudio VCP | **CS simulator** | ✅ supported | undetermined |
 | ocpp-rs | Library + simulator (Rust) | ❌ 1.6J / 2.0.1 | ❌ |
 | tzi-OCTT | CSMS verification pytest suite | ❌ 2.0.1 / 1.6J | — |
 | OCTT (official) | Conformance test tool — **paid subscription** | ❌ 2.0.1 / 1.6 | — |
 | **SwapVe** | **Library + test tooling + reference CSMS** (Kotlin) | ✅ | ✅ |
 
-The three markings mean different things. **❌** is confirmed unsupported; **"not mentioned"** means
-the topic was not found in the project's docs or issues; **"undetermined"** means no basis was found
-either way. The latter two are *not evidence of absence.*
+The markings mean different things. **❌** is confirmed unsupported; **"not mentioned"** means the
+topic was not found in the project's docs or issues; **"undetermined"** means no basis was found
+either way. The latter two are *not evidence of absence* — the Java row is what that warning looks
+like when it comes true. Its Battery Swapping module appears in no README and in no released
+artifact; it was found by reading the source tree, and then confirmed by compiling it into a server
+and running swaps against it ([CONFORMANCE.md](docs/CONFORMANCE.md#limits-of-self-verification)).
+**It handles the server side. It is not a station, and it is not tooling for exercising Block S.**
 **Corrections are welcome.** If you know an implementation that handles the Block S messages
 (`RequestBatterySwap`, `BatterySwap` transaction events), please open an issue.
 
@@ -267,14 +273,21 @@ deliberately corrupted logs must turn each item red.
 > 1.6** today, and 2.1 support is stated as future work. What is here is an **independent
 > implementation** of the Part 6 cases.
 
-**Tested against someone else's server.** The simulator has been pointed at **two independent
-open-source CSMS implementations**, one of them OCA-certified for OCPP 2.0.1 (that certificate
-covers a specific 2.0.1 release; the build exercised here was its `latest`). The handshake,
-subprotocol negotiation, `BootNotification`, `NotifyEvent`, `TransactionEvent` and message
-correlation all held, and a CALLERROR raised here was read correctly at the other end. **Three
-defects in this repository were found that way** — none of them in the published modules. What
-could not be judged is **Block S itself**: neither peer implements a `BatterySwap` handler, and
-timeouts and reconnection were never exercised.
+**Tested against someone else's server.** The simulator has been pointed at **three independent
+open-source implementations**, one of them OCA-certified for OCPP 2.0.1 (that certificate covers a
+specific 2.0.1 release; the build exercised here was its `latest`). The handshake, subprotocol
+negotiation, `BootNotification`, `NotifyEvent`, `TransactionEvent` and message correlation all held,
+and a CALLERROR raised here was read correctly at the other end. **Three defects in this repository
+were found that way** — none of them in the published modules.
+
+**Block S has now been answered by someone else's handler.** The third peer is a JVM library, not a
+deployed CSMS, and its Battery Swapping module is undocumented and unpublished — but it is a Block S
+implementation with a real request handler, written by another author. Compiled into a local server,
+it carried a **station-initiated swap and a CSMS-initiated one end to end**, adopted and correlated
+the `requestId` it issued, drove our CALL timeout when it stalled a reply, and answered a
+retransmission after a mid-swap reconnect. That last run also showed the limit of the referee: it
+ran its application handler **twice** for the same `messageId`, which is the case `InboundCallLedger`
+exists to absorb.
 
 > What the interoperability runs covered, and where they stopped →
 > **[docs/CONFORMANCE.md](docs/CONFORMANCE.md) § Limits of self-verification**

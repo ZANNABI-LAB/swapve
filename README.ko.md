@@ -214,8 +214,9 @@ OCPP 2.1 이 2025년 1월 **Battery Swap 기능 블록(Block S)** 을 정식 편
 전동킥보드·전기자전거 같은 2·3륜과 일반 EV 의 배터리 교환을 표준으로 다룹니다.
 
 **"2.1 을 지원한다"는 이 프로젝트의 차별점이 아닙니다.** 재검증(2026-08)에서 2.1 에 손대는
-구현이 여럿 확인됐습니다. 우리가 하는 주장은 더 좁습니다 — **Block S 를 실제로 다루는
-오픈소스가 확인되지 않습니다.** 서버 측 구현도, Block S 를 걸어 볼 수 있는 시험 도구도 그렇습니다.
+구현이 여럿 확인됐고, 그중 하나가 Block S 를 갖고 있었습니다. 우리가 하는 주장은 전보다 좁습니다
+— **서버 측 Block S 구현은 오픈소스로 하나 존재하고, 스테이션 측 구현과 Block S 를 걸어 볼 수
+있는 시험 도구는 이것 말고 확인되지 않습니다.**
 
 | 프로젝트 | 역할 | OCPP 2.1 | Block S |
 |---|---|---|---|
@@ -223,6 +224,7 @@ OCPP 2.1 이 2025년 1월 **Battery Swap 기능 블록(Block S)** 을 정식 편
 | [CitrineOS](https://github.com/citrineos/citrineos) | CSMS (TypeScript) | 로드맵의 "기타 주제"에만 | 언급 없음 |
 | [MaEVe](https://github.com/thoughtworks/maeve-csms) | CSMS (Go) | ❌ 1.6J + 2.0.1 | ❌ |
 | [EVerest libocpp](https://github.com/EVerest/libocpp) | **충전기 측** 라이브러리 (C++) | "개발 중" | 언급 없음 |
+| [Java-OCA-OCPP](https://github.com/ChargeTimeEU/Java-OCA-OCPP) | 라이브러리 (Java) | ✅ 2.1 트리 | ✅ **서버 측**, 문서에 없고 배포물에도 없음 |
 | Solidstudio VCP | **CS 시뮬레이터** | ✅ 지원함 | 확인 안 됨 |
 | ocpp-rs | 라이브러리 + 시뮬레이터 (Rust) | ❌ 1.6J / 2.0.1 | ❌ |
 | tzi-OCTT | CSMS 검증 pytest 스위트 | ❌ 2.0.1 / 1.6J | — |
@@ -231,6 +233,10 @@ OCPP 2.1 이 2025년 1월 **Battery Swap 기능 블록(Block S)** 을 정식 편
 
 **❌** 는 미지원으로 확인된 것, **"언급 없음"** 은 문서·이슈에서 찾지 못한 것,
 **"확인 안 됨"** 은 판단 근거를 얻지 못한 것입니다 — 뒤의 둘은 *부재의 증거가 아닙니다.*
+Java 행이 바로 그 경고가 현실이 된 자리입니다. 그 구현의 Battery Swapping 모듈은 어느 README
+에도 없고 배포된 아티팩트에도 없습니다. 소스 트리를 읽어 찾았고, 서버로 컴파일해 교환을 걸어
+확인했습니다([CONFORMANCE.md](docs/CONFORMANCE.md#limits-of-self-verification)).
+**서버 측을 처리합니다. 스테이션도 아니고, Block S 를 걸어 볼 시험 도구도 아닙니다.**
 **반증을 환영합니다.** Block S 메시지(`RequestBatterySwap` · `BatterySwap` 트랜잭션 이벤트)를
 다루는 구현을 아신다면 이슈로 알려 주세요.
 
@@ -253,13 +259,19 @@ OCPP 2.1 이 2025년 1월 **Battery Swap 기능 블록(Block S)** 을 정식 편
 > OCA 의 인증 프로그램과 OCTT 시험 도구는 오늘 기준 **2.0.1 과 1.6** 을 다루고 2.1 지원은
 > 향후 과제로 적혀 있습니다. 여기 있는 것은 Part 6 케이스의 **자체 구현**입니다.
 
-**남의 서버를 상대로 시험했습니다.** 시뮬레이터를 **공개 CSMS 구현 두 곳**에 붙였고, 그중 하나는
+**남의 서버를 상대로 시험했습니다.** 시뮬레이터를 **공개 구현 세 곳**에 붙였고, 그중 하나는
 OCPP 2.0.1 로 OCA 인증을 받은 구현입니다(그 인증서는 특정 2.0.1 릴리스를 덮고, 여기서 붙은
 것은 그 구현의 `latest` 입니다). 핸드셰이크 · 서브프로토콜 협상 · `BootNotification` ·
 `NotifyEvent` · `TransactionEvent` · 메시지 상관이 모두 성립했고, 이쪽에서 낸 CALLERROR 를 상대가
 제대로 읽었습니다. **그 과정에서 이 저장소의 결함 셋을 찾았습니다** — 셋 다 배포 모듈 밖이었습니다.
-판정하지 못한 것은 **Block S 자체**입니다. 양쪽 모두 `BatterySwap` 핸들러가 없고, 타임아웃 ·
-재접속은 아예 건드리지 않았습니다.
+
+**Block S 를 이제 남의 핸들러가 받았습니다.** 세 번째 상대는 배포된 CSMS 가 아니라 JVM
+라이브러리이고, 그 Battery Swapping 모듈은 문서에도 배포물에도 없습니다 — 그래도 다른 저자가 쓴,
+실제 요청 핸들러를 갖춘 Block S 구현입니다. 로컬 서버로 컴파일해 붙이자 **스테이션이 개시한 교환과
+CSMS 가 개시한 교환이 모두 끝까지** 돌았고, 상대가 발번한 `requestId` 를 승계해 상관시켰으며,
+응답을 붙잡자 이쪽 CALL 타임아웃이 발동했고, 교환 도중 재접속한 뒤의 재전송에도 응답했습니다.
+마지막 실행은 심판의 한계도 함께 보여 줬습니다 — 같은 `messageId` 에 응용 핸들러가 **두 번**
+불렸습니다. `InboundCallLedger` 가 존재하는 이유가 정확히 그 경우입니다.
 
 > 상호운용 시험이 덮은 것과 멈춘 자리 →
 > **[docs/CONFORMANCE.md](docs/CONFORMANCE.md) § Limits of self-verification**

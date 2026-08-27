@@ -1,5 +1,7 @@
 package dev.swapve.station
 
+import dev.swapve.ocpp.session.MessageDirection
+import dev.swapve.ocpp.swap.BatterySwapWire
 import dev.swapve.swap.IdToken
 import kotlinx.coroutines.runBlocking
 
@@ -35,6 +37,10 @@ object StationSimCli {
                                     RequestBatterySwapRequest 를 기다린다.
                                     앱이 교환을 거는 표준 유즈케이스다:
                                       POST /api/swaps {"stationId": ..., "idToken": ...}
+          --fault-f6                ★ F6 — 출고 직전에 연결이 끊긴 상황을 재현한다.
+                                    입고까지 진행한 뒤 끊고, 재접속해 **같은 messageId 로**
+                                    BatteryIn 을 재전송한다. 상대 CSMS 가 멱등 원장을
+                                    가졌다면 저장된 응답을 다시 낼 뿐 장부는 늘지 않는다.
     """.trimIndent()
 
     @JvmStatic
@@ -45,12 +51,22 @@ object StationSimCli {
         }
 
         val remoteStart = args.any { it == REMOTE_START_FLAG }
-        val options = parse(args.filterNot { it == REMOTE_START_FLAG }.toTypedArray())
+        val faultF6 = args.any { it == FAULT_F6_FLAG }
+        require(!(remoteStart && faultF6)) {
+            "$REMOTE_START_FLAG 과 $FAULT_F6_FLAG 를 함께 쓸 수 없다 — F6 은 스테이션이 개시하는 경로다"
+        }
+        val options = parse(args.filterNot { it == REMOTE_START_FLAG || it == FAULT_F6_FLAG }.toTypedArray())
         val config = buildConfig(options)
 
         println("station-sim → ${config.connectUrl} (순서 ${config.swapOrder.wireValue}, 배터리 ${config.insertSlots.size} 개)")
 
-        StationSimulator(config).use { simulator ->
+        val faults = if (faultF6) {
+            FaultInjection.failingAt(SimStep.BATTERY_OUT, "교환 도중 연결이 끊겼다")
+        } else {
+            FaultInjection.None
+        }
+
+        StationSimulator(config, faults = faults).use { simulator ->
             var requestId = config.requestId
             runBlocking {
                 simulator.connect()
@@ -65,16 +81,61 @@ object StationSimCli {
                     // 상관 번호는 CSMS 가 발번한 값을 승계한다 (S02.FR.02).
                     requestId = simulator.awaitRemoteStart()
                     simulator.runRemoteSwap()
+                } else if (faultF6) {
+                    runF6(simulator, config)
                 } else {
                     simulator.bootAndSwap()
                 }
             }
-            println("교환 완주: requestId=$requestId, 오간 메시지 ${simulator.eventLog.size()} 건")
+            if (faultF6) {
+                println("F6 완주: requestId=$requestId, 오간 메시지 ${simulator.eventLog.size()} 건")
+            } else {
+                println("교환 완주: requestId=$requestId, 오간 메시지 ${simulator.eventLog.size()} 건")
+            }
         }
     }
 
-    /** S02 원격 개시 대기 모드. 값을 받지 않는 유일한 인자라 [parse] 에 넣지 않는다. */
+    /** S02 원격 개시 대기 모드. 값을 받지 않는 인자라 [parse] 에 넣지 않는다. */
     private const val REMOTE_START_FLAG = "--remote-start"
+
+    /** F6 재접속 재전송. 값을 받지 않는 인자라 [parse] 에 넣지 않는다. */
+    private const val FAULT_F6_FLAG = "--fault-f6"
+
+    /**
+     * F6 — 출고 직전에 끊기고, 재접속해 같은 messageId 로 되보낸다.
+     *
+     * 판정 대상은 **상대 CSMS** 다. 같은 `(stationId, messageId)` 로 두 번 온 `BatteryIn` 을
+     * 멱등하게 처리하면 저장된 응답이 다시 오고 장부는 그대로여야 한다. 재전송에 대한 응답이
+     * 오지 않으면 상대가 그 프레임을 조용히 버렸다는 뜻이고, 그것도 결과다.
+     */
+    private suspend fun runF6(simulator: StationSimulator, config: StationSimConfig) {
+        simulator.boot()
+
+        // 입고까지 가고 출고 직전에 끊긴다.
+        try {
+            simulator.runSwap()
+            error("F6 인데 장애가 주입되지 않았다 — 출고 직전에 끊겼어야 한다")
+        } catch (fault: SimulatedFault) {
+            println("F6 장애 주입: ${fault.message}")
+        }
+
+        val batteryIn = simulator.eventLog.of(config.stationId)
+            .lastOrNull {
+                it.direction == MessageDirection.OUTBOUND && it.action == BatterySwapWire.BATTERY_SWAP
+            }
+            ?: error("BatteryIn 이 나가지 않았다 — 되보낼 것이 없다")
+        println("F6 첫 BatteryIn: messageId=${batteryIn.messageId}, 응답 ${simulator.repliesTo(batteryIn.messageId)} 건")
+
+        simulator.disconnect()
+        simulator.reconnect()
+        simulator.resendLastBatterySwap(sameMessageId = true)
+
+        val replies = simulator.repliesTo(batteryIn.messageId)
+        println("F6 재전송 뒤: 같은 messageId 에 대한 응답 $replies 건")
+        check(replies >= 2) {
+            "재전송에 대한 응답이 오지 않았다 — 상대가 재전송을 조용히 버렸다 (messageId=${batteryIn.messageId})"
+        }
+    }
 
     /**
      * 기본 시나리오 구성.

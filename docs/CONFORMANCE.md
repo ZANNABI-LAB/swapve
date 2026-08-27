@@ -114,8 +114,8 @@ a stand-in.
 | Layer | External referee | What stands in for one |
 |---|---|---|
 | Payload ↔ schema | ✅ yes | The 181 official JSON schemas under `schemas/`. `SchemaCrossCheckTest` validates every message in both directions; `WireContractTest` looks our own constants up in the schema `enum`s |
-| OCPP-J framing · correlation | ⚠️ **partly, once** | Two third-party CSMS implementations have accepted our CALL, CALLRESULT and CALLERROR frames and correlated them by `messageId` (see below). Between those runs, `OcppFrameCodecTest` decodes the Part 4 §4.2.1–4.2.4 example frames verbatim and `ProtocolContractTest` asserts against string literals rather than production constants |
-| Timeouts · reconnection | ❌ no | `OcppSessionTimeoutTest` pins Part 4 §4.1.1 behaviour, but the reading of the specification is ours and is shared by both ends. The interoperability runs did not exercise this layer at all |
+| OCPP-J framing · correlation | ⚠️ **partly, three times** | Three third-party implementations have accepted our CALL, CALLRESULT and CALLERROR frames and correlated them by `messageId` (see below). Between those runs, `OcppFrameCodecTest` decodes the Part 4 §4.2.1–4.2.4 example frames verbatim and `ProtocolContractTest` asserts against string literals rather than production constants |
+| Timeouts · reconnection | ⚠️ **partly, once** | A third-party JVM CSMS was stood up locally and driven through both a stalled reply and a mid-swap disconnect (see below). Between those runs, `OcppSessionTimeoutTest` pins Part 4 §4.1.1 behaviour, but the reading of the specification is ours and is shared by both ends |
 
 **What the literal assertions buy — and what they do not.** `ProtocolContractTest` writes its
 expectations as string literals in the test file instead of referencing `BatterySwapWire` or
@@ -144,22 +144,46 @@ our CALLERROR frames for actions the simulator does not implement. Our own `Conn
 `AvailabilityState` and `ISO14443` values came back out of their logs, applied. That is the first
 evidence for those strings that is not a comment we wrote.
 
-Three things were attempted and did not complete, and the reason differs in each case.
+Three things were attempted in those runs and did not complete, and the reason differs in each
+case. **All three were later opened against a third peer** — see the section after this one.
 
 - **Block S was delivered and refused.** A `BatterySwap(BatteryOut)` frame reached the certified
   peer, which answered `FormatViolation` with the log line *"No schema found for action
-  BatterySwap"*. Its 2.1 support does not include Battery Swap. This is the strongest statement this
-  repository can currently make about Block S: not "we could not find a counterpart" but "we sent
-  it, and the counterpart said it has no schema for it."
+  BatterySwap"*. Its 2.1 support does not include Battery Swap.
 - **No swap ran end to end.** `TransactionEvent` passed that peer's schema validation and then
   failed inside its own database on a unique constraint, which it returned as an OCPP
-  `InternalError`. The individual messages were confirmed; a whole swap, start to finish, against an
-  outside implementation was not.
+  `InternalError`. The individual messages were confirmed; a whole swap, start to finish, was not.
 - **Authorization was never granted.** `Authorize` arrived but the token was not provisioned on the
-  peer, so the answer was `Unknown`. The path where a swap opens on an accepted token has not been
-  seen from outside.
+  peer, so the answer was `Unknown`. The path where a swap opens on an accepted token was not seen.
 
-**Timeouts and reconnection were not exercised at all** in either run.
+**Timeouts and reconnection were not exercised at all** in either of those two runs.
+
+**A third peer answered Block S.** The two runs above were against deployed CSMS images. A third
+referee was found in a different form: an MIT-licensed JVM OCPP library whose 2.1 tree carries a
+**server-side Battery Swapping function with an actual request handler**, not just message types
+(the Java row in the comparison table in [the README](../README.md#why-block-s)).
+Its published artifacts do not include that module and its build does not run on a current JDK, so
+its sources were compiled directly into a small local CSMS and the simulator was pointed at it. That
+peer is not certified and is not a product; what it is, is a Block S implementation written by
+someone other than us. Four runs were performed:
+
+| Run | Result |
+|---|---|
+| Station-initiated swap (S01) | Completed. The peer's own handler received `BatterySwap(BatteryIn)` and `BatterySwap(BatteryOut)`, 42 messages end to end |
+| CSMS-initiated swap (S02) | The peer sent `RequestBatterySwap`; the simulator answered `Accepted` and **adopted the peer's `requestId`** for the whole swap (S02.FR.02), 38 messages |
+| Stalled reply | The peer held a `BatterySwap` reply past our 30-second CALL timeout. The timeout fired and reported the `messageId` it was waiting on |
+| Disconnect mid-swap, reconnect, retransmit (F6) | The link dropped before `BatteryOut`; after reconnecting, the same frame was retransmitted **under its original `messageId`** and was answered |
+
+This closes the three entries above. A swap now has run start to finish against an implementation
+that is not ours, on an accepted token, with Block S handled rather than refused, and the timeout
+and reconnection layer has been exercised from outside for the first time.
+
+**What that peer did with the retransmission is itself a finding.** Its application handler ran
+**twice** for the same `(stationId, messageId)`. Part 4 §4.1.4 exists because a station that does not
+see a reply retransmits, and the receiver is expected to recognise the repeat rather than book it
+again. `InboundCallLedger` is this repository's answer to that, and F6 is the test that pins it; the
+peer has no equivalent. This is reported here as an observation about the referee, not as a defect
+claim we have raised with anyone.
 
 **Where the cause lies and what is verified are different questions.** Most of what blocked these
 runs sits on the other side — a missing schema, a database constraint, an unprovisioned token. One
@@ -170,10 +194,14 @@ far to trust this repository needs the second answer, not the first, so the entr
 this section regardless of whose code caused them.
 
 **The referees themselves are limited.** One peer is an example server that has not moved in about a
-year; disagreeing with it proves little in either direction. The other is certified, but for OCPP
+year; disagreeing with it proves little in either direction. The second is certified, but for OCPP
 2.0.1, while what we exercised was its 2.1 path on a pre-release image — so the two defects we ran
-into there most likely sit outside the scope of its certification. An outside implementation being
-wrong is a real outcome of interoperability testing, and it is not the same as our being right.
+into there most likely sit outside the scope of its certification. The third is a library rather
+than a deployed CSMS: its Battery Swapping module is not mentioned in its own README, is absent from
+its published artifacts, and the server we ran it in was written here, so what it proves is that
+*another author's reading of Block S accepts our frames* — not that any product does. An outside
+implementation being wrong is a real outcome of interoperability testing, and it is not the same as
+our being right.
 
 **None of this is repeatable by a gate.** The runs were manual, they needed containers, and nothing
 in this repository re-runs them. They are evidence about the days they were performed, not a
