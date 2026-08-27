@@ -114,8 +114,8 @@ a stand-in.
 | Layer | External referee | What stands in for one |
 |---|---|---|
 | Payload ↔ schema | ✅ yes | The 181 official JSON schemas under `schemas/`. `SchemaCrossCheckTest` validates every message in both directions; `WireContractTest` looks our own constants up in the schema `enum`s |
-| OCPP-J framing · correlation | ❌ no | `OcppFrameCodecTest` decodes the Part 4 §4.2.1–4.2.4 example frames verbatim; `ProtocolContractTest` asserts against string literals rather than production constants |
-| Timeouts · reconnection | ❌ no | `OcppSessionTimeoutTest` pins Part 4 §4.1.1 behaviour, but the reading of the specification is ours and is shared by both ends |
+| OCPP-J framing · correlation | ⚠️ **partly, once** | Two third-party CSMS implementations have accepted our CALL, CALLRESULT and CALLERROR frames and correlated them by `messageId` (see below). Between those runs, `OcppFrameCodecTest` decodes the Part 4 §4.2.1–4.2.4 example frames verbatim and `ProtocolContractTest` asserts against string literals rather than production constants |
+| Timeouts · reconnection | ❌ no | `OcppSessionTimeoutTest` pins Part 4 §4.1.1 behaviour, but the reading of the specification is ours and is shared by both ends. The interoperability runs did not exercise this layer at all |
 
 **What the literal assertions buy — and what they do not.** `ProtocolContractTest` writes its
 expectations as string literals in the test file instead of referencing `BatterySwapWire` or
@@ -128,22 +128,57 @@ changing the constant turns a test red.
 file is one. The literals were transcribed from Part 6 Tool validation into the comments that sit
 next to them, and cross-checked against the schema `enum`s where a schema has one. Four fields have
 no `enum` to check against: `component.name`, `variable.name`, `SecurityEventNotification.type`, and
-`idToken.type` are free-form strings in the schemas, so for those the only evidence is the comments
-in `ProtocolContractTest`. Note also what `WireContractTest` cannot see even where an `enum` exists:
+`idToken.type` are free-form strings in the schemas. For three of them the comments are no longer the
+only evidence — a third-party CSMS read our `Connector`, `AvailabilityState` and `ISO14443` back out
+and acted on them (below). `SecurityEventNotification.type` is still comment-only: one peer did not
+implement the message at all and the other accepted it without saying what it made of the value. Note also what `WireContractTest` cannot see even where an `enum` exists:
 it catches a value the standard does not allow, but not **the wrong choice among allowed values** —
 that requires reading the specification text.
 
-**No interoperability testing against a third-party CSMS.** Every run here is this simulator against
-this CSMS. It has been pointed at one other OCPP 2.0.1 implementation once, by hand — that peer did
-not know `SecurityEventNotification`, which is why the simulator now carries on past an action the
-peer says it does not implement instead of dying on it; see
-[VIRTUAL-STATION.md §5](VIRTUAL-STATION.md#5-limits). A single run is not a compatibility claim and
-nothing in this repository re-runs it. The parts that would benefit most from
-being pointed at someone else's implementation are the ordinary ones — BootNotification, Heartbeat,
-NotifyEvent, TransactionEvent, and OCPP-J framing exist in every OCPP 2.x product, so there is real
-interoperability to confirm there. Block S is not in that position: Battery Swap is new in 2.1 and a
-counterpart to test against may simply not exist yet. Formal certification is a separate matter and
-is covered above, under the Battery Swap cases.
+**What the interoperability runs showed, and where they stopped.** The simulator has been pointed
+at two third-party CSMS implementations by hand: a small OCPP 2.0.1 example server, and the current
+image of a certified implementation, which negotiated **`ocpp2.1`** with us. Between them they
+accepted the handshake and subprotocol negotiation, `BootNotification`, `NotifyEvent`, `Authorize`,
+`TransactionEvent` and `SecurityEventNotification`, correlated every reply by `messageId`, and read
+our CALLERROR frames for actions the simulator does not implement. Our own `Connector`,
+`AvailabilityState` and `ISO14443` values came back out of their logs, applied. That is the first
+evidence for those strings that is not a comment we wrote.
+
+Three things were attempted and did not complete, and the reason differs in each case.
+
+- **Block S was delivered and refused.** A `BatterySwap(BatteryOut)` frame reached the certified
+  peer, which answered `FormatViolation` with the log line *"No schema found for action
+  BatterySwap"*. Its 2.1 support does not include Battery Swap. This is the strongest statement this
+  repository can currently make about Block S: not "we could not find a counterpart" but "we sent
+  it, and the counterpart said it has no schema for it."
+- **No swap ran end to end.** `TransactionEvent` passed that peer's schema validation and then
+  failed inside its own database on a unique constraint, which it returned as an OCPP
+  `InternalError`. The individual messages were confirmed; a whole swap, start to finish, against an
+  outside implementation was not.
+- **Authorization was never granted.** `Authorize` arrived but the token was not provisioned on the
+  peer, so the answer was `Unknown`. The path where a swap opens on an accepted token has not been
+  seen from outside.
+
+**Timeouts and reconnection were not exercised at all** in either run.
+
+**Where the cause lies and what is verified are different questions.** Most of what blocked these
+runs sits on the other side — a missing schema, a database constraint, an unprovisioned token. One
+peer also rejected an `idToken` value that the official schema permits, enforcing a format rule the
+specification does not impose, and enforcing it inconsistently across its own message handlers. None
+of that is a defect here. **It does not make the affected areas verified.** A reader deciding how
+far to trust this repository needs the second answer, not the first, so the entries above stay in
+this section regardless of whose code caused them.
+
+**The referees themselves are limited.** One peer is an example server that has not moved in about a
+year; disagreeing with it proves little in either direction. The other is certified, but for OCPP
+2.0.1, while what we exercised was its 2.1 path on a pre-release image — so the two defects we ran
+into there most likely sit outside the scope of its certification. An outside implementation being
+wrong is a real outcome of interoperability testing, and it is not the same as our being right.
+
+**None of this is repeatable by a gate.** The runs were manual, they needed containers, and nothing
+in this repository re-runs them. They are evidence about the days they were performed, not a
+standing compatibility claim. Formal certification is a separate matter and is covered above, under
+the Battery Swap cases.
 
 **Observation is derived from the log — with two exceptions.** Nothing here is asserted against a
 flag the simulator set about itself; every claim is read back out of the event log

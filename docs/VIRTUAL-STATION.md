@@ -252,13 +252,18 @@ no server-side WebSocket, so a fake CSMS cannot be stood up, and without that se
 would be testable *only* through the real CSMS — where a red test cannot tell you which side is
 wrong.
 
-It has been pointed at one other OCPP 2.0.1 implementation, once, and the result is why
-`unsupportedActions` exists ([§4](#4-observation-is-derived-from-the-event-log)). That peer answered
-`SecurityEventNotification` with a "do not know this action" error, and the whole boot sequence died
-on it, so nothing after that point was ever attempted — including the swap the run was for. One
-observation is not a compatibility claim, and nothing here is tested against a second implementation
-on any regular basis; what it did establish is that a tool built to find out what a peer cannot do
-must not stop at the first thing the peer cannot do.
+It has been pointed at two third-party CSMS implementations by hand. The first is why
+`unsupportedActions` exists ([§4](#4-observation-is-derived-from-the-event-log)): that peer answered
+`SecurityEventNotification` with a "do not know this action" error and the whole boot sequence died
+on it, so nothing after that point was ever attempted — including the swap the run was for. A tool
+built to find out what a peer cannot do must not stop at the first thing the peer cannot do.
+
+Once it no longer stopped there, the second peer — which negotiated `ocpp2.1` — took the boot
+sequence, `Authorize`, `TransactionEvent` and the CALLERROR replies, and a `BatterySwap` frame
+reached it and was refused for want of a schema. What each run confirmed, what it did not, and whose
+side the obstacles were on is written out in
+[CONFORMANCE.md](CONFORMANCE.md#limits-of-self-verification). Neither run is repeatable here:
+both were manual, and nothing in this repository re-runs them.
 
 **Four inbound actions are answered**, and only four: `RequestBatterySwap`, `GetVariables`,
 `SetVariables`, `GetBaseReport`. Everything else returns `NotImplemented` per Part 4 §4.3, rather
