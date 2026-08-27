@@ -48,8 +48,8 @@
 
 ```kotlin
 dependencies {
-    implementation("io.github.zannabi-lab:ocpp-core:0.1.0")   // codec · schema validation · session
-    implementation("io.github.zannabi-lab:swap-domain:0.1.0") // the swap state machine, zero dependencies
+    implementation("io.github.zannabi-lab:ocpp-core:0.2.0")   // codec · schema validation · session
+    implementation("io.github.zannabi-lab:swap-domain:0.2.0") // the swap state machine, zero dependencies
 }
 ```
 
@@ -229,6 +229,17 @@ deliberately corrupted logs must turn each item red.
 > **[docs/CONFORMANCE.md](docs/CONFORMANCE.md)**
 > **Official OCTT certification has not been obtained** — it is paid and must go through an
 > OCA-approved test lab. What is here is an **independent implementation** of the Part 6 cases.
+
+**Tested against someone else's server.** The simulator has been pointed at **two independent
+open-source CSMS implementations**, one of them OCA-certified for OCPP 2.0.1. The handshake,
+subprotocol negotiation, `BootNotification`, `NotifyEvent`, `TransactionEvent` and message
+correlation all held, and a CALLERROR raised here was read correctly at the other end. **Three
+defects in this repository were found that way** — none of them in the published modules. What
+could not be judged is **Block S itself**: neither peer implements a `BatterySwap` handler, and
+timeouts and reconnection were never exercised.
+
+> What the interoperability runs covered, and where they stopped →
+> **[docs/CONFORMANCE.md](docs/CONFORMANCE.md) § Limits of self-verification**
 
 ## Layout
 

@@ -47,8 +47,8 @@
 
 ```kotlin
 dependencies {
-    implementation("io.github.zannabi-lab:ocpp-core:0.1.0")   // 코덱 · 스키마 검증 · 세션
-    implementation("io.github.zannabi-lab:swap-domain:0.1.0") // 교환 상태머신, 의존성 0
+    implementation("io.github.zannabi-lab:ocpp-core:0.2.0")   // 코덱 · 스키마 검증 · 세션
+    implementation("io.github.zannabi-lab:swap-domain:0.2.0") // 교환 상태머신, 의존성 0
 }
 ```
 
@@ -217,6 +217,16 @@ OCPP 2.1 이 2025년 1월 **Battery Swap 기능 블록(Block S)** 을 정식 편
 > 출력 예시 · 성공 기준 S1~S7 · 적합성 케이스 전문 → **[docs/CONFORMANCE.md](docs/CONFORMANCE.md)**
 > **OCTT 공식 인증은 받지 않았습니다** — 유료이고 OCA 승인 시험소를 거쳐야 합니다.
 > 여기 있는 것은 Part 6 케이스의 **자체 구현**입니다.
+
+**남의 서버를 상대로 시험했습니다.** 시뮬레이터를 **공개 CSMS 구현 두 곳**에 붙였고, 그중 하나는
+OCPP 2.0.1 로 OCA 인증을 받은 구현입니다. 핸드셰이크 · 서브프로토콜 협상 · `BootNotification` ·
+`NotifyEvent` · `TransactionEvent` · 메시지 상관이 모두 성립했고, 이쪽에서 낸 CALLERROR 를 상대가
+제대로 읽었습니다. **그 과정에서 이 저장소의 결함 셋을 찾았습니다** — 셋 다 배포 모듈 밖이었습니다.
+판정하지 못한 것은 **Block S 자체**입니다. 양쪽 모두 `BatterySwap` 핸들러가 없고, 타임아웃 ·
+재접속은 아예 건드리지 않았습니다.
+
+> 상호운용 시험이 덮은 것과 멈춘 자리 →
+> **[docs/CONFORMANCE.md](docs/CONFORMANCE.md) § Limits of self-verification**
 
 ## 구성
 

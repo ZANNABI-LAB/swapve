@@ -11,6 +11,18 @@ repository.
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-08-27
+
+The session layer's transport boundary became total: handing a frame to the transport now returns
+a value instead of throwing, and a closed session refuses both directions. Every change here was
+found by a test or a review, not by a consumer — the shape of these types still has none.
+
+### Added
+
+- **`TransmitOutcome`** — `Delivered` or `Gone(reason)`, the answer to *"did the frame leave?"*.
+  **`OcppTransmit`** — `suspend (String) -> TransmitOutcome`, the shape a consumer now supplies.
+  Both are in `dev.swapve.ocpp.session`; the entry below says why they exist.
+
 ### Changed
 
 - **`transmit` now reports whether the frame left, instead of throwing.** Its type went from
@@ -97,6 +109,10 @@ resolution from Central by a consumer project — deliberately kept as a record 
   here runs against this project's own simulator
 - Security profiles 2 and 3 (mTLS) are not implemented; OCPP 1.6J is not supported
 
-[Unreleased]: https://github.com/ZANNABI-LAB/swapve/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/ZANNABI-LAB/swapve/releases/tag/v0.1.0
-[0.0.1]: https://github.com/ZANNABI-LAB/swapve/releases/tag/v0.0.1
+<sub>`0.0.1` and `0.1.0` link to the commit that set the version rather than to a tag: both were
+uploaded to Central without a git tag ever being created. Tagging starts at `v0.2.0`.</sub>
+
+[Unreleased]: https://github.com/ZANNABI-LAB/swapve/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/ZANNABI-LAB/swapve/compare/eb95179...v0.2.0
+[0.1.0]: https://github.com/ZANNABI-LAB/swapve/commit/eb95179
+[0.0.1]: https://github.com/ZANNABI-LAB/swapve/commit/e1d07c9
