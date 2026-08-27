@@ -39,7 +39,7 @@ import kotlin.test.assertTrue
  *
  * ```
  * val sessions = OcppSessions(clock, eventSink = myEventLog)
- * val session = sessions.open(stationId, transmit = { ws.send(it) }, onCall = ::handle)
+ * val session = sessions.open(stationId, transmit = { ws.send(it); TransmitOutcome.Delivered }, onCall = ::handle)
  * ```
  *
  * **이 예제는 일부러 손으로 조립한 쪽을 남겨 둔다.** 팩토리가 감추는 것이 무엇인지 보여

@@ -14,8 +14,8 @@ import java.util.concurrent.ConcurrentHashMap
  * Validates payloads against the official OCPP 2.1 JSON Schemas and decides which RPC error code
  * to answer with when they fail (Part 4 §4.1.6, §4.2.4, §4.3).
  *
- * Schemas are read only as documents from the classpath, through [OcppSchemas] — never
- * transcribed into code (CC BY-ND 4.0 forbids derivatives). Compiled [JsonSchema] instances are
+ * Schemas are read only as documents from the classpath — never transcribed into code
+ * (CC BY-ND 4.0 forbids derivatives). Compiled [JsonSchema] instances are
  * cached by name, so each schema is parsed once.
  *
  * No I/O, no session state. **It does not send the CALLERROR** — it judges and decides policy,
