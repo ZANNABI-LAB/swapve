@@ -5,7 +5,6 @@ import com.networknt.schema.JsonSchema
 import com.networknt.schema.JsonSchemaFactory
 import com.networknt.schema.SpecVersion
 import com.networknt.schema.ValidationMessage
-import dev.swapve.ocpp.rpc.MessageType
 import dev.swapve.ocpp.rpc.OcppFrame
 import dev.swapve.ocpp.rpc.OcppFrameCodec
 import dev.swapve.ocpp.rpc.RpcErrorCode
@@ -168,17 +167,4 @@ class OcppPayloadValidator {
 
         private const val ELLIPSIS = "..."
     }
-}
-
-/**
- * Convenience for callers that only hold a [MessageType]. Types with no payload schema yield
- * [PayloadValidation.NotApplicable].
- */
-fun OcppPayloadValidator.validateByType(
-    type: MessageType,
-    action: String,
-    payload: JsonNode,
-): PayloadValidation {
-    val schemaName = OcppSchemaNames.forMessage(type, action) ?: return PayloadValidation.NotApplicable
-    return validateAgainst(schemaName, payload)
 }

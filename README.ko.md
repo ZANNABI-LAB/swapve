@@ -56,6 +56,40 @@ dependencies {
 부 버전 사이에도 공개 API 가 바뀔 수 있습니다 — 이 저장소 밖의 소비자가 그 모양을 아직
 시험해 보지 않았기 때문입니다.</sub>
 
+**쓰는 모습은 이렇습니다.** 프레이밍 · 스키마 검증 · 타임아웃 · Part 4 §4.1.1 의
+"연결당 CALL 하나" 규칙은 라이브러리가 갖습니다. 넘겨줄 것은 전송 함수와 핸들러입니다.
+
+```kotlin
+val sessions = OcppSessions(Clock.systemUTC(), eventSink = myEventLog)
+
+// 세션은 연결 하나당 하나. 재접속하면 같은 스테이션으로 open() 을 다시 부릅니다 —
+// 멱등 원장이 그대로 이어져서, 재전송된 교환이 두 번 세어지는 것을 막습니다.
+val session = sessions.open(
+    stationId = "CS001",
+    transmit = { line ->
+        if (socket.isOpen) { socket.send(line); TransmitOutcome.Delivered }
+        else TransmitOutcome.Gone("socket closed")
+    },
+    onCall = { stationId, call -> InboundResponse.Respond(answerFor(call)) },
+)
+
+// 들어온 줄은 도착 순서대로:  session.receive(line)
+
+when (val result = session.call(OcppCall("RequestBatterySwap", payload))) {
+    is OcppResult.Accepted -> result.payload
+    is OcppResult.Rejected -> result.knownErrorCode
+    is OcppResult.InvalidResponse,
+    is OcppResult.TimedOut,
+    is OcppResult.NotConnected -> null   // 던지지 않습니다 — 모든 결말이 값입니다
+}
+```
+
+연결을 맺고, 끊기면 다시 붙이고, `receive` 를 도착 순서대로 부르는 것은 소비자 몫입니다.
+**코덱 · 스키마 층은 Java 에서 부를 수 있고, 그 위의 세션 층은 Kotlin 전용입니다**(코루틴).
+`swap-domain` 은 의존성이 아예 없지만 식별자가 Kotlin `value class` 라 Java 에서는
+`constructor-impl` 형태로 맹글링돼 보입니다 — **Kotlin 소비자를 위해 쓰였습니다.**
+→ [docs/LAYERS.md](docs/LAYERS.md) §4
+
 ## 빠른 시작
 
 필요한 것은 **JDK 17 과 git 뿐**입니다. Gradle 은 래퍼가 받아옵니다.

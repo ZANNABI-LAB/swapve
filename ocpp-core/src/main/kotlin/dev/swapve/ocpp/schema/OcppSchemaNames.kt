@@ -18,7 +18,7 @@ import dev.swapve.ocpp.rpc.MessageType
  * SEND messages take no suffix because their names never end in `Request`/`Response` to begin
  * with (Part 4 §4.2.4).
  */
-object OcppSchemaNames {
+internal object OcppSchemaNames {
 
     /** The schema a `CALL` payload must satisfy (Part 4 §4.1.6). */
     fun forCall(action: String): String = action + REQUEST_SUFFIX

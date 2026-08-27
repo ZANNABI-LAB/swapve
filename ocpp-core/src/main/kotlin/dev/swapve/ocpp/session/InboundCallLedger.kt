@@ -8,13 +8,13 @@ package dev.swapve.ocpp.session
  * (Part 4 §4.1.4). Put the connection in the key and a retransmission after reconnect reads as
  * a brand-new message — which, for a battery swap, double-counts the ledger.
  */
-data class InboundCallKey(
+internal data class InboundCallKey(
     val stationId: String,
     val messageId: String,
 )
 
 /** What [InboundCallLedger.claim] decided. */
-sealed interface CallClaim {
+internal sealed interface CallClaim {
 
     /** Not seen before. Go ahead and process it. */
     data object Fresh : CallClaim
@@ -82,7 +82,7 @@ class InboundCallLedger(private val maxEntries: Int = DEFAULT_MAX_ENTRIES) {
      * Deciding and marking happen in one critical section. Split apart, two copies of the same
      * messageId could both come back [CallClaim.Fresh] and the layer above would run twice.
      */
-    fun claim(key: InboundCallKey): CallClaim = synchronized(lock) {
+    internal fun claim(key: InboundCallKey): CallClaim = synchronized(lock) {
         when (val existing = entries[key]) {
             null -> {
                 entries[key] = Entry.InProgress
@@ -101,7 +101,7 @@ class InboundCallLedger(private val maxEntries: Int = DEFAULT_MAX_ENTRIES) {
      * it verbatim instead of rebuilding it — **the second answer is then byte-for-byte the
      * first**. Rebuilding could differ if the code changed in between.
      */
-    fun complete(key: InboundCallKey, responseText: String) = synchronized(lock) {
+    internal fun complete(key: InboundCallKey, responseText: String) = synchronized(lock) {
         entries[key] = Entry.Answered(responseText)
     }
 
@@ -111,7 +111,7 @@ class InboundCallLedger(private val maxEntries: Int = DEFAULT_MAX_ENTRIES) {
      * Without this the messageId would stay [CallClaim.InFlight] forever and block every retry.
      * A failed attempt has to be retriable by retransmission.
      */
-    fun release(key: InboundCallKey) = synchronized(lock) {
+    internal fun release(key: InboundCallKey) = synchronized(lock) {
         entries.remove(key)
         Unit
     }

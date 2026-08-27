@@ -57,6 +57,41 @@ dependencies {
 the public API may still change between minor versions — no consumer outside this repository has
 tested its shape yet.</sub>
 
+**What using it looks like.** The library owns framing, schema validation, timeouts, and the
+one-CALL-in-flight rule of Part 4 §4.1.1. You supply a transport function and a handler.
+
+```kotlin
+val sessions = OcppSessions(Clock.systemUTC(), eventSink = myEventLog)
+
+// One session per connection. After a reconnect, call open() again for the same station:
+// the idempotency ledger carries across, which is what stops a retransmitted swap from
+// being counted twice.
+val session = sessions.open(
+    stationId = "CS001",
+    transmit = { line ->
+        if (socket.isOpen) { socket.send(line); TransmitOutcome.Delivered }
+        else TransmitOutcome.Gone("socket closed")
+    },
+    onCall = { stationId, call -> InboundResponse.Respond(answerFor(call)) },
+)
+
+// Feed inbound lines in arrival order:  session.receive(line)
+
+when (val result = session.call(OcppCall("RequestBatterySwap", payload))) {
+    is OcppResult.Accepted -> result.payload
+    is OcppResult.Rejected -> result.knownErrorCode
+    is OcppResult.InvalidResponse,
+    is OcppResult.TimedOut,
+    is OcppResult.NotConnected -> null   // never thrown — every outcome is a value
+}
+```
+
+Opening the connection, reconnecting, and calling `receive` in arrival order stay yours.
+**The codec and schema layers are callable from Java; the session layer above is Kotlin-only**
+(coroutines). `swap-domain` has no dependencies at all, but its identifiers are Kotlin
+`value class`es, which Java sees as mangled `constructor-impl` names — it is written for Kotlin
+consumers. → [docs/LAYERS.md](docs/LAYERS.md) §4
+
 ## Quick start
 
 All you need is **JDK 17 and git**. The Gradle wrapper fetches the rest.

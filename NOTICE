@@ -10,7 +10,7 @@ THIRD-PARTY MATERIAL
 
 OCPP 2.1 JSON Schemas  —  schemas/
 
-    OCPP 2.1 Edition 1 / Edition 2
+    OCPP 2.1, from the Edition 2 release package
     Copyright (c) Open Charge Alliance (OCA)
     Licensed under the Creative Commons
     Attribution-NoDerivatives 4.0 International Public License (CC BY-ND 4.0)
@@ -18,6 +18,11 @@ OCPP 2.1 JSON Schemas  —  schemas/
 
     The schema files under schemas/ are redistributed VERBATIM and are NOT
     modified in any way, in accordance with the NoDerivatives condition.
+
+    Note on the edition: each document's own `comment` field reads
+    "OCPP 2.1 Edition 1". That is how the OCA ships them inside the Edition 2
+    release (OCPP-2.1_part3_JSON_schemas), and the 181 files here are byte-for-byte
+    those files. Nothing was renamed or restamped - doing so would be a derivative.
     They are NOT covered by the Apache License that applies to the rest of
     this repository.
 

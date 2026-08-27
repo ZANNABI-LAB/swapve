@@ -10,7 +10,7 @@ package dev.swapve.ocpp.schema
  *
  * Names are the OCPP action plus `Request`/`Response`, e.g. `BatterySwapRequest`.
  */
-object OcppSchemas {
+internal object OcppSchemas {
 
     private const val ROOT = "dev/swapve/ocpp/schemas"
     private const val INDEX = "$ROOT/_index.txt"

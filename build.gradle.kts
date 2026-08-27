@@ -99,7 +99,9 @@ subprojects {
                             "Framework-agnostic. Payloads are Jackson JsonNode - there are no generated message DTOs. " +
                             "The codec and schema layers are callable from Java; the session layer is Kotlin-only (coroutines)."
                     else ->
-                        "OCPP 2.1 Battery Swap (Block S) domain model: swap state machine, slot model, and invariants. No I/O, no dependencies."
+                        "OCPP 2.1 Battery Swap (Block S) domain model: swap state machine, slot model, and invariants. " +
+                            "No I/O, no dependencies. Written for Kotlin consumers - the identifiers are value classes, " +
+                            "which Java sees mangled."
                 },
             )
             inceptionYear.set("2026")

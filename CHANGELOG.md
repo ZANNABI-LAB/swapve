@@ -14,8 +14,10 @@ repository.
 ## [0.2.0] — 2026-08-27
 
 The session layer's transport boundary became total: handing a frame to the transport now returns
-a value instead of throwing, and a closed session refuses both directions. Every change here was
-found by a test or a review, not by a consumer — the shape of these types still has none.
+a value instead of throwing, and a closed session refuses both directions. The public surface also
+narrowed: five types that only ever served the internals are no longer part of the contract.
+Every change here came from a test or a review — this library still has no consumer outside its
+own repository, which is exactly why narrowing it now was cheap.
 
 ### Added
 
@@ -48,6 +50,23 @@ found by a test or a review, not by a consumer — the shape of these types stil
   same as being able to reach the station — a socket can die between the last frame and the
   teardown that unregisters it. The authoritative answer is what `StationCommandBus.send`
   returns.
+
+### Removed
+
+- **`validateByType`** — an extension on `OcppPayloadValidator` that nothing called, here or
+  anywhere else in this repository. `validate(frame, callAction)` covers the same ground starting
+  from a decoded frame.
+- **`OcppSchemas` and `OcppSchemaNames` are now `internal`.** One reads a schema document off the
+  classpath and the other turns an action into a schema name. Both are how the validator does its
+  job, not a contract someone else was meant to hold. `OcppPayloadValidator` is the way in.
+- **`InboundCallKey`, `CallClaim`, and `InboundCallLedger.claim` / `complete` / `release` are now
+  `internal`.** A consumer builds an `InboundCallLedger` and hands it to the session — that is what
+  the ledger is for, and driving it by hand was never part of the design. The constructor and
+  `size()` stay public.
+
+  **Migration**: none expected. Every one of these had zero callers outside `ocpp-core`, which is
+  why they moved now: while the major version is `0`, narrowing the surface costs nothing, and
+  once someone depends on it, it stops being free.
 
 ### Fixed
 
