@@ -262,11 +262,14 @@ deliberately corrupted logs must turn each item red.
 
 > Sample output · success criteria S1–S7 · full conformance case list →
 > **[docs/CONFORMANCE.md](docs/CONFORMANCE.md)**
-> **Official OCTT certification has not been obtained** — it is paid and must go through an
-> OCA-approved test lab. What is here is an **independent implementation** of the Part 6 cases.
+> **Official OCTT certification has not been obtained, and for OCPP 2.1 there is nothing to
+> apply to yet** — the OCA's certification programme and its OCTT test tool cover **2.0.1 and
+> 1.6** today, and 2.1 support is stated as future work. What is here is an **independent
+> implementation** of the Part 6 cases.
 
 **Tested against someone else's server.** The simulator has been pointed at **two independent
-open-source CSMS implementations**, one of them OCA-certified for OCPP 2.0.1. The handshake,
+open-source CSMS implementations**, one of them OCA-certified for OCPP 2.0.1 (that certificate
+covers a specific 2.0.1 release; the build exercised here was its `latest`). The handshake,
 subprotocol negotiation, `BootNotification`, `NotifyEvent`, `TransactionEvent` and message
 correlation all held, and a CALLERROR raised here was read correctly at the other end. **Three
 defects in this repository were found that way** — none of them in the published modules. What

@@ -249,19 +249,23 @@ class TcS103CsmsTest {
             val step = listOf(13, 17)[index]
             val info = event.path("transactionInfo")
 
-            // ★ 함정 2 — 초기 설계는 이 자리를 EVCommunicationLost 로 추정했다. 스펙이 정본이다.
+            // ★ 함정 2 — 초기 설계는 triggerReason 자리를 EVCommunicationLost 로 추정했다.
+            // 아래 셋은 **리터럴**이다. `BatterySwapWire` 를 기댓값으로 쓰면 상수로 만든 값을
+            // 같은 상수와 견주는 꼴이라, 값을 잘못 고쳐도 시험이 초록으로 남는다. 실제로 그랬다 —
+            // 상수를 EVCommunicationLost 로 되돌려도 게이트 6개가 전부 통과했다(2026-08-27 실측).
+            // 출처는 Part 6 pp.1366-1369 의 TC_S_103_CSMS step 13·17 이다. 지우지 말 것.
             assertEquals(
-                BatterySwapWire.TRIGGER_REASON_ENERGY_LIMIT_REACHED,
+                "EnergyLimitReached",
                 event.path("triggerReason").asText(),
                 "step $step — triggerReason (왜 끝났나)",
             )
             assertEquals(
-                BatterySwapWire.STOPPED_REASON_EV_DISCONNECTED,
+                "EVDisconnected",
                 info.path("stoppedReason").asText(),
                 "step $step — stoppedReason (무엇이 끊겼나)",
             )
             assertEquals(
-                BatterySwapWire.CHARGING_STATE_IDLE,
+                "Idle",
                 info.path("chargingState").asText(),
                 "step $step — chargingState (끝난 뒤의 상태)",
             )
