@@ -992,7 +992,7 @@ class StationSimulator(
         BatterySwapWire.GET_BASE_REPORT -> getBaseReport(call.payload)
         else -> InboundResponse.Fail(
             RpcErrorCode.NotImplemented,
-            "station-sim 이 구현하지 않은 action: ${call.action}",
+            "action not implemented by station-sim: ${call.action}",
         )
     }
 
@@ -1064,7 +1064,7 @@ class StationSimulator(
                 SimPayloads.getBaseReportResponse(
                     accepted = false,
                     reasonCode = REASON_UNSUPPORTED_REPORT_BASE,
-                    additionalInfo = "이 스테이션이 만들 수 있는 보고는 FullInventory 뿐이다: $reportBase",
+                    additionalInfo = "this station can only produce FullInventory: $reportBase",
                 ),
             )
         }
@@ -1130,7 +1130,7 @@ class StationSimulator(
                 SimPayloads.requestBatterySwapResponse(
                     accepted = false,
                     reason = BatteryRejectionReason.NO_BATTERY_AVAILABLE,
-                    additionalInfo = "교환에 내줄 배터리가 없다 (가용 $available 개)",
+                    additionalInfo = "no battery available for the swap (available: $available)",
                 ),
             )
         }

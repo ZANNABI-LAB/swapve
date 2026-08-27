@@ -70,6 +70,33 @@ tasks.withType<Test>().configureEach {
 }
 
 /**
+ * ⚠️ **소스를 읽는 시험은 그 파일을 입력으로 선언해야 한다.**
+ *
+ * `WireLanguageAuditTest` 는 다섯 모듈의 main 소스를 열어 와이어로 나가는 문자열에 한글이
+ * 없는지 본다. 그런데 문자열 리터럴만 바꾸면 `csms` 의 바이트코드는 그대로라, 선언이 없으면
+ * Gradle 이 `test` 를 up-to-date 로 건너뛴다 — 위반을 넣어도 시험이 아예 돌지 않고 초록으로
+ * 보인다. `ocpp-core` 의 `wireConstantsSource` 선언이 같은 사고를 겪고 남은 자리다.
+ *
+ * 경로는 시험이 작업 디렉토리에서 추정하지 않는다. 추정이 빗나가면 0 개를 스캔하고도
+ * 통과로 끝나기 때문에, Gradle 이 **입력으로 선언한 바로 그 경로**를 그대로 넘긴다.
+ *
+ * 새 게이트를 만들지 않는다 — `:csms:test` 는 `build` 가 이미 도는 자리다.
+ */
+val wireLanguageSourceRoots = listOf("ocpp-core", "swap-domain", "csms", "station-sim", "sim-console")
+    .map { rootProject.layout.projectDirectory.dir("$it/src/main/kotlin") }
+
+tasks.named<Test>("test") {
+    inputs.files(wireLanguageSourceRoots.map { it.asFileTree.matching { include("**/*.kt") } })
+        .withPropertyName("wireLanguageSources")
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+
+    systemProperty(
+        "swapve.wireLanguage.sourceRoots",
+        wireLanguageSourceRoots.joinToString(File.pathSeparator) { it.asFile.absolutePath },
+    )
+}
+
+/**
  * ★ **L2 표준 적합성 게이트의 실체**.
  *
  * 시험 대상(System under test)이 CSMS 인 Part 6 케이스가 여기서 돈다. 시험계(Test System)

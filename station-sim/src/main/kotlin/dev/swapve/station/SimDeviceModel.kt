@@ -127,7 +127,7 @@ class SimDeviceModel(
                 ref,
                 VariableStatus.REJECTED,
                 reasonCode = REASON_READ_ONLY,
-                additionalInfo = "배터리의 값은 관측되는 것이지 설정되는 것이 아니다: $ref",
+                additionalInfo = "battery values are observed, not set: $ref",
             )
         }
         if (!isKnownComponent(ref)) return unknownComponentWrite(ref)
@@ -184,7 +184,7 @@ class SimDeviceModel(
                 ref,
                 VariableStatus.REJECTED,
                 reasonCode = REASON_READ_ONLY,
-                additionalInfo = "교환 순서는 스테이션의 성질이라 설정할 수 없다 (S03.FR.07)",
+                additionalInfo = "swap order is a property of the station and cannot be set (S03.FR.07)",
             )
 
         // 이름 비교는 언제나 대소문자를 무시한다 — 스키마가 그렇게 규정한다.
@@ -196,7 +196,7 @@ class SimDeviceModel(
                     ref,
                     VariableStatus.REJECTED,
                     reasonCode = REASON_INVALID_VALUE,
-                    additionalInfo = "타임아웃은 0 이상의 정수 초여야 한다: $value",
+                    additionalInfo = "timeout must be a non-negative whole number of seconds: $value",
                 )
             }
 
@@ -208,7 +208,7 @@ class SimDeviceModel(
                     ref,
                     VariableStatus.REJECTED,
                     reasonCode = REASON_INVALID_VALUE,
-                    additionalInfo = "boolean 이어야 한다: $value",
+                    additionalInfo = "must be a boolean: $value",
                 )
             }
 
@@ -221,14 +221,14 @@ class SimDeviceModel(
         ref,
         VariableStatus.REJECTED,
         reasonCode = REASON_SOC_ORDER,
-        additionalInfo = "S04.FR.06/10 — MaxSoc($max) 은 TargetSoC($target) 이상이어야 한다",
+        additionalInfo = "S04.FR.06/10 — MaxSoc($max) must be at least TargetSoC($target)",
     )
 
     private fun rejectPercent(ref: VariableRef, value: String) = VariableWrite(
         ref,
         VariableStatus.REJECTED,
         reasonCode = REASON_INVALID_VALUE,
-        additionalInfo = "0..100 의 정수 퍼센트여야 한다: $value",
+        additionalInfo = "must be a whole percentage in 0..100: $value",
     )
 
     private fun currentInt(ref: VariableRef, fallback: Int): Int =
@@ -253,14 +253,14 @@ class SimDeviceModel(
             ref,
             VariableStatus.UNKNOWN_COMPONENT,
             reasonCode = REASON_UNKNOWN_COMPONENT,
-            additionalInfo = "BatteryCartridge 는 evse.id 없이는 어느 배터리인지 정해지지 않는다 (S04.FR.12)",
+            additionalInfo = "BatteryCartridge is undetermined without evse.id (S04.FR.12)",
         )
 
         val battery = batteryAt(evseId) ?: return VariableReading(
             ref,
             VariableStatus.UNKNOWN_COMPONENT,
             reasonCode = REASON_UNKNOWN_COMPONENT,
-            additionalInfo = "슬롯 $evseId 에 배터리가 없다",
+            additionalInfo = "no battery in slot $evseId",
         )
 
         return when {
@@ -274,7 +274,7 @@ class SimDeviceModel(
                 ref,
                 VariableStatus.UNKNOWN_VARIABLE,
                 reasonCode = REASON_UNKNOWN_VARIABLE,
-                additionalInfo = "BatteryCartridge 가 갖는 변수가 아니다: ${ref.variable}",
+                additionalInfo = "not a variable of BatteryCartridge: ${ref.variable}",
             )
         }
     }
@@ -283,14 +283,14 @@ class SimDeviceModel(
         ref,
         VariableStatus.UNKNOWN_COMPONENT,
         reasonCode = REASON_UNKNOWN_COMPONENT,
-        additionalInfo = "이 스테이션이 갖지 않은 컴포넌트다: ${ref.component}",
+        additionalInfo = "not a component of this station: ${ref.component}",
     )
 
     private fun unknownComponentWrite(ref: VariableRef) = VariableWrite(
         ref,
         VariableStatus.UNKNOWN_COMPONENT,
         reasonCode = REASON_UNKNOWN_COMPONENT,
-        additionalInfo = "이 스테이션이 갖지 않은 컴포넌트다: ${ref.component}",
+        additionalInfo = "not a component of this station: ${ref.component}",
     )
 
     /** `Timeout` 을 인스턴스 없이 물었을 때 그 사실을 말해 준다 (주의 1). */
@@ -298,9 +298,9 @@ class SimDeviceModel(
         if (ref.variable.equals(DeviceModelVariables.VARIABLE_TIMEOUT, ignoreCase = true) &&
             ref.variableInstance == null
         ) {
-            "Timeout 은 instance 로 In/Out 을 정해야 한다 (변수 두 개가 아니다)"
+            "Timeout needs an instance to select In/Out (it is not two variables)"
         } else {
-            "이 컴포넌트가 갖지 않은 변수다: ${ref.variable}"
+            "not a variable of this component: ${ref.variable}"
         }
 
     /** 정수면 정수로 적는다 — `80.0` 이 아니라 `80` 이다. 상대가 `%` 정수로 읽는다. */

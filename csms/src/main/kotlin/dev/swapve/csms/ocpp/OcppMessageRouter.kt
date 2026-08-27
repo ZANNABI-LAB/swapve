@@ -164,7 +164,7 @@ class OcppMessageRouter(
         if (value.isNullOrBlank() || type.isNullOrBlank()) {
             return InboundResponse.Fail(
                 RpcErrorCode.PropertyConstraintViolation,
-                "idToken.idToken 과 idToken.type 은 비어 있을 수 없다",
+                "idToken.idToken and idToken.type must not be empty",
             )
         }
 
@@ -300,7 +300,7 @@ class OcppMessageRouter(
         if (transactionId.isNullOrBlank()) {
             return InboundResponse.Fail(
                 RpcErrorCode.PropertyConstraintViolation,
-                "transactionInfo.transactionId 는 비어 있을 수 없다",
+                "transactionInfo.transactionId must not be empty",
             )
         }
 
@@ -365,7 +365,7 @@ class OcppMessageRouter(
             // 성립하지 않는다고 답하는 것이라, 빈 응답 규칙과 충돌하지 않는다 (Part 4 §4.3).
             return InboundResponse.Fail(
                 RpcErrorCode.PropertyConstraintViolation,
-                "idToken.idToken 과 idToken.type 은 비어 있을 수 없다",
+                "idToken.idToken and idToken.type must not be empty",
             )
         }
 
