@@ -83,8 +83,12 @@ class StationRoundTripTest {
 
             val swaps = csms.received(BatterySwapWire.BATTERY_SWAP).map(::callPayloadOf)
             assertEquals(2, swaps.size, "입고 하나 · 출고 하나")
-            assertEquals(BatterySwapWire.BATTERY_IN, swaps[0].path("eventType").asText())
-            assertEquals(BatterySwapWire.BATTERY_OUT, swaps[1].path("eventType").asText())
+
+            // 아래 둘은 **리터럴**이다. `BatterySwapWire` 를 기댓값으로 쓰면 그 상수로 만든 값을
+            // 같은 상수와 견주는 꼴이라, 값을 잘못 고쳐도 시험이 초록으로 남는다.
+            // 출처는 `schemas/BatterySwapRequest.json` 의 `BatterySwapEventEnumType` 이다. 지우지 말 것.
+            assertEquals("BatteryIn", swaps[0].path("eventType").asText())
+            assertEquals("BatteryOut", swaps[1].path("eventType").asText())
             assertEquals(
                 swaps[0].path("requestId").asInt(),
                 swaps[1].path("requestId").asInt(),
@@ -117,7 +121,10 @@ class StationRoundTripTest {
 
             val swaps = csms.received(BatterySwapWire.BATTERY_SWAP).map(::callPayloadOf)
             assertEquals(1, swaps.size, "2.0.1 위에서도 BatterySwap 은 나간다")
-            assertEquals(BatterySwapWire.BATTERY_IN, swaps.single().path("eventType").asText())
+
+            // 리터럴이다 — 상수를 기댓값으로 쓰면 동어반복이 된다.
+            // `schemas/BatterySwapRequest.json` 의 `BatterySwapEventEnumType`. 지우지 말 것.
+            assertEquals("BatteryIn", swaps.single().path("eventType").asText())
         }
     }
 
@@ -137,7 +144,10 @@ class StationRoundTripTest {
             )
 
             val accepted = assertIs<OcppResult.Accepted>(result, "스테이션이 답하지 않았다: $result")
-            assertEquals(BatterySwapWire.GENERIC_ACCEPTED, accepted.payload.path("status").asText())
+
+            // 리터럴이다 — 상수를 기댓값으로 쓰면 그 상수로 만든 값을 같은 상수와 견주게 된다.
+            // `schemas/RequestBatterySwapResponse.json` 의 `GenericStatusEnumType`. 지우지 말 것.
+            assertEquals("Accepted", accepted.payload.path("status").asText())
             assertEquals(
                 REMOTE_REQUEST_ID,
                 station.awaitRemoteStart(),
@@ -160,7 +170,10 @@ class StationRoundTripTest {
             )
 
             val answered = assertIs<OcppResult.Accepted>(result, "거부도 CALLRESULT 로 온다: $result")
-            assertEquals(BatterySwapWire.GENERIC_REJECTED, answered.payload.path("status").asText())
+
+            // 리터럴이다 — 상수를 기댓값으로 쓰면 동어반복이 된다.
+            // `schemas/RequestBatterySwapResponse.json` 의 `GenericStatusEnumType`. 지우지 말 것.
+            assertEquals("Rejected", answered.payload.path("status").asText())
             assertEquals(
                 BatteryRejectionReason.NO_BATTERY_AVAILABLE.wireValue,
                 answered.payload.path("statusInfo").path("reasonCode").asText(),
@@ -268,7 +281,10 @@ class StationRoundTripTest {
             )
 
             val accepted = assertIs<OcppResult.Accepted>(requested, "스테이션이 답하지 않았다: $requested")
-            assertEquals(BatterySwapWire.DEVICE_MODEL_ACCEPTED, accepted.payload.path("status").asText())
+
+            // 리터럴이다 — 상수를 기댓값으로 쓰면 동어반복이 된다.
+            // `schemas/GetBaseReportResponse.json` 의 `GenericDeviceModelStatusEnumType`. 지우지 말 것.
+            assertEquals("Accepted", accepted.payload.path("status").asText())
 
             assertEquals(REPORT_REQUEST_ID, station.reportFullInventory(), "청한 쪽의 상관 번호를 그대로 되돌린다")
 

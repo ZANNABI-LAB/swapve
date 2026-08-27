@@ -163,7 +163,7 @@ object BatterySwapWire {
     const val CHARGING_STATE_SUSPENDED_EVSE = "SuspendedEVSE"
 
     /** `MeasurandEnumType` — battery state of charge, the value periodic reports carry. */
-    const val MEASURAND_SOC = "SoC"
+    const val MEASURAND_SOC = "SOC"
 
     /**
      * ⚠️ **Not constrained by any schema.** `SampledValue.unitOfMeasure.unit` — percent.
