@@ -46,7 +46,10 @@ class StationOperationSweepTest {
 
             val boots = csms.received(BatterySwapWire.BOOT_NOTIFICATION).map(::callPayloadOf)
             assertEquals(2, boots.size)
-            assertEquals(BatterySwapWire.BOOT_REASON_POWER_UP, boots[0].path("reason").asText())
+
+            // 리터럴이다 — 상수를 기댓값으로 쓰면 그 상수로 만든 값을 같은 상수와 견주게 된다.
+            // `schemas/BootNotificationRequest.json` 의 `BootReasonEnumType`. 지우지 말 것.
+            assertEquals("PowerUp", boots[0].path("reason").asText())
             assertEquals(
                 BatterySwapWire.BOOT_REASON_LOCAL_RESET,
                 boots[1].path("reason").asText(),
@@ -54,8 +57,14 @@ class StationOperationSweepTest {
             )
 
             val securityEvents = csms.received(BatterySwapWire.SECURITY_EVENT_NOTIFICATION).map(::callPayloadOf)
-            assertEquals(BatterySwapWire.SECURITY_EVENT_STARTUP, securityEvents[0].path("type").asText())
-            assertEquals(BatterySwapWire.SECURITY_EVENT_RESET_OR_REBOOT, securityEvents[1].path("type").asText())
+
+            // ★ 아래 둘은 **스키마가 한 글자도 못 잡아 주는 자리**다. `SecurityEventNotificationRequest`
+            // 의 `type` 은 enum 이 아니라 maxLength 50 자유 문자열이라, 오타든 엉뚱한 값이든 검증을
+            // 그대로 통과한다. 그래서 여기서만이라도 리터럴로 못 박는다 — 상수를 기댓값으로 쓰면
+            // 그 상수로 만든 값을 같은 상수와 견주는 꼴이라 아무것도 못 잡는다.
+            // 출처는 Part 6 `BootedBatterySwapping` 전사다. 지우지 말 것.
+            assertEquals("StartupOfTheDevice", securityEvents[0].path("type").asText())
+            assertEquals("ResetOrReboot", securityEvents[1].path("type").asText())
         }
     }
 
@@ -83,8 +92,13 @@ class StationOperationSweepTest {
 
             assertTrue(periodic.path("transactionInfo").path("chargingState").isMissingNode, "상태는 바뀌지 않았다")
             val sample = periodic.path("meterValue").get(0).path("sampledValue").get(0)
-            assertEquals(BatterySwapWire.MEASURAND_SOC, sample.path("measurand").asText())
-            assertEquals(BatterySwapWire.UNIT_PERCENT, sample.path("unitOfMeasure").path("unit").asText())
+            // 둘 다 리터럴이다 — 상수를 기댓값으로 쓰면 동어반복이라 값을 잘못 고쳐도 초록이다.
+            // `measurand` 는 `schemas/TransactionEventRequest.json` 의 `MeasurandEnumType` 이 덮지만,
+            // ★ `unitOfMeasure.unit` 은 **enum 이 아니라 자유 문자열**이다 — 스키마는 "Part 2
+            // Appendices 의 표준 단위를 쓸 것"이라고만 하고 검사하지 않으므로 "percent" 같은 오타가
+            // 그대로 통과한다. 그 자리를 잡는 것은 이 단언뿐이다. 지우지 말 것.
+            assertEquals("SoC", sample.path("measurand").asText())
+            assertEquals("Percent", sample.path("unitOfMeasure").path("unit").asText())
             assertEquals(70.0, sample.path("value").asDouble())
             assertEquals(70.0, station.batteryAt(2)?.soC, "보고한 값과 배터리의 값이 두 벌이면 하나는 거짓이다")
         }
@@ -109,7 +123,9 @@ class StationOperationSweepTest {
 
             val timedOut = csms.received(BatterySwapWire.BATTERY_SWAP).map(::callPayloadOf).last()
 
-            assertEquals(BatterySwapWire.BATTERY_OUT_TIMEOUT, timedOut.path("eventType").asText())
+            // 리터럴이다 — 상수를 기댓값으로 쓰면 동어반복이 된다.
+            // `schemas/BatterySwapRequest.json` 의 `BatterySwapEventEnumType`. 지우지 말 것.
+            assertEquals("BatteryOutTimeout", timedOut.path("eventType").asText())
             assertEquals(station.config.requestId, timedOut.path("requestId").asInt(), "상관 번호는 그대로다")
             assertEquals(
                 "BAT-OUT",
