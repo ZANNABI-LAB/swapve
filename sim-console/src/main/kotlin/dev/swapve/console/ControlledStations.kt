@@ -271,6 +271,11 @@ data class StationEvent(
  *   [connected] 로도 갈리지 않는다: 그쪽은 소켓이 있는가를 답하지 방금 보낸 것이 나갔는가를
  *   답하지 않아, 상대가 먼저 닫은 창에서는 참인 채로 전송만 실패한다. **읽기 전용이다** —
  *   이 값으로 조작을 거절하는 순간 순서 게이트가 되고, 그 선은 저쪽 KDoc 이 그어 두었다.
+ * @param lastCallTimeout ★ 마지막으로 건 CALL 이 답 없이 끝났다면 그 사유
+ *   ([StationSimulator.lastCallTimeout] 그대로). [lastTransmitFailure] 와 **다른 사실이다**:
+ *   저쪽은 프레임이 나가지 못한 것이고 이쪽은 나갔는데 답이 오지 않은 것이라, 무응답으로 끝난
+ *   CALL 은 저쪽 칸이 `null` 인 채로 이 칸만 찬다. 답이 오면 — 거부여도 — 지워진다. 여기도
+ *   **읽기 전용이다**: 이 값으로 조작을 거절하는 순간 순서 게이트가 된다.
  * @param unsupportedActions ★ CSMS 가 **모른다고 답한** action 들
  *   ([StationSimulator.unsupportedActions] 그대로). [lastTransmitFailure] 와 달리 쌓인다 —
  *   상대가 그 action 을 모른다는 사실은 나중에 거짓이 되지 않기 때문이다. 여기도 **읽기
@@ -294,6 +299,7 @@ data class StationSnapshot(
     val subprotocol: String?,
     val events: List<StationEvent>,
     val lastTransmitFailure: String?,
+    val lastCallTimeout: String?,
     val unsupportedActions: List<String>,
 ) {
     companion object {
@@ -597,6 +603,10 @@ class ControlledStation(val spec: StationSpec) : AutoCloseable {
             // 시뮬레이터가 들고 있는 그 값이다. 콘솔이 조작 결과로 따로 세우지 않는다 —
             // 실패는 수동 조작만이 아니라 인바운드 응답에서도 나므로 콘솔은 다 보지 못한다.
             lastTransmitFailure = simulator?.lastTransmitFailure,
+            // 위 칸과 같은 자리에서 오지만 같은 사실이 아니다 — 나가지 못한 것과 나갔는데
+            // 답이 없는 것이다. 둘을 한 칸으로 합치면 재전송이 필요한 상황과 다시 눌러 볼
+            // 상황이 화면에서 같아진다.
+            lastCallTimeout = simulator?.lastCallTimeout,
             // 아직 붙지 않았으면 빈 목록이다. 상대가 무엇을 모르는지는 물어봐야 알 수 있고,
             // 아무것도 보내지 않은 스테이션은 아직 아무것도 알아내지 못했다.
             unsupportedActions = simulator?.unsupportedActions.orEmpty(),

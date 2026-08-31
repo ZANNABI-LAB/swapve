@@ -95,6 +95,7 @@ All 24 public functions and 6 public properties of `StationSimulator`, with noth
 | `isConnected` | whether the transport is open; `false` rather than throwing when there is none |
 | `subprotocol` | whatever the server picked in the handshake, reported verbatim ([§3](#3-there-is-no-ordering-gate-and-that-is-deliberate)); `null` when there is no open transport |
 | `lastTransmitFailure` | the reason the last attempted transmission never left the station, or `null` when it did; a successful transmission clears it ([§4](#4-observation-is-derived-from-the-event-log)) |
+| `lastCallTimeout` | the reason the last CALL ended with no answer at all, or `null` when an answer came; distinct from `lastTransmitFailure` — the frame did go out ([§4](#4-observation-is-derived-from-the-event-log)) |
 | `unsupportedActions` | the actions the peer answered `NotImplemented`/`NotSupported` to, in the order they were first sent ([§4](#4-observation-is-derived-from-the-event-log)) |
 | `slotState(slotId)` | `EMPTY` or `HOLDS_BATTERY`, in domain vocabulary — `Available`/`Occupied` never leaves the wire boundary |
 | `batteryAt(slotId)` | the battery in the slot, or `null` |
@@ -204,8 +205,8 @@ fresh messageId: the CSMS receives the same `requestId` and the same battery set
 messageId is new the idempotency ledger does not intercept it. Both paths are pinned down in
 `StationFailurePathTest`.
 
-**One field is the exception to that rule**, and it exists because of the write-before-transmit
-order just described. `OcppSession.emitRaw` records a frame *before* it goes out, so
+**Three fields are the exception to that rule.** The first exists because of the
+write-before-transmit order just described. `OcppSession.emitRaw` records a frame *before* it goes out, so
 `OcppEventRecord` has no outcome column and **the record of a frame that left and one that never
 left are identical, character for character.** Nor can the difference be inferred from "no reply came
 back" — that is indistinguishable from a CALL still in flight or timed out, and SEND and CALLRESULT
@@ -224,7 +225,19 @@ the badge had to be driven to `끊김` (disconnected) before the operation butto
 badge answers whether a socket exists, not whether the last frame left. Reproduced the way
 `SimConsoleControlTest` does it: `disconnect`, then `authorize`, over the console's REST API.</sub>
 
-**A second field follows the same rule, for a different absence.** `unsupportedActions` accumulates
+**A second field splits that absence in two.** `lastTransmitFailure` answers *the frame never left*;
+`lastCallTimeout` answers *the frame left and nothing came back*. From outside they look like one
+failure, but what follows them differs: a CALL that timed out did reach the wire, so the peer may
+already have processed it, and the next move is a resend that has to be idempotent — the same ground
+F6 covers from the other direction. When that happens `lastTransmitFailure` stays `null`, because nothing failed to go out.
+The event log cannot tell the two apart either: `emitRaw` records before transmitting, and the
+absence of a CALLRESULT is indistinguishable from a CALL still in flight. `lastCallTimeout` holds
+only the last one and is cleared the moment an answer arrives — including a rejection or a
+schema-invalid response, because the condition is *did an answer come*, not *did it succeed*. Same
+read-only rule: nothing may consult it to refuse an operation, and the console prints it on its own
+line rather than merging it with the line above, so the distinction survives to the screen.
+
+**A third field follows the same rule, for a different absence.** `unsupportedActions` accumulates
 every action the peer answered `NotImplemented` or `NotSupported` to. The log does hold that
 CALLERROR, but it does not say what the simulator did with it — whether the scenario stopped there
 or carried on — and that is the part worth reading. Only calls whose response body nobody reads are

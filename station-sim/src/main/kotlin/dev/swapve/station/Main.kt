@@ -4,6 +4,7 @@ import dev.swapve.ocpp.session.MessageDirection
 import dev.swapve.ocpp.swap.BatterySwapWire
 import dev.swapve.swap.IdToken
 import kotlinx.coroutines.runBlocking
+import kotlin.system.exitProcess
 
 /**
  * 실행 진입점 — 붙어서 교환 1건을 완주하고 끝난다.
@@ -66,6 +67,28 @@ object StationSimCli {
             FaultInjection.None
         }
 
+        // 상대와의 사이에서 난 실패는 스택트레이스가 답이 아니다. 무응답도 끊긴 연결도
+        // 이 도구가 알아내려고 온 결과이지 버그가 아니라서, 한 줄로 말하고 1 로 끝낸다.
+        // 시나리오 판정([runF6] 의 check)이나 인자 오류는 여기서 잡지 않는다 — 그건 우리
+        // 쪽이 틀렸다는 뜻이라 트레이스가 그대로 필요하다.
+        try {
+            runScenario(config, faults, remoteStart, faultF6)
+        } catch (fault: SimulatedFault) {
+            System.err.println("station-sim 중단: ${fault.message}")
+            exitProcess(1)
+        } catch (failed: CallFailed) {
+            System.err.println("station-sim 중단: ${failed.message}")
+            exitProcess(1)
+        }
+    }
+
+    /** 세 경로(S02 대기 · F6 · 기본 교환) 중 하나를 골라 끝까지 돌린다. [main] 이 그 실패만 받는다. */
+    private fun runScenario(
+        config: StationSimConfig,
+        faults: FaultInjection,
+        remoteStart: Boolean,
+        faultF6: Boolean,
+    ) {
         StationSimulator(config, faults = faults).use { simulator ->
             var requestId = config.requestId
             runBlocking {

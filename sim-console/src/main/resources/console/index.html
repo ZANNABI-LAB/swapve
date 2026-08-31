@@ -464,6 +464,13 @@ function stationCard(station) {
   if (station.lastTransmitFailure) {
     card.appendChild(el("div", "마지막 전송이 나가지 못했습니다: " + station.lastTransmitFailure, "error"));
   }
+  // 위 줄과 **다른 사실이다** — 저쪽은 나가지 못한 것이고 이쪽은 나갔는데 답이 오지 않은
+  // 것이다. 프레임이 선로에 올랐으므로 상대가 처리했을 수도 있고, 그래서 다음 수가 다르다
+  // (재전송이 멱등해야 하는 상황이다). 한 줄로 합치면 그 구분이 화면에서 사라진다.
+  // 여기도 보여 주기만 한다: disabledReason 은 이 값을 읽지 않는다.
+  if (station.lastCallTimeout) {
+    card.appendChild(el("div", "보냈지만 응답이 오지 않았습니다: " + station.lastCallTimeout, "error"));
+  }
   // CSMS 가 모른다고 답한 action 들. 위 줄과 달리 **쌓인다** — 상대가 그것을 모른다는 사실은
   // 나중에 거짓이 되지 않는다. 여기도 보여 주기만 한다: disabledReason 은 이 목록을 읽지
   // 않는다. 모른다고 했으니 다음부터 보내지 않는 것은 시험계가 시험 대상에 맞춰 조용해지는
