@@ -1,6 +1,6 @@
-# `.zannabi.json` 의 게이트를 그대로 돈다.
-# 그 파일이 이 프로젝트의 **완료의 정의**이므로, 여기 목록이 그것과 갈리면 CI 가
-# 초록인데 완료 기준은 확인되지 않은 상태가 된다. 게이트를 늘릴 때 두 곳을 같이 고친다.
+# ★ 이 파일의 게이트 목록이 이 프로젝트의 **완료의 정의**다.
+# 로컬에서 무엇을 돌렸든 판정은 여기서 난다. 게이트를 늘리거나 고칠 때
+# README 의 "개발 방식" 절도 같이 본다 — 두 곳이 갈리면 문서가 거짓이 된다.
 #
 #   L1 단위        :csms:cleanTest build     — 단위 시험 + 모듈 경계 검증 5종 + Java 호환 시험
 #   L2 표준 적합성  conformanceTest           — TC_S_102/103_CSMS + 실패 F1~F6 (인증 BASIC)
@@ -66,8 +66,8 @@ jobs:
       - name: L5 스테이션 인증 게이트 (보안 프로파일 1)
         run: ./gradlew --no-build-cache :csms:cleanTest :csms:test --tests '*BasicAuthTest*'
 
-      # ⚠️ 이 게이트는 `.zannabi.json` 에는 있었는데 여기에 없었다. 파일 머리의 규칙이
-      #    "두 곳을 같이 고친다" 인데 실제로 갈렸던 자리다.
+      # ⚠️ 이 게이트가 한동안 여기에만 없었다. 로컬에서는 돌고 CI 에서는 안 도는
+      #    상태였고, 그동안 REST · 콘솔 인증은 푸시마다 확인되지 않았다.
       - name: L6 REST · 콘솔 인증 게이트
         run: >-
           ./gradlew --no-build-cache :csms:cleanTest :csms:test

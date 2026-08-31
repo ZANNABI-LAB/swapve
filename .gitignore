@@ -8,8 +8,10 @@ build/
 !gradle/wrapper/gradle-wrapper.jar
 *.class
 
-# zannabi-code 실행 증거 (필요 시 선별 커밋)
+# 로컬 개발 도구의 실행 증거와 설정 — 저장소의 계약이 아니다.
+# 완료의 정의는 .github/workflows/ci.yml 의 게이트 여섯 개다.
 .zannabi/
+.zannabi.json
 
 # H2 — OUT_TIMED_OUT 장부 (PLAN §5.3). 런타임 데이터라 저장소에 넣지 않는다.
 data/

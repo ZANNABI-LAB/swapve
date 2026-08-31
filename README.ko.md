@@ -325,17 +325,22 @@ battery swap **via a smartphone app, e.g. by scanning a QR code**"*. 즉
 
 ## 개발 방식
 
-[**zannabi-code**](https://github.com/ZANNABI-LAB/zannabi-code) — 검증 우선 외부 러너 — 로
-개발합니다. 모든 완료 선언에 기계 검증 가능한 증거를 요구합니다.
+설명만으로 완료를 선언하지 않습니다. **게이트 여섯 개가 곧 완료의 정의**이고,
+[GitHub Actions](.github/workflows/ci.yml) 에서 푸시마다 전부 돕니다. 한 줄로 합치지
+않습니다 — 합치면 "단위는 통과했는데 적합성이 깨졌다"가 초록 체크 하나 뒤에 숨습니다.
 
 ```bash
-zannabi run "<작업>" --cwd. \
-  --gate "unit:./gradlew test" \
-  --gate "conformance:./gradlew conformanceTest" \
-  --gate "audit:./gradlew auditTest" --budget 3
+./gradlew --no-build-cache :csms:cleanTest build   # L1  단위 + 모듈 경계 검증
+./gradlew --no-build-cache conformanceTest         # L2  TC_S_102/103_CSMS + 실패 F1~F6
+./gradlew --no-build-cache auditTest               # L3  스테이션 20대 동시 → 불변식 감사
 ```
 
-같은 게이트가 [GitHub Actions](.github/workflows/ci.yml) 에서도 그대로 돕니다.
+`--no-build-cache` 는 장식이 아닙니다. 출력을 지워도 **빌드 캐시가 복원**하기 때문에,
+시험을 실제로 돌리지 않은 게이트가 초록으로 끝납니다. 근거가 된 실측은
+[ci.yml](.github/workflows/ci.yml) 머리에 적혀 있습니다.
+
+게이트가 닿지 못하는 곳은 짐작에 맡기지 않고 적어 둡니다 —
+[docs/CONFORMANCE.md](docs/CONFORMANCE.md) 의 "자체 검증의 한계" 절입니다.
 
 ## 라이선스와 스펙
 

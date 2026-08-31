@@ -342,18 +342,24 @@ why the metrics avoid Micrometer) is in **[docs/API.md](docs/API.md)**.
 
 ## How this is built
 
-Development runs through [**zannabi-code**](https://github.com/ZANNABI-LAB/zannabi-code), a
-verification-first external runner: every claim of completion must come with machine-checkable
-evidence.
+Nothing here is called done on the strength of a description. **Six gates are the definition of
+done**, and every one of them runs on every push in
+[GitHub Actions](.github/workflows/ci.yml) — never squashed into a single command, so that
+"the unit tests passed but conformance broke" cannot hide inside one green check.
 
 ```bash
-zannabi run "<task>" --cwd. \
-  --gate "unit:./gradlew test" \
-  --gate "conformance:./gradlew conformanceTest" \
-  --gate "audit:./gradlew auditTest" --budget 3
+./gradlew --no-build-cache :csms:cleanTest build   # L1  unit + module-boundary checks
+./gradlew --no-build-cache conformanceTest         # L2  TC_S_102/103_CSMS + failures F1-F6
+./gradlew --no-build-cache auditTest               # L3  20 stations at once, then invariants
 ```
 
-The same gates run in [GitHub Actions](.github/workflows/ci.yml).
+`--no-build-cache` is not decoration: clearing the outputs is not enough, because the build
+cache restores them. A gate that did not actually run the tests is green and has checked
+nothing — see the header of [ci.yml](.github/workflows/ci.yml) for the measurement that
+settled it.
+
+Where the gates cannot reach is written down rather than left implied —
+[docs/CONFORMANCE.md](docs/CONFORMANCE.md) has a "limits of self-verification" section.
 
 ## License and specification
 
