@@ -781,6 +781,36 @@ class StationSimulator(
         private set
 
     /**
+     * 마지막으로 건 CALL 이 답 없이 끝났다면 그 사유. 답이 왔으면 `null` 이다.
+     *
+     * ### [lastTransmitFailure] 와 분업한다 — 다른 사실이다
+     *
+     * 저쪽은 **나가지 못했다**(`TransmitOutcome.Gone`)이고 이쪽은 **나갔는데 답이 없다**
+     * (`OcppResult.TimedOut`)이다. 밖에서 보면 둘 다 예외 하나지만 남는 상태가 다르다 —
+     * 무응답으로 끝난 CALL 은 프레임이 실제로 선로에 올랐으므로 상대가 그것을 처리했을 수도
+     * 있고, 그래서 재전송이 멱등해야 하는 상황이 된다. 저쪽 칸은 그때 `null` 인 채로 남는다.
+     * 이벤트 로그로는 어느 쪽도 알 수 없다: `emitRaw` 는 보내기 전에 적고, CALLRESULT 가
+     * 없다는 것만으로는 아직 응답 전인 CALL 과 구분되지 않는다.
+     *
+     * ### ★ 읽기 전용 관측이다 — 이 값으로 아무것도 막지 않는다
+     *
+     * [lastTransmitFailure] 에 그은 선이 그대로 여기에도 있다. 어떤 `check()` 도, 콘솔의 어떤
+     * 분기도, 화면의 어떤 비활성 판정도 이 값을 읽어서는 안 된다. 읽는 순간 이것은 순서
+     * 게이트가 되고, `insertBatteries()` 가 `authorize()` 없이 통해야 성립하는 F5 가 죽는다
+     * (docs/VIRTUAL-STATION.md §3). 보여 주기만 한다.
+     *
+     * ### 마지막 하나다 — 쌓이지 않는다
+     *
+     * 답이 온 CALL 이 이 값을 지운다. 답이 왔다는 것은 상대가 살아 있다는 뜻이고, 지난 무응답은
+     * 그 순간 거짓이 되기 때문이다. 거부·스키마 위반도 **답이다** — 지우는 조건은 "성공"이
+     * 아니라 "답이 왔는가"다. `@Volatile` 인 이유는 저쪽과 같다: 전송은 작업 스레드에서 돌고
+     * 관측은 HTTP 스레드에서 뜬다.
+     */
+    @Volatile
+    var lastCallTimeout: String? = null
+        private set
+
+    /**
      * 상대가 **모른다고 답한** action 들. 우리가 보낸 순서대로다.
      *
      * [notify] 로 보낸 CALL 이 `NotImplemented`/`NotSupported` 로 거부될 때마다 여기 남는다.
@@ -962,19 +992,26 @@ class StationSimulator(
             error("시뮬레이터가 만든 ${action}Request 가 공식 스키마를 통과하지 못했다: ${validation.errorDescription}")
         }
 
-        return when (val result = session.call(OcppCall(action, payload))) {
+        val result = session.call(OcppCall(action, payload))
+        // 무응답의 관측은 여기 한 자리에서만 갱신한다. 답이 온 순간 — 그것이 거부든 스키마
+        // 위반이든 — 지난 무응답은 더 이상 참이 아니므로 같은 줄이 지운다.
+        lastCallTimeout = (result as? OcppResult.TimedOut)?.let { "$action 응답이 오지 않았다: messageId=${it.messageId}" }
+
+        return when (result) {
             is OcppResult.Accepted -> result.payload
             is OcppResult.Rejected ->
                 if (toleratingUnsupported && result.knownErrorCode in UNSUPPORTED_ACTION_CODES) {
                     synchronized(unsupported) { unsupported += action }
                     JsonNodeFactory.instance.objectNode()
                 } else {
-                    error("$action 이 거부됐다: ${result.errorCode} ${result.errorDescription}")
+                    throw CallFailed("$action 이 거부됐다: ${result.errorCode} ${result.errorDescription}")
                 }
 
-            is OcppResult.InvalidResponse -> error("$action 응답이 스키마를 통과하지 못했다: ${result.errorDescription}")
-            is OcppResult.TimedOut -> error("$action 응답이 오지 않았다: messageId=${result.messageId}")
-            is OcppResult.NotConnected -> error("$action 을 보낼 연결이 없다: station=${result.stationId}")
+            is OcppResult.InvalidResponse ->
+                throw CallFailed("$action 응답이 스키마를 통과하지 못했다: ${result.errorDescription}")
+
+            is OcppResult.TimedOut -> throw CallFailed("$action 응답이 오지 않았다: messageId=${result.messageId}")
+            is OcppResult.NotConnected -> throw CallFailed("$action 을 보낼 연결이 없다: station=${result.stationId}")
         }
     }
 

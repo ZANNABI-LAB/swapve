@@ -339,6 +339,7 @@ class SimConsoleServer(
             .put("messageCount", snapshot.messageCount)
             .put("subprotocol", snapshot.subprotocol)
             .put("lastTransmitFailure", snapshot.lastTransmitFailure)
+            .put("lastCallTimeout", snapshot.lastCallTimeout)
             .set<ObjectNode>("unsupportedActions", unsupportedActions)
             .set<ObjectNode>("slots", slots)
             .set<ObjectNode>("events", events)

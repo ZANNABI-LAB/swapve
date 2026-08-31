@@ -224,7 +224,7 @@ in this repository re-runs them. They are evidence about the days they were perf
 standing compatibility claim. Formal certification is a separate matter and is covered above, under
 the Battery Swap cases.
 
-**Observation is derived from the log — with two exceptions.** Nothing here is asserted against a
+**Observation is derived from the log — with three exceptions.** Nothing here is asserted against a
 flag the simulator set about itself; every claim is read back out of the event log
 ([VIRTUAL-STATION.md §4](VIRTUAL-STATION.md#4-observation-is-derived-from-the-event-log)). The first
 field outside that rule is `StationSimulator.lastTransmitFailure`, and the reason is structural:
@@ -236,7 +236,13 @@ API does carry it, but nothing consults it to *refuse* an operation — not a `c
 console's `disabledReason`, not an API path — so it reports a transmission failure without becoming
 a gate on the call order.
 
-The second is `StationSimulator.unsupportedActions`, and its reason is the mirror image: the log
+The second is `StationSimulator.lastCallTimeout`, and it exists because the first one cannot say
+everything: a frame that went out and drew no answer is not a frame that never left, and the log
+cannot separate them either — no CALLRESULT is indistinguishable from a CALL still in flight. It is
+cleared as soon as any answer arrives, a rejection included, because the question it holds is
+whether an answer came at all. The same read-only rule applies.
+
+The third is `StationSimulator.unsupportedActions`, and its reason is the mirror image: the log
 holds the CALLERROR but not what was done with it, so it cannot say whether the run stopped there or
 went on. It accumulates rather than holding only the last, because a peer's not knowing an action
 does not stop being true the way a dead line does. The same read-only rule applies, and here it

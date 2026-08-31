@@ -446,6 +446,7 @@ class SimConsoleControlTest {
         val attached = attach(stationId)
         val beforeGone = attached.path("messageCount").asInt()
         assertTrue(attached.path("lastTransmitFailure").isNull, "붙자마자 전송이 실패해 있다")
+        assertTrue(attached.path("lastCallTimeout").isNull, "붙자마자 답 없는 CALL 이 있다")
 
         // 소켓만 없앤다. 세션도 슬롯도 그대로라 다음 조작은 정상으로 시작해 전송에서만 죽는다.
         val (disconnectStatus, disconnected) = op(stationId, """{"op":"disconnect"}""")
@@ -478,6 +479,14 @@ class SimConsoleControlTest {
         //     조작은 각본이 아니고, 전송 실패를 각본의 실패로 적으면 둘이 뒤섞인다.
         assertContains(gone.path("lastTransmitFailure").asText(), "연결되지 않았다")
         assertContains(gone.path("lastTransmitFailure").asText(), stationId)
+
+        // (3-1) ★ 옆 칸은 **다른 사실**을 답한다. 나가지 못한 프레임은 답을 기다린 적이
+        //       없으므로 `lastCallTimeout` 은 비어 있어야 한다 — 둘이 함께 차면 그 순간
+        //       화면은 "재전송이 필요한가"를 더 이상 말하지 못한다.
+        assertTrue(
+            gone.path("lastCallTimeout").isNull,
+            "나가지도 못한 프레임을 무응답으로 적었다: ${gone.path("lastCallTimeout")}",
+        )
         assertTrue(gone.path("note").isNull, "각본이 아닌데 note 가 있다: ${gone.path("note")}")
         assertTrue(gone.path("error").isNull, "각본이 아닌데 error 가 있다: ${gone.path("error")}")
         assertEquals("ATTACHED", gone.path("progress").asText(), "조작은 각본의 진행을 건드리지 않는다")
@@ -530,6 +539,12 @@ class SimConsoleControlTest {
         assertTrue(
             authorized.path("lastTransmitFailure").isNull,
             "나간 뒤에도 실패가 남아 있다: ${authorized.path("lastTransmitFailure")}",
+        )
+        // 답이 온 CALL 이다. 옆 칸도 같은 규칙으로 비어 있어야 한다 — 지우는 조건은
+        // "성공했는가"가 아니라 "답이 왔는가"이고, 여기서는 답이 왔다.
+        assertTrue(
+            authorized.path("lastCallTimeout").isNull,
+            "답이 왔는데 무응답이 실려 있다: ${authorized.path("lastCallTimeout")}",
         )
     }
 

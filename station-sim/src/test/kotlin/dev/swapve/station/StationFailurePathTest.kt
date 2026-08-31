@@ -223,7 +223,7 @@ class StationFailurePathTest {
         stationOn(csms).use { station ->
             station.connect()
 
-            val failure = assertFailsWith<IllegalStateException> { station.boot() }
+            val failure = assertFailsWith<CallFailed> { station.boot() }
 
             assertTrue(
                 failure.message.orEmpty().startsWith("${BatterySwapWire.BOOT_NOTIFICATION} 응답이 오지 않았다"),
@@ -236,10 +236,16 @@ class StationFailurePathTest {
             )
             assertEquals(1, csms.withheld.size, "프레임은 선로에 올랐다 — 못 보낸 것이 아니다")
 
+            // ★ 관측도 두 갈래로 갈린다. 프레임은 나갔으므로 `lastTransmitFailure` 는 비어
+            //   있고, 답이 없었다는 사실은 이 칸에만 남는다 — 예외를 놓치면 어디에도 없다.
+            assertEquals(failure.message, station.lastCallTimeout, "무응답이 관측으로 남지 않았다")
+            assertNull(station.lastTransmitFailure, "나간 프레임을 나가지 못한 것으로 적었다")
+
             csms.mode = FakeCsms.Mode.ANSWERING
             station.boot()
 
             assertEquals(1, csms.received(BatterySwapWire.BOOT_NOTIFICATION).size, "타임아웃이 세션을 망가뜨리면 안 된다")
+            assertNull(station.lastCallTimeout, "답이 왔는데 지난 무응답이 남아 있다")
         }
     }
 

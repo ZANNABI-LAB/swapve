@@ -90,6 +90,23 @@ fun interface FaultInjection {
 class SimulatedFault(message: String) : RuntimeException(message)
 
 /**
+ * 우리가 건 CALL 이 답을 얻지 못하고 끝났다.
+ *
+ * [SimulatedFault] 가 **일부러 낸** 장애라면 이쪽은 **상대와의 사이에서 실제로 일어난** 실패다.
+ * 거부·스키마 위반·무응답·연결 없음 — `StationSimulator` 가 CALL 하나를 성립시키지 못한 네
+ * 갈래가 전부 이 타입으로 끝난다. 전용 타입인 이유는 [SimulatedFault] 와 같다: 시나리오 판정이
+ * 내는 `check()`·`error()` 와 섞이면 "상대가 답하지 않았다"와 "우리 코드가 깨졌다"를 부르는
+ * 쪽에서 가를 수 없다.
+ *
+ * ### ★ [IllegalStateException] 을 상속하는 것은 계약이다
+ *
+ * `ControlledStations.operate` 가 `IllegalStateException` 을 잡아 **422** 로 옮기고 메시지를
+ * 그대로 싣는다. 상위 타입을 바꾸면 콘솔의 전송 실패가 조용히 **500** 으로 새고, 그 순간
+ * "스테이션이 거절했다"와 "콘솔이 고장 났다"가 같은 응답이 된다.
+ */
+class CallFailed(message: String) : IllegalStateException(message)
+
+/**
  * 훅에 함께 넘기는 상황 정보.
  *
  * @param stationId 어느 스테이션인가
