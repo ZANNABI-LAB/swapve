@@ -6,6 +6,11 @@ plugins {
 }
 
 dependencies {
+    // 남의 라이브러리가 내는 "SLF4J providers were found" 경고를 끄는 no-op 바인딩.
+    // 실행 파일로 배포되는 모듈에만 붙인다 — 라이브러리(`ocpp-core`·`swap-domain`)에 넣으면
+    // 그것을 쓰는 남의 애플리케이션의 로깅 선택을 우리가 대신 해 버린다.
+    runtimeOnly(libs.slf4j.nop)
+
     // 조종당하는 쪽. 의존 방향은 sim-console → station-sim 한 방향이고, 반대는 없다.
     implementation(project(":station-sim"))
     // station-sim 이 implementation 으로 감춘 둘을 여기서 **다시 선언한다.** 콘솔이 직접

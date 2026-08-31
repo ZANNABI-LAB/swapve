@@ -6,6 +6,23 @@ plugins {
     alias(libs.plugins.spring.dependency.management)
 }
 
+/**
+ * ★ **시험에서는 no-op 로거를 걷어낸다.**
+ *
+ * `station-sim`·`sim-console` 은 실행 파일로 배포되므로 `slf4j-nop` 을 달고 있다 — 남의
+ * 라이브러리가 내는 *"No SLF4J providers were found"* 경고를 끄기 위해서다. 그런데 이 모듈은
+ * 그 둘을 **시험 의존으로** 쓰고, `runtimeOnly` 는 시험 런타임까지 따라 들어온다.
+ *
+ * logback 과 nop 이 한 클래스패스에 있으면 SLF4J 는 **하나만 고르고**, nop 이 이기면 시험이
+ * 깨졌을 때 CSMS 로그가 통째로 사라진다. 실패를 진단할 수 없는 시험은 절반만 있는 시험이다.
+ * 배포되는 `csms.jar` 에는 애초에 nop 이 없다 — 그쪽은 `runtimeClasspath` 라 전이되지 않는다.
+ */
+configurations {
+    testRuntimeClasspath {
+        exclude(group = "org.slf4j", module = "slf4j-nop")
+    }
+}
+
 dependencies {
     implementation(project(":ocpp-core"))
     implementation(project(":swap-domain"))
