@@ -117,7 +117,7 @@ class StationUnsupportedActionTest {
             val failure = assertFailsWith<IllegalStateException> { station.boot() }
 
             assertTrue(
-                failure.message.orEmpty().startsWith("${BatterySwapWire.SECURITY_EVENT_NOTIFICATION} 이 거부됐다"),
+                failure.message.orEmpty().startsWith("${BatterySwapWire.SECURITY_EVENT_NOTIFICATION} was rejected"),
                 "아는 action 을 처리하다 실패한 것은 시나리오의 실패다: ${failure.message}",
             )
             assertTrue(
@@ -139,7 +139,7 @@ class StationUnsupportedActionTest {
             val failure = assertFailsWith<IllegalStateException> { station.authorize() }
 
             assertTrue(
-                failure.message.orEmpty().startsWith("${BatterySwapWire.AUTHORIZE} 이 거부됐다"),
+                failure.message.orEmpty().startsWith("${BatterySwapWire.AUTHORIZE} was rejected"),
                 "인가 결과를 읽어 다음을 정하는 호출이다 — 답이 없으면 이어갈 근거가 없다: ${failure.message}",
             )
             assertTrue(

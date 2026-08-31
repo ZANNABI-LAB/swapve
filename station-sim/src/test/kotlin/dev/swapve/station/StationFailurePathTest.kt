@@ -42,7 +42,7 @@ class StationFailurePathTest {
             val failure = assertFailsWith<IllegalStateException> { station.boot() }
 
             assertEquals(
-                "${BatterySwapWire.BOOT_NOTIFICATION} 을 보낼 연결이 없다: station=${station.config.stationId}",
+                "no connection to send ${BatterySwapWire.BOOT_NOTIFICATION} on: station=${station.config.stationId}",
                 failure.message,
                 "보낼 수 없었다는 사실이 그대로 올라와야 한다",
             )
@@ -104,7 +104,7 @@ class StationFailurePathTest {
                 station.resendLastBatterySwap(sameMessageId = false)
             }
             assertEquals(
-                "보낸 BatterySwap 이 없다: ${station.config.stationId}",
+                "no BatterySwap was ever sent: ${station.config.stationId}",
                 noFrame.message,
                 "되보낼 프레임이 없다 — 재전송도 복구 경로가 아니다",
             )
@@ -194,7 +194,7 @@ class StationFailurePathTest {
 
             val failure = assertFailsWith<IllegalStateException> { station.authorize() }
             assertEquals(
-                "${BatterySwapWire.AUTHORIZE} 을 보낼 연결이 없다: station=${station.config.stationId}",
+                "no connection to send ${BatterySwapWire.AUTHORIZE} on: station=${station.config.stationId}",
                 failure.message,
                 "죽은 전송과 없는 전송은 같은 결말이다 — 둘 다 Gone 이다",
             )
@@ -226,7 +226,7 @@ class StationFailurePathTest {
             val failure = assertFailsWith<CallFailed> { station.boot() }
 
             assertTrue(
-                failure.message.orEmpty().startsWith("${BatterySwapWire.BOOT_NOTIFICATION} 응답이 오지 않았다"),
+                failure.message.orEmpty().startsWith("no answer to ${BatterySwapWire.BOOT_NOTIFICATION}"),
                 "Gone 이 아니라 타임아웃이어야 한다: ${failure.message}",
             )
             assertEquals(

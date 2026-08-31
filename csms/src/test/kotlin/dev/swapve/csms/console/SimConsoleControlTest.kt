@@ -367,7 +367,7 @@ class SimConsoleControlTest {
         val (status, body) = op(stationId, """{"op":"advanceCharging","slotId":1,"byPercent":5}""")
 
         assertEquals(422, status, "빈 슬롯 충전이 거절되지 않았다")
-        assertContains(body.path("error").asText(), "빈 슬롯은 충전되지 않는다")
+        assertContains(body.path("error").asText(), "an empty slot does not charge")
     }
 
     /** 인자가 빠진 조작은 아직 스테이션에 닿지도 않았다 — 400 이지 422 가 아니다. */
@@ -455,7 +455,7 @@ class SimConsoleControlTest {
 
         val (authorizeStatus, failure) = op(stationId, """{"op":"authorize"}""")
         assertEquals(422, authorizeStatus, "전송이 죽었는데 조작이 통했다")
-        assertContains(failure.path("error").asText(), "보낼 연결이 없다")
+        assertContains(failure.path("error").asText(), "no connection to send")
 
         val gone = station(stationId)
 
@@ -477,7 +477,7 @@ class SimConsoleControlTest {
 
         // (3) ★ 그래서 스냅샷이 따로 말한다. 각본의 자리(note·error·progress)는 그대로 침묵한다 —
         //     조작은 각본이 아니고, 전송 실패를 각본의 실패로 적으면 둘이 뒤섞인다.
-        assertContains(gone.path("lastTransmitFailure").asText(), "연결되지 않았다")
+        assertContains(gone.path("lastTransmitFailure").asText(), "not connected")
         assertContains(gone.path("lastTransmitFailure").asText(), stationId)
 
         // (3-1) ★ 옆 칸은 **다른 사실**을 답한다. 나가지 못한 프레임은 답을 기다린 적이
@@ -506,7 +506,7 @@ class SimConsoleControlTest {
         )
         assertContains(
             afterReconnect.path("lastTransmitFailure").asText(),
-            "연결되지 않았다",
+            "not connected",
             message = "connected 가 참이 되자 전송 실패가 지워졌다 — 소켓과 전송을 같은 것으로 본다",
         )
     }

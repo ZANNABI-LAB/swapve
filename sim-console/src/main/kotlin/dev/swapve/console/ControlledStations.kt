@@ -74,15 +74,15 @@ enum class SwapProgress {
 enum class FaultScenario(val title: String, val expectation: String) {
 
     F1(
-        "배터리 부족",
-        "스테이션이 Rejected + NoBatteryAvailable 로 답한다. CSMS 가 기록한다 " +
-            "(개시가 CSMS 쪽이라 이 시나리오는 RequestBatterySwap 을 기다린다)",
+        "no battery available",
+        "The station answers Rejected + NoBatteryAvailable and the CSMS records it " +
+            "(the CSMS starts this one, so the scenario waits for a RequestBatterySwap)",
     ),
-    F2("수령 타임아웃", "BatteryOutTimeout 수신 → CSMS 가 OUT_TIMED_OUT 으로 영속 기록"),
-    F3("미등록 배터리", "CSMS 가 BatterySwapResponse.customData 로 Rejected/BatteryUnknown"),
-    F4("중복 BatteryIn", "같은 (stationId, requestId) 재수신 → 상태머신이 멱등 무시"),
-    F5("순서 위반", "AUTHORIZED 없이 BatterySwap 도착 → 이상 이벤트 기록 (응답은 정상 회신)"),
-    F6("재접속 중 재전송", "재연결 후 같은 messageId 로 CALL 재전송 → 멱등 처리, 장부 무결"),
+    F2("collection timeout", "BatteryOutTimeout arrives → the CSMS persists it as OUT_TIMED_OUT"),
+    F3("unknown battery", "The CSMS answers Rejected/BatteryUnknown in BatterySwapResponse.customData"),
+    F4("duplicate BatteryIn", "The same (stationId, requestId) arrives again → the state machine ignores it idempotently"),
+    F5("out of order", "A BatterySwap arrives without AUTHORIZED → an anomaly is recorded (the answer is still normal)"),
+    F6("resend after reconnect", "After reconnecting the CALL is resent under the same messageId → handled idempotently, the books stay intact"),
 }
 
 /**
@@ -172,11 +172,11 @@ data class StationSpec(
     val requestId: Int = 1001,
 ) {
     init {
-        require(stationId.isNotBlank()) { "stationId 가 비어 있다" }
-        require(csmsUrl.isNotBlank()) { "csmsUrl 이 비어 있다" }
-        require(setSize >= 1) { "한 번에 오가는 배터리는 1개 이상이어야 한다: $setSize" }
+        require(stationId.isNotBlank()) { "stationId is blank" }
+        require(csmsUrl.isNotBlank()) { "csmsUrl is blank" }
+        require(setSize >= 1) { "at least one battery has to move per exchange: $setSize" }
         require(slotCount >= setSize * 2) {
-            "슬롯이 부족하다: 투입 $setSize 개 + 반출 $setSize 개 = ${setSize * 2} 개가 필요한데 $slotCount 개다"
+            "not enough slots: $setSize to insert + $setSize to dispense = ${setSize * 2} needed, but there are $slotCount"
         }
     }
 
@@ -404,7 +404,7 @@ class ControlledStation(val spec: StationSpec) : AutoCloseable {
     fun start(fault: FaultScenario?) {
         synchronized(lock) {
             if (progress == SwapProgress.RUNNING || progress == SwapProgress.AWAITING_REMOTE_START) {
-                throw ControlError(409, "이미 교환이 진행 중이다: ${spec.stationId} ($progress)")
+                throw ControlError(409, "an exchange is already running: ${spec.stationId} ($progress)")
             }
             this.fault = fault
             note = null
@@ -462,13 +462,13 @@ class ControlledStation(val spec: StationSpec) : AutoCloseable {
         try {
             onWorker { simulator -> perform(simulator, op, params) }
         } catch (rejected: IllegalStateException) {
-            throw ControlError(422, rejected.message ?: "스테이션이 조작을 받아들이지 않았다: ${op.wireValue}")
+            throw ControlError(422, rejected.message ?: "the station did not accept the operation: ${op.wireValue}")
         } catch (rejected: IllegalArgumentException) {
-            throw ControlError(422, rejected.message ?: "스테이션이 조작을 받아들이지 않았다: ${op.wireValue}")
+            throw ControlError(422, rejected.message ?: "the station did not accept the operation: ${op.wireValue}")
         } catch (unreachable: IOException) {
             throw ControlError(
                 502,
-                "전송이 조작을 실어 나르지 못했다 (${spec.csmsUrl}): ${unreachable.message ?: unreachable.toString()}",
+                "the transport could not carry the operation (${spec.csmsUrl}): ${unreachable.message ?: unreachable.toString()}",
             )
         }
         // 조작의 결과는 새 상태 변수가 아니라 슬롯과 이벤트 꼬리에서 파생돼 보인다.
@@ -499,20 +499,20 @@ class ControlledStation(val spec: StationSpec) : AutoCloseable {
     private fun <T> onWorker(block: suspend (StationSimulator) -> T): T {
         val pending = synchronized(lock) {
             if (progress == SwapProgress.RUNNING || progress == SwapProgress.AWAITING_REMOTE_START) {
-                throw ControlError(409, "교환이 진행 중이라 조작을 받지 않는다: ${spec.stationId} ($progress)")
+                throw ControlError(409, "an exchange is running, so no operation is accepted: ${spec.stationId} ($progress)")
             }
-            if (detached) throw ControlError(404, "이미 내려간 스테이션이다: ${spec.stationId}")
+            if (detached) throw ControlError(404, "this station has already been detached: ${spec.stationId}")
             // 락 안에서 집은 그 인스턴스를 작업 스레드까지 들고 간다. 밖에서 다시 읽으면
             // 그 사이의 rebuild() 가 바꿔치기한 다른 시뮬레이터를 잡게 된다.
             val simulator = this.simulator
-                ?: throw ControlError(409, "아직 붙지 않은 스테이션이다: ${spec.stationId}")
+                ?: throw ControlError(409, "this station is not attached yet: ${spec.stationId}")
             worker.submit(Callable<T> { runBlocking { block(simulator) } })
         }
 
         return try {
             pending.get(OP_TIMEOUT_MS, TimeUnit.MILLISECONDS)
         } catch (timeout: TimeoutException) {
-            throw ControlError(504, "조작이 ${OP_TIMEOUT_MS}ms 안에 끝나지 않았다 — 아직 돌고 있다: ${spec.stationId}")
+            throw ControlError(504, "the operation did not finish within ${OP_TIMEOUT_MS}ms — it is still running: ${spec.stationId}")
         } catch (failure: ExecutionException) {
             // 껍데기를 벗겨 원인을 그대로 올린다. 상태 코드는 원인의 종류가 정한다.
             throw failure.cause ?: failure
@@ -645,10 +645,10 @@ class ControlledStation(val spec: StationSpec) : AutoCloseable {
 
     /** 없으면 400 이다 — 아직 아무것도 시키지 않았으므로 스테이션이 거절한 것(422)이 아니다. */
     private fun <T : Any> required(value: T?, name: String, op: StationOp): T =
-        value ?: throw ControlError(400, "${op.wireValue} 에는 $name 이 필요하다")
+        value ?: throw ControlError(400, "${op.wireValue} needs $name")
 
     private fun rebuild(fault: FaultScenario?): StationSimulator = synchronized(lock) {
-        check(!detached) { "이미 내려간 스테이션이다: ${spec.stationId}" }
+        check(!detached) { "this station has already been detached: ${spec.stationId}" }
         simulator?.close()
 
         val requestId = requestIds.getAndIncrement()
@@ -670,7 +670,7 @@ class ControlledStation(val spec: StationSpec) : AutoCloseable {
      * 더 만들지 않는다.
      */
     private fun faultInjection(fault: FaultScenario?): FaultInjection = when (fault) {
-        FaultScenario.F6 -> FaultInjection.failingAt(SimStep.BATTERY_OUT, "교환 도중 연결이 끊겼다")
+        FaultScenario.F6 -> FaultInjection.failingAt(SimStep.BATTERY_OUT, "the connection dropped mid-exchange")
         else -> FaultInjection.None
     }
 
@@ -714,7 +714,7 @@ class ControlledStation(val spec: StationSpec) : AutoCloseable {
                     note = interrupted.message
                 }
                 // 끊기지 않았다면 이어지는 재전송은 F6 이 아니라 그냥 중복 전송이다.
-                check(fired) { "장애가 주입되지 않았다 — 교환이 그대로 완주했다" }
+                check(fired) { "the fault never fired — the exchange ran to completion" }
 
                 simulator.disconnect()
                 simulator.reconnect()
@@ -755,7 +755,7 @@ class ControlledStation(val spec: StationSpec) : AutoCloseable {
             delay(REMOTE_START_POLL_INTERVAL_MS)
         }
         throw IllegalStateException(
-            "CSMS 가 RequestBatterySwap 을 보내지 않았다 — POST /api/swaps 로 개시해야 한다",
+            "the CSMS never sent a RequestBatterySwap — start it with POST /api/swaps",
         )
     }
 
@@ -813,7 +813,7 @@ class ControlledStations(val defaultCsmsUrl: String) : AutoCloseable {
         // 둘 다 붙어 버리는 일이 없다.
         val station = synchronized(lock) {
             if (stations.containsKey(spec.stationId)) {
-                throw ControlError(409, "이미 붙어 있는 스테이션이다: ${spec.stationId}")
+                throw ControlError(409, "this station is already attached: ${spec.stationId}")
             }
             ControlledStation(spec).also { stations[spec.stationId] = it }
         }
@@ -823,7 +823,7 @@ class ControlledStations(val defaultCsmsUrl: String) : AutoCloseable {
         } catch (failure: Exception) {
             synchronized(lock) { stations.remove(spec.stationId) }
             station.close()
-            throw ControlError(502, "CSMS 에 붙지 못했다 (${spec.csmsUrl}): ${failure.message ?: failure.toString()}")
+            throw ControlError(502, "could not attach to the CSMS (${spec.csmsUrl}): ${failure.message ?: failure.toString()}")
         }
         return station
     }
@@ -842,5 +842,5 @@ class ControlledStations(val defaultCsmsUrl: String) : AutoCloseable {
         synchronized(lock) { stations.values.toList().also { stations.clear() } }.forEach { it.close() }
     }
 
-    private fun notFound(stationId: String) = ControlError(404, "붙어 있지 않은 스테이션이다: $stationId")
+    private fun notFound(stationId: String) = ControlError(404, "no such station is attached: $stationId")
 }

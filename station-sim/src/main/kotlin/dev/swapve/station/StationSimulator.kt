@@ -187,8 +187,8 @@ class StationSimulator(
 
     /** CSMS 에 붙는다. `{csmsUrl}/{stationId}` 로 간다 (Part 4 §3.1.1). */
     suspend fun connect() {
-        check(!closed) { "이미 닫힌 시뮬레이터다: ${config.stationId}" }
-        check(transport == null) { "이미 연결돼 있다: ${config.stationId}" }
+        check(!closed) { "this simulator is already closed: ${config.stationId}" }
+        check(transport == null) { "already connected: ${config.stationId}" }
         transport = openTransport.open(
             url = config.connectUrl,
             authorization = config.basicAuthorization,
@@ -286,7 +286,7 @@ class StationSimulator(
         )
         val status = response.path("status").asText()
         check(status == BatterySwapWire.REGISTRATION_ACCEPTED) {
-            "부팅이 거부됐다: status=$status"
+            "the boot was rejected: status=$status"
         }
 
         orderedSlots().forEach { reportSlotStatus(it) }
@@ -333,7 +333,7 @@ class StationSimulator(
         )
         val status = response.path("idTokenInfo").path("status").asText()
         check(status == BatterySwapWire.AUTHORIZATION_ACCEPTED) {
-            "인가가 거부됐다: status=$status"
+            "the authorization was rejected: status=$status"
         }
     }
 
@@ -355,7 +355,7 @@ class StationSimulator(
 
         inserted.forEach { (slotId, battery) ->
             val slot = slotOf(slotId)
-            check(slot.battery == null) { "이미 배터리가 든 슬롯에 투입하려 한다: $slotId" }
+            check(slot.battery == null) { "inserting into a slot that already holds a battery: $slotId" }
             slot.battery = battery
             reportSlotStatus(slot)
             startChargingTransaction(slot)
@@ -431,9 +431,9 @@ class StationSimulator(
      * @return 보고한 SoC. 상한에 닿았으면 상한값이다.
      */
     suspend fun advanceCharging(slotId: Int, byPercent: Double): Double {
-        require(byPercent > 0) { "충전은 앞으로만 간다: $byPercent" }
+        require(byPercent > 0) { "charging only moves forward: $byPercent" }
         val slot = slotOf(slotId)
-        val battery = checkNotNull(slot.battery) { "빈 슬롯은 충전되지 않는다: $slotId" }
+        val battery = checkNotNull(slot.battery) { "an empty slot does not charge: $slotId" }
         if (slot.chargingSuspended) return battery.soC
 
         val limit = maxSoc
@@ -538,7 +538,7 @@ class StationSimulator(
     suspend fun removeBatteries() {
         val removed = config.dispenseSlots.map { slotId ->
             val slot = slotOf(slotId)
-            val battery = checkNotNull(slot.battery) { "빈 슬롯에서 배터리를 꺼내려 한다: $slotId" }
+            val battery = checkNotNull(slot.battery) { "taking a battery out of an empty slot: $slotId" }
             slotId to battery
         }
 
@@ -651,7 +651,7 @@ class StationSimulator(
         val pending = config.dispenseSlots.mapNotNull { slotId ->
             slotOf(slotId).battery?.let { slotId to it }
         }
-        check(pending.isNotEmpty()) { "꺼내가지 않은 배터리가 없다: ${config.dispenseSlots}" }
+        check(pending.isNotEmpty()) { "no battery was left uncollected: ${config.dispenseSlots}" }
 
         faults.before(SimStep.BATTERY_OUT_TIMEOUT, context(requestId = activeRequestId))
         call(
@@ -722,8 +722,8 @@ class StationSimulator(
 
     /** 끊긴 뒤 다시 붙는다. 멱등 원장은 CSMS 쪽에 남아 있으므로 재전송이 그대로 잡힌다. */
     suspend fun reconnect() {
-        check(!closed) { "이미 닫힌 시뮬레이터다: ${config.stationId}" }
-        check(transport == null) { "아직 끊기지 않았다: ${config.stationId}" }
+        check(!closed) { "this simulator is already closed: ${config.stationId}" }
+        check(transport == null) { "not disconnected yet: ${config.stationId}" }
         transport = openTransport.open(
             url = config.connectUrl,
             authorization = config.basicAuthorization,
@@ -736,7 +736,7 @@ class StationSimulator(
             .lastOrNull {
                 it.direction == MessageDirection.OUTBOUND && it.action == BatterySwapWire.BATTERY_SWAP
             }
-            ?: error("보낸 BatterySwap 이 없다: ${config.stationId}")
+            ?: error("no BatterySwap was ever sent: ${config.stationId}")
 
     // ------------------------------------------------------------------ 관측
 
@@ -989,13 +989,13 @@ class StationSimulator(
     ): ObjectNode {
         val validation = validator.validateCall(action, payload)
         if (validation is PayloadValidation.Invalid) {
-            error("시뮬레이터가 만든 ${action}Request 가 공식 스키마를 통과하지 못했다: ${validation.errorDescription}")
+            error("the ${action}Request this simulator built failed the official schema: ${validation.errorDescription}")
         }
 
         val result = session.call(OcppCall(action, payload))
         // 무응답의 관측은 여기 한 자리에서만 갱신한다. 답이 온 순간 — 그것이 거부든 스키마
         // 위반이든 — 지난 무응답은 더 이상 참이 아니므로 같은 줄이 지운다.
-        lastCallTimeout = (result as? OcppResult.TimedOut)?.let { "$action 응답이 오지 않았다: messageId=${it.messageId}" }
+        lastCallTimeout = (result as? OcppResult.TimedOut)?.let { "no answer to $action: messageId=${it.messageId}" }
 
         return when (result) {
             is OcppResult.Accepted -> result.payload
@@ -1004,14 +1004,14 @@ class StationSimulator(
                     synchronized(unsupported) { unsupported += action }
                     JsonNodeFactory.instance.objectNode()
                 } else {
-                    throw CallFailed("$action 이 거부됐다: ${result.errorCode} ${result.errorDescription}")
+                    throw CallFailed("$action was rejected: ${result.errorCode} ${result.errorDescription}")
                 }
 
             is OcppResult.InvalidResponse ->
-                throw CallFailed("$action 응답이 스키마를 통과하지 못했다: ${result.errorDescription}")
+                throw CallFailed("the answer to $action failed the schema: ${result.errorDescription}")
 
-            is OcppResult.TimedOut -> throw CallFailed("$action 응답이 오지 않았다: messageId=${result.messageId}")
-            is OcppResult.NotConnected -> throw CallFailed("$action 을 보낼 연결이 없다: station=${result.stationId}")
+            is OcppResult.TimedOut -> throw CallFailed("no answer to $action: messageId=${result.messageId}")
+            is OcppResult.NotConnected -> throw CallFailed("no connection to send $action on: station=${result.stationId}")
         }
     }
 
@@ -1122,7 +1122,7 @@ class StationSimulator(
     suspend fun reportFullInventory(): Int {
         val requestId = baseReport.await()
         val pages = deviceModel.fullInventory().chunked(REPORT_PAGE_SIZE)
-        check(pages.isNotEmpty()) { "보고할 변수가 하나도 없다 — 디바이스 모델이 비어 있을 수 없다" }
+        check(pages.isNotEmpty()) { "not one variable to report — the device model cannot be empty" }
 
         pages.forEachIndexed { index, page ->
             notify(
@@ -1182,10 +1182,10 @@ class StationSimulator(
     private fun orderedSlots(): List<SimSlot> = slots.values.sortedBy { it.config.slotId }
 
     private fun slotOf(slotId: Int): SimSlot =
-        slots[slotId] ?: error("없는 슬롯: $slotId (스테이션 ${config.stationId})")
+        slots[slotId] ?: error("no such slot: $slotId (station ${config.stationId})")
 
     private fun requireTransaction(slot: SimSlot): String =
-        checkNotNull(slot.transactionId) { "충전 트랜잭션이 없는 슬롯: ${slot.config.slotId}" }
+        checkNotNull(slot.transactionId) { "a slot with no charging transaction: ${slot.config.slotId}" }
 
     private fun nextTxSeqNo(slot: SimSlot): Int = slot.txSeqNo++
 
@@ -1206,7 +1206,7 @@ class StationSimulator(
      */
     private suspend fun transmitOrGone(text: String): TransmitOutcome {
         val transport = this.transport
-            ?: return gone("연결되지 않았다: ${config.stationId}")
+            ?: return gone("not connected: ${config.stationId}")
         return try {
             transport.send(text)
             lastTransmitFailure = null
@@ -1215,7 +1215,7 @@ class StationSimulator(
             // 취소는 전송의 실패가 아니다. 관측을 건드리지 않고 그대로 올린다.
             throw cancelled
         } catch (failure: Exception) {
-            gone("전송이 실패했다: ${config.stationId} — ${failure.message ?: failure.toString()}")
+            gone("the transmission failed: ${config.stationId} — ${failure.message ?: failure.toString()}")
         }
     }
 
@@ -1226,7 +1226,7 @@ class StationSimulator(
     }
 
     private fun connectedTransport(): StationTransport =
-        transport ?: error("연결되지 않았다: ${config.stationId}")
+        transport ?: error("not connected: ${config.stationId}")
 
     private fun context(slotId: Int? = null, requestId: Int? = null) =
         FaultContext(config.stationId, slotId, requestId)

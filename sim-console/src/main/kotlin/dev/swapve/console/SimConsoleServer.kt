@@ -51,7 +51,7 @@ class SimConsoleServer(
 
     init {
         require(address.isLoopbackAddress || credentials != null) {
-            "sim-console 을 loopback 이 아닌 주소($bindAddress)에 바인딩하려면 --user 와 --password 가 필요하다"
+            "binding sim-console to a non-loopback address ($bindAddress) requires --user and --password"
         }
         http = HttpServer.create(InetSocketAddress(address, port), BACKLOG)
         // 요청 처리는 짧다 — 오래 걸리는 교환 시퀀스는 스테이션마다의 작업 스레드로 넘긴다.
@@ -119,7 +119,7 @@ class SimConsoleServer(
                 Reply(200, snapshotOf(station.operate(opOf(body), paramsOf(body))))
             }
 
-            else -> throw ControlError(405, "다루지 않는 요청이다: ${exchange.requestMethod} ${exchange.requestURI.path}")
+            else -> throw ControlError(405, "unsupported request: ${exchange.requestMethod} ${exchange.requestURI.path}")
         }
     }
 
@@ -130,7 +130,7 @@ class SimConsoleServer(
      * 화면이 언젠가 어긋나므로, 설명의 출처를 [FaultScenario] 한 곳으로 둔다.
      */
     private fun stateRoute(exchange: HttpExchange): Reply {
-        if (exchange.requestMethod != "GET") throw ControlError(405, "GET 만 받는다")
+        if (exchange.requestMethod != "GET") throw ControlError(405, "GET only")
 
         val faults = array()
         FaultScenario.entries.forEach { scenario ->
@@ -156,14 +156,14 @@ class SimConsoleServer(
 
     /** 화면 한 장. 외부 자원을 링크하지 않으므로 이 파일 하나로 뜬다. */
     private fun staticRoute(exchange: HttpExchange): Reply {
-        if (exchange.requestMethod != "GET") throw ControlError(405, "GET 만 받는다")
+        if (exchange.requestMethod != "GET") throw ControlError(405, "GET only")
         if (exchange.requestURI.path !in setOf("/", "/index.html")) {
-            throw ControlError(404, "없는 경로다: ${exchange.requestURI.path}")
+            throw ControlError(404, "no such path: ${exchange.requestURI.path}")
         }
 
         val html = javaClass.getResourceAsStream("/console/index.html")
             ?.use { it.readBytes() }
-            ?: throw ControlError(500, "화면 파일이 클래스패스에 없다: /console/index.html")
+            ?: throw ControlError(500, "the page is not on the classpath: /console/index.html")
         return Reply(200, body = html, contentType = "text/html; charset=utf-8")
     }
 
@@ -180,7 +180,7 @@ class SimConsoleServer(
             Reply(failure.status, node().put("error", failure.message))
         } catch (failure: IllegalArgumentException) {
             // 구성이 성립하지 않는다 — StationSimConfig 의 require 가 여기로 온다.
-            Reply(400, node().put("error", failure.message ?: "잘못된 요청이다"))
+            Reply(400, node().put("error", failure.message ?: "bad request"))
         } catch (failure: Exception) {
             Reply(500, node().put("error", failure.message ?: failure.toString()))
         }
@@ -231,7 +231,7 @@ class SimConsoleServer(
     private fun specOf(body: JsonNode): StationSpec {
         val csmsUrl = body.path("csmsUrl").asText(stations.defaultCsmsUrl)
         val stationId = body.path("stationId").asText("")
-        if (stationId.isBlank()) throw ControlError(400, "stationId 를 적어야 한다")
+        if (stationId.isBlank()) throw ControlError(400, "stationId is required")
 
         return StationSpec(
             csmsUrl = csmsUrl.ifBlank { stations.defaultCsmsUrl },
@@ -250,23 +250,23 @@ class SimConsoleServer(
     private fun swapOrderOf(value: String): SwapOrder {
         if (value.isBlank()) return SwapOrder.IN_OUT
         return SwapOrder.entries.firstOrNull { it.wireValue.equals(value, ignoreCase = true) || it.name == value }
-            ?: throw ControlError(400, "모르는 교환 순서다: $value (In-Out 또는 Out-In)")
+            ?: throw ControlError(400, "unknown swap order: $value (In-Out or Out-In)")
     }
 
     private fun faultOf(body: JsonNode): FaultScenario? {
         val value = body.path("fault").asText("")
         if (value.isBlank()) return null
         return FaultScenario.entries.firstOrNull { it.name.equals(value, ignoreCase = true) }
-            ?: throw ControlError(400, "모르는 장애 시나리오다: $value (F1~F6)")
+            ?: throw ControlError(400, "unknown fault scenario: $value (F1-F6)")
     }
 
     private fun opOf(body: JsonNode): StationOp {
         val value = body.path("op").asText("")
-        if (value.isBlank()) throw ControlError(400, "op 을 적어야 한다")
+        if (value.isBlank()) throw ControlError(400, "op is required")
         return StationOp.entries.firstOrNull { it.wireValue.equals(value, ignoreCase = true) || it.name == value }
             ?: throw ControlError(
                 400,
-                "모르는 조작이다: $value (${StationOp.entries.joinToString { it.wireValue }})",
+                "unknown operation: $value (${StationOp.entries.joinToString { it.wireValue }})",
             )
     }
 
