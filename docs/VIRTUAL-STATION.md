@@ -51,7 +51,7 @@ A fourth group, **observations**, is read-only and covered in [§4](#4-observati
 
 ## 2. Where every operation sits
 
-All 24 public functions and 6 public properties of `StationSimulator`, with nothing left out.
+All 24 public functions and 7 public properties of `StationSimulator`, with nothing left out.
 
 ### Acts — change a fact, then announce it
 
