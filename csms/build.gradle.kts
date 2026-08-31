@@ -192,3 +192,52 @@ val auditTest by tasks.registering(Test::class) {
 tasks.named<org.springframework.boot.gradle.tasks.bundling.BootJar>("bootJar") {
     archiveFileName.set("csms.jar")
 }
+
+/**
+ * ★ **운영 화면도 밖을 참조하지 않는다** — `sim-console` 이 자기 화면에 거는 것과 같은 검사다.
+ *
+ * `static/index.html` 머리에 *"빌드 검사가 이 파일까지 훑어 확인한다"* 고 적어 두었는데,
+ * **그 검사가 이 모듈에는 없었다.** 확인하지 않는 것을 확인한다고 적으면 그 문장은 다음
+ * 사람에게 거짓 확신을 준다 — 코드 리뷰가 그 자리를 짚었다.
+ *
+ * 의존성 검사는 하지 않는다. 이 모듈은 Spring 을 쓰는 자리이고, 그 경계는
+ * `ocpp-core`·`swap-domain` 쪽 검사가 반대편에서 지킨다. 여기서 막는 것은 **화면이 네트워크
+ * 없는 곳에서 깨지는 것** 하나다.
+ *
+ * 새 게이트를 만들지 않는다 — `check` 에 매달아 두면 L1 `build` 가 이미 도는 자리에서 돈다.
+ */
+val forbiddenAssetPatterns = mapOf(
+    "http://" to "외부 자원을 링크하지 않는다 — 네트워크 없이도 떠야 한다",
+    "https://" to "외부 자원을 링크하지 않는다 — 네트워크 없이도 떠야 한다",
+    "cdn." to "CDN 을 링크하지 않는다 — 네트워크 없이도 떠야 한다",
+)
+
+val checkNoExternalAssets by tasks.registering {
+    val assets = layout.projectDirectory.dir("src/main/resources").asFileTree.matching { include("**/*.html") }
+    val patterns = forbiddenAssetPatterns
+
+    inputs.files(assets)
+
+    doLast {
+        // 화면이 하나도 안 걸리면 이 검사는 아무것도 지키지 않는다. 이름이 바뀌어 0 개를
+        // 훑게 되는 날 조용히 통과하지 않도록, 훑은 파일 수를 함께 검사한다.
+        val files = assets.files.sortedBy { it.path }
+        check(files.isNotEmpty()) { "훑을 화면 파일이 없다 — 경로가 바뀌었으면 이 검사도 함께 고친다" }
+
+        val offendingLines = files.flatMap { file ->
+            file.readLines().withIndex().flatMap { (index, line) ->
+                patterns.entries
+                    .filter { (needle, _) -> needle in line }
+                    .map { (_, reason) -> "${file.name}:${index + 1} — $reason" }
+            }
+        }
+
+        check(offendingLines.isEmpty()) {
+            "csms 의 화면이 밖을 참조한다:\n" + offendingLines.joinToString("\n")
+        }
+    }
+}
+
+tasks.named("check") {
+    dependsOn(checkNoExternalAssets)
+}

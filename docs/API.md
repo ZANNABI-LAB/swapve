@@ -598,6 +598,13 @@ everything.
 The screen that reads them is served at `/` by the CSMS itself — a static page, no CDN, no
 framework, same rule as the simulator console.
 
+⚠️ **The page loads without credentials; what it reads does not.** `/` sits outside the
+`/api/*` filter, so a default install — `csms.api.security.enabled: true` with `users` left
+commented out — serves the page and then denies every request it makes, and no password the
+browser offers can help. Configure `csms.api.security.users`, or run with
+`--csms.api.security.enabled=false` locally. The screen reports this in words rather than
+leaving a bare `401` on screen.
+
 ![The CSMS operations screen — the stations it knows](assets/csms-operations.png)
 
 Selecting a station lists every frame exchanged with it. Clicking a row opens the payload; it is

@@ -323,6 +323,12 @@ control server must never gain a dependency that lets it drive a station.
 every frame exchanged with each one, payloads verbatim — a static page with no CDN or framework,
 the same rule the simulator console follows. See [docs/API.md](docs/API.md).
 
+<sub>The page itself is outside the API filter, but everything it reads is not. A default install
+ships `csms.api.security.enabled: true` with no users configured, which denies **every** `/api`
+request — so configure `csms.api.security.users`, or start with
+`--csms.api.security.enabled=false` for a local look. The screen says so on its face rather than
+just showing a bare 401.</sub>
+
 The standard already defines the app scenario. **S02**: *"EV Driver requests CSMS to initiate a
 battery swap **via a smartphone app, e.g. by scanning a QR code**."* So
 `app → CSMS → RequestBatterySwap → station` is the standard use case. Building the app is out of

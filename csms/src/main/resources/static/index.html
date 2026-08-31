@@ -148,7 +148,12 @@
 "use strict";
 
 // 화면이 기억하는 것은 **고른 스테이션과 펼친 줄**뿐이다. 나머지는 전부 서버가 말한다.
-var state = { stations: [], selected: null, events: null, expanded: {}, auto: true, error: null };
+// 에러 슬롯이 둘인 이유: 프레임 조회가 실패했다고 스테이션 목록까지 지우면, 다시 고를
+// 카드조차 사라진다. 두 칸은 서로 다른 질문에 답한다.
+var state = {
+  stations: [], selected: null, events: null, expanded: {}, auto: true,
+  stationsError: null, framesError: null,
+};
 
 function el(tag, text, className) {
   var node = document.createElement(tag);
@@ -164,6 +169,17 @@ function orDash(value) {
 
 async function getJson(path) {
   var response = await fetch(path, { headers: { Accept: "application/json" } });
+  // 기본 설정은 `csms.api.security.enabled: true` 에 `users` 가 비어 있다. 그 상태에서는
+  // 어떤 자격증명도 통하지 않으므로, 브라우저에게 다시 물어보라고 해 봐야 소용이 없다.
+  // 무엇을 고쳐야 하는지 그 자리에서 말한다 — 화면을 처음 여는 사람이 읽는 첫 문장이다.
+  if (response.status === 401) {
+    throw new Error(
+      "The API refused this request (401). This CSMS ships with csms.api.security.enabled=true " +
+      "and no users configured, so every /api request is denied no matter what you type. " +
+      "Add csms.api.security.users to application.yml, or start it with " +
+      "--csms.api.security.enabled=false to look around locally."
+    );
+  }
   if (!response.ok) throw new Error(path + " → HTTP " + response.status);
   return response.json();
 }
@@ -171,19 +187,26 @@ async function getJson(path) {
 async function loadStations() {
   try {
     state.stations = await getJson("/api/stations");
-    state.error = null;
+    state.stationsError = null;
   } catch (failure) {
-    state.error = failure.message;
+    state.stationsError = failure.message;
   }
   renderStations();
 }
 
 async function loadEvents(stationId) {
   try {
-    state.events = await getJson("/api/stations/" + encodeURIComponent(stationId) + "/events?limit=200");
-    state.error = null;
+    var body = await getJson("/api/stations/" + encodeURIComponent(stationId) + "/events?limit=200");
+    // ★ 응답이 도는 사이에 다른 스테이션을 골랐을 수 있다. 5 초 폴링과 클릭이 겹치면 늦게
+    // 온 응답이 **다른 스테이션의 이름 아래** 그려진다. 이 화면에서 그것은 가장 나쁜 실패다 —
+    // 누구의 프레임인지를 조용히 잘못 말하는 것이기 때문이다. 그래서 서버가 함께 보내 준
+    // stationId 로 확인하고, 어긋나면 버린다.
+    if (body.stationId !== state.selected) return;
+    state.events = body;
+    state.framesError = null;
   } catch (failure) {
-    state.error = failure.message;
+    if (stationId !== state.selected) return;
+    state.framesError = failure.message;
     state.events = null;
   }
   renderFrames();
@@ -237,8 +260,8 @@ function renderStations() {
 
   document.getElementById("clock").textContent = new Date().toISOString().replace("T", " ").slice(0, 19) + "Z";
 
-  if (state.error) {
-    container.appendChild(el("p", state.error, "error"));
+  if (state.stationsError) {
+    container.appendChild(el("p", state.stationsError, "error"));
     document.getElementById("stationCount").textContent = "";
     return;
   }
@@ -284,7 +307,7 @@ function renderFrames() {
     return;
   }
   if (!state.events) {
-    label.textContent = state.error || "loading…";
+    label.textContent = state.framesError || "loading…";
     return;
   }
 

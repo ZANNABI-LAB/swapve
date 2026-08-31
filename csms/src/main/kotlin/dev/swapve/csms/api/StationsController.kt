@@ -27,6 +27,11 @@ import java.time.Instant
  * 남는다. 권위 있는 답은 실제로 보내 보고 받는 결과뿐이므로, 화면도 `connected` 가 아니라
  * `registered` 라고 적는다. **모르는 것을 아는 척하지 않는 것**이 이 화면의 규칙이다.
  *
+ * ### 건수는 집계 한 번으로 받는다
+ *
+ * 화면이 5 초마다 이 목록을 다시 묻는다. 스테이션마다 건수를 따로 세면 그때마다 `1 + N` 번
+ * 왕복하므로, [JdbcOcppEventLog.countsByStation] 이 `GROUP BY` 한 번으로 끝낸다.
+ *
  * ### 목록의 출처가 둘인 이유
  *
  * [StationRegistry] 는 `BootNotification` 을 받은 스테이션만 안다. 그런데 프로세스를 다시
@@ -45,14 +50,14 @@ class StationsController(
     fun stations(): List<StationSummary> {
         val registered = stations.all().associateBy { it.stationId.value }
         val live = sessions.registeredStationIds
-        val seen = events.stationIds()
+        val counts = events.countsByStation()
 
-        return (registered.keys + live + seen).sorted().map { stationId ->
+        return (registered.keys + live + counts.keys).sorted().map { stationId ->
             val registration = registered[stationId]
             StationSummary(
                 stationId = stationId,
                 sessionRegistered = stationId in live,
-                messageCount = events.countOf(stationId),
+                messageCount = counts[stationId] ?: 0,
                 registration = registration?.let {
                     StationRegistrationView(
                         operatorId = it.operatorId.value,

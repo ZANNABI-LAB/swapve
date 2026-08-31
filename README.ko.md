@@ -311,6 +311,12 @@ swapve/
 원문 그대로 보여 줍니다. 시뮬레이터 콘솔과 같은 규칙의 정적 페이지 한 장이며 CDN 도
 프레임워크도 링크하지 않습니다. 자세한 것은 [docs/API.md](docs/API.md) 에 있습니다.
 
+<sub>화면 자체는 인증 밖이지만 화면이 읽는 것은 전부 인증 뒤입니다. 기본 설정은
+`csms.api.security.enabled: true` 에 사용자가 비어 있어 **모든** `/api` 요청이 거절됩니다 —
+`csms.api.security.users` 를 채우거나, 로컬에서 둘러보려면
+`--csms.api.security.enabled=false` 로 띄우십시오. 화면이 401 만 보여 주지 않고 그 사실을
+직접 말합니다.</sub>
+
 표준이 앱 시나리오를 이미 정의해 두었습니다 — **S02**: *"EV Driver requests CSMS to initiate a
 battery swap **via a smartphone app, e.g. by scanning a QR code**"*. 즉
 `앱 → CSMS → RequestBatterySwap → 스테이션` 이 표준 유즈케이스입니다. 앱 구현은 범위 밖이지만

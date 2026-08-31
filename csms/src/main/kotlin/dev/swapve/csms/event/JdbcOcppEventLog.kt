@@ -146,6 +146,17 @@ class JdbcOcppEventLog(private val jdbc: JdbcTemplate) : OcppEventSink {
             limit,
         ).reversed()
 
+    /**
+     * 스테이션별 기록 수를 **한 번에**.
+     *
+     * 목록 화면은 스테이션마다 건수를 보여 주는데, [countOf] 를 대수만큼 부르면 5 초마다
+     * `1 + N` 번 왕복한다. 집계 하나로 끝낼 수 있는 것을 반복하지 않는다.
+     */
+    fun countsByStation(): Map<String, Int> =
+        jdbc.query("SELECT station_id, COUNT(*) AS c FROM ocpp_event GROUP BY station_id") { rs, _ ->
+            rs.getString("station_id") to rs.getInt("c")
+        }.toMap()
+
     /** 한 스테이션에 쌓인 기록 수. 화면이 "몇 건 중 몇 건을 보고 있는지" 말할 수 있게 한다. */
     fun countOf(stationId: String): Int =
         jdbc.queryForObject(

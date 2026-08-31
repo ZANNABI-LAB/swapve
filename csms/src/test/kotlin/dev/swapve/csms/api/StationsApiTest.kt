@@ -177,6 +177,31 @@ class StationsApiTest {
         assertEquals(1, events(stationId, limit = 0).path("limit").asInt(), "0 이하를 그대로 받았다")
     }
 
+    /**
+     * ★ **화면이 실제로 서빙되는지 아무도 확인하지 않고 있었다.**
+     *
+     * 빌드 검사는 이 파일의 **내용**만 본다(밖을 참조하지 않는가). 그런데 리소스 디렉토리가
+     * 바뀌거나 `spring.web.resources.add-mappings` 가 꺼지거나 `@EnableWebMvc` 가 붙으면
+     * `/` 는 조용히 404 가 되고 **게이트는 전부 초록으로 남는다.** README 가 "`/` 에 화면이
+     * 뜬다"고 약속하는 이상, 그 약속을 붙드는 단언이 하나는 있어야 한다.
+     *
+     * 화면 자체는 `/api` 밖이라 자격증명 없이 열린다 — 그 사실도 여기서 함께 고정된다.
+     */
+    @Test
+    fun `운영 화면이 인증 없이 HTML 로 서빙된다`() {
+        val page = TestRestTemplate().getForEntity("http://localhost:$port/", String::class.java)
+
+        assertEquals(HttpStatus.OK, page.statusCode, "운영 화면이 뜨지 않는다")
+        assertTrue(
+            page.headers.contentType?.toString().orEmpty().contains("text/html"),
+            "HTML 로 내려오지 않는다: ${page.headers.contentType}",
+        )
+        assertTrue(
+            requireNotNull(page.body).contains("SwapVe — CSMS operations"),
+            "다른 문서가 그 자리에 있다",
+        )
+    }
+
     // ------------------------------------------------------------------ 지원
 
     private fun stations(): List<JsonNode> {
