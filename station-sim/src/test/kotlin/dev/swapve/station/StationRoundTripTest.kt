@@ -174,8 +174,11 @@ class StationRoundTripTest {
             // 리터럴이다 — 상수를 기댓값으로 쓰면 동어반복이 된다.
             // `schemas/RequestBatterySwapResponse.json` 의 `GenericStatusEnumType`. 지우지 말 것.
             assertEquals("Rejected", answered.payload.path("status").asText())
+            // ★ `statusInfo.reasonCode` 는 **스키마가 maxLength 밖에 보지 않는 자리**다.
+            // 오타든 잘못 고른 사유든 검증을 그대로 통과하므로 이 리터럴이 유일한 검사다.
+            // 출처는 Part 6 TC_S_102 전사. 지우지 말 것.
             assertEquals(
-                BatteryRejectionReason.NO_BATTERY_AVAILABLE.wireValue,
+                "NoBatteryAvailable",
                 answered.payload.path("statusInfo").path("reasonCode").asText(),
                 "S02.FR.04 — 재고 판정은 스테이션이 한다",
             )
@@ -316,8 +319,11 @@ class StationRoundTripTest {
             )
 
             val accepted = assertIs<OcppResult.Accepted>(result, "거부도 CALLRESULT 로 온다: $result")
+            // 리터럴이다 — `GenericDeviceModelStatusEnumType` 은 `Accepted`·`Rejected`·
+            // `NotSupported`·`EmptyResultSet` 넷을 전부 허용하므로 스키마는 어느 것이 옳은지
+            // 말해 주지 않는다. `schemas/GetBaseReportResponse.json`. 지우지 말 것.
             assertEquals(
-                BatterySwapWire.DEVICE_MODEL_NOT_SUPPORTED,
+                "NotSupported",
                 accepted.payload.path("status").asText(),
                 "'못 만든다'는 '안 만든다'(Rejected)와 다른 답이다",
             )

@@ -50,8 +50,10 @@ class StationOperationSweepTest {
             // 리터럴이다 — 상수를 기댓값으로 쓰면 그 상수로 만든 값을 같은 상수와 견주게 된다.
             // `schemas/BootNotificationRequest.json` 의 `BootReasonEnumType`. 지우지 말 것.
             assertEquals("PowerUp", boots[0].path("reason").asText())
+            // 바로 위와 같은 이유로 리터럴이다. `BootReasonEnumType` 은 아홉 값을 허용하므로
+            // `PowerUp` 과 `LocalReset` 을 뒤바꿔도 스키마는 갈라내지 못한다. 지우지 말 것.
             assertEquals(
-                BatterySwapWire.BOOT_REASON_LOCAL_RESET,
+                "LocalReset",
                 boots[1].path("reason").asText(),
                 "전원 인가와 재시작은 다른 사건이고 표준이 그 둘을 구분할 값을 준다",
             )
@@ -188,8 +190,11 @@ class StationOperationSweepTest {
 
             val eventTypes = csms.received(BatterySwapWire.BATTERY_SWAP)
                 .map { callPayloadOf(it).path("eventType").asText() }
+            // 리터럴이다 — 상수 둘을 서로 뒤바꾸면 발신과 기댓값이 함께 바뀌어 이 시험이
+            // 초록으로 남는다. 둘 다 `BatterySwapEventEnumType` 의 정당한 멤버라 스키마도
+            // 갈라내지 못한다. `schemas/BatterySwapRequest.json`. 지우지 말 것.
             assertEquals(
-                listOf(BatterySwapWire.BATTERY_OUT, BatterySwapWire.BATTERY_IN),
+                listOf("BatteryOut", "BatteryIn"),
                 eventTypes,
                 "역순 스테이션은 반출이 먼저다",
             )

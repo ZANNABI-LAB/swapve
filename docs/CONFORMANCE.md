@@ -136,9 +136,23 @@ cannot see. Six of the mutated fields (`idToken.type`, `statusInfo.reasonCode` a
 vendor identifier among them) are not constrained by any schema at all, so the literal assertion is
 the **only** check on them.
 
-**Where this is not done yet.** Twelve assertions in the `station-sim` test suite still compare a
-wire value against the constant that produced it. They are listed as outstanding rather than fixed
-here, because a limits section that reports only the holes already closed is not a limits section.
+**The same was then done to the simulator suite, and the same way.** Sixteen assertions in
+`station-sim` were still comparing a wire value against the constant that produced it. All sixteen
+now hold literals, and nine mutations — each swapping a constant for another value the standard
+also permits (`PowerUp`→`Triggered`, `LocalReset`→`RemoteReset`, `BatteryOut`→`BatteryIn`,
+`SoC`→`Voltage`, `NotSupported`→`EmptyResultSet`, `NoBatteryAvailable`→`BatteryUnknown`, and so
+on) — each turned exactly the tests that cover that value red.
+
+Two of those mutations are the ones worth naming, because **no schema could have caught them**:
+`SecurityEventNotificationRequest.type` is a free-form string with a length limit rather than an
+enum, and `unitOfMeasure.unit` is likewise unconstrained — the schema asks for a standard unit from
+Part 2 Appendices and then does not check. Changing `Percent` to the lowercase `percent` validates
+cleanly; only the literal assertion sees it.
+
+One thing the mutations found on the way: `BatterySwapWire.BOOT_REASON_POWER_UP` is used by no
+production code at all. The simulator's default boot reason is a literal in `StationSimConfig`, so
+mutating the constant changed nothing anywhere. It is a published library constant and stays, but
+it is worth knowing that it guards nothing.
 
 **Where the literals come from.** The specification PDFs are not in this repository — no tracked
 file is one. The literals were transcribed from Part 6 Tool validation into the comments that sit
