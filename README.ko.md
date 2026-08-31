@@ -92,6 +92,18 @@ when (val result = session.call(OcppCall("RequestBatterySwap", payload))) {
 
 ## 빠른 시작
 
+태그가 붙은 릴리스마다 **`swapve-<버전>.zip`** 이 함께 올라갑니다. CSMS·시뮬레이터·콘솔이
+이미 빌드된 채로 들어 있고, JDK 17 만 있으면 됩니다.
+
+```bash
+unzip swapve-0.2.0.zip && cd swapve-0.2.0
+java -jar csms/csms.jar --csms.security.profile=NONE   # 터미널 A
+./station-sim/bin/station-sim --station-id CS001       # 터미널 B — 교환 1건을 완주하고 끝난다
+./sim-console/bin/sim-console                          # 선택 — 브라우저에서 조종한다
+```
+
+소스에서 직접 빌드하려면 아래를 따릅니다.
+
 필요한 것은 **JDK 17 과 git 뿐**입니다. Gradle 은 래퍼가 받아옵니다.
 
 ```bash
@@ -112,8 +124,8 @@ git clone https://github.com/ZANNABI-LAB/swapve.git && cd swapve
 ```
 
 ```
-station-sim → ws://localhost:8080/ocpp/CS001 (순서 In-Out, 배터리 2 개)
-교환 완주: requestId=1001, 오간 메시지 42 건
+station-sim → ws://localhost:8080/ocpp/CS001 (order In-Out, 2 batteries)
+Exchange complete: requestId=1001, 42 messages exchanged
 ```
 
 **터미널 C** — 앱이 보게 될 것을 그대로 조회합니다.
@@ -175,7 +187,7 @@ curl -X POST localhost:8080/api/swaps -H 'Content-Type: application/json' \
 |---|---|---|
 | `./gradlew build` | 54s ~ 1m25s | 시험 368건 + 모듈 경계 검증 5종 통과 |
 | `./gradlew :csms:bootRun` | 명령 후 ~20s (서버 자체 기동은 2.8s) | `Started CsmsApplicationKt` · `Tomcat started on port 8080` |
-| `./gradlew :station-sim:run …` | 13s | `교환 완주: requestId=1001, 오간 메시지 42 건` |
+| `./gradlew :station-sim:run …` | 13s | `Exchange complete: requestId=1001, 42 messages exchanged` |
 | CSMS 쪽 확인 | — | `BatteryIn → HalfIn`, `BatteryOut → Completed` |
 
 **Gradle 의존성이 이미 받아져 있는 상태에서 잰 값입니다.** 처음 클론한 뒤 첫 `./gradlew build`

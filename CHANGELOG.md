@@ -11,6 +11,20 @@ repository.
 
 ## [Unreleased]
 
+### Added
+
+- A **release bundle** (`swapve-<version>.zip`) is now attached to every tagged release. It
+  carries the CSMS as an executable jar plus the station simulator and the control console as
+  ready-to-run distributions, so the tools can be used without building from source. This is
+  separate from Maven Central, which continues to carry the two libraries only.
+
+### Changed
+
+- Every string a person sees at runtime is now English — the console screen, both CLIs, and the
+  messages the server puts on screen (operation rejections, the reason a transmission never
+  left, the F1–F6 scenario descriptions). Comments and KDoc stay Korean; they do not reach the
+  wire or the screen. The console screenshots in the documentation were retaken.
+
 ## [0.2.0] — 2026-08-27
 
 The session layer's transport boundary became total: handing a frame to the transport now returns

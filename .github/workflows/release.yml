@@ -73,6 +73,20 @@ jobs:
           ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.SIGNING_IN_MEMORY_KEY_PASSWORD }}
         run: ./gradlew publishToMavenCentral --no-configuration-cache
 
+      # ★ Central 에 올라가는 것은 라이브러리 둘뿐이다. 도구를 쓰려는 사람에게는
+      #   좌표가 아니라 받아서 바로 돌릴 수 있는 한 벌이 필요하다.
+      #   스모크는 사람이 한 번 돌려 확인한다 — 풀어서 두 CLI 의 --help 가 뜨고,
+      #   csms.jar 에 시뮬레이터를 붙여 교환 1건이 완주하는지까지다.
+      - name: 배포물 한 벌 만들기
+        run: ./gradlew releaseBundle
+
+      - name: GitHub Release 에 붙인다
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: build/distributions/swapve-*.zip
+          fail_on_unmatched_files: true
+
       - name: 다음에 할 일을 요약에 남긴다
         run: |
           {

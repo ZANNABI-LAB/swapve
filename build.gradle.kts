@@ -198,3 +198,56 @@ tasks.register("auditTest") {
     description = "스테이션 20대 동시 접속 후 불변식 감사 (S4, 게이트 L3)"
     dependsOn(":csms:auditTest")
 }
+
+/**
+ * ★★ **받아서 바로 돌릴 수 있는 배포물** — Maven Central 과는 다른 물건이다.
+ *
+ * ```
+ * ./gradlew releaseBundle     # build/distributions/swapve-<version>.zip
+ * ```
+ *
+ * Central 에 올라가는 것은 **라이브러리 둘**(`ocpp-core`·`swap-domain`)이고, 그것은
+ * 코드를 쓰는 사람을 위한 것이다. 이 zip 은 **도구를 쓰는 사람**을 위한 것이다 —
+ * CSMS 하나와 스테이션 시뮬레이터, 그리고 그 시뮬레이터를 브라우저에서 조종하는 콘솔.
+ * 둘은 청중이 다르므로 `publishedModules` 는 그대로 둔다.
+ *
+ * ### 무엇이 들어가는가
+ *
+ * - `csms/` — Spring Boot 실행 가능 jar 하나
+ * - `station-sim/` · `sim-console/` — `installDist` 산출물 그대로(`bin/` + `lib/`)
+ * - `README.md` · `LICENSE` · `NOTICE` · `docs/`
+ *
+ * 스펙 PDF 도 `schemas/` 도 넣지 않는다. 전자는 애초에 저장소에 없고, 후자는
+ * OCA 의 CC BY-ND 저작물이라 재배포 조건이 우리 라이선스와 다르다([NOTICE]).
+ */
+val releaseBundle by tasks.registering(Zip::class) {
+    group = "distribution"
+    description = "콘솔·시뮬레이터·CSMS 를 한 벌로 묶은 배포물 (Central 과 별개)"
+
+    archiveBaseName.set("swapve")
+    archiveVersion.set(version.toString())
+    destinationDirectory.set(layout.buildDirectory.dir("distributions"))
+
+    // 압축을 풀면 곧바로 버전이 보이는 디렉토리 하나가 나온다.
+    into("swapve-$version") {
+        into("csms") {
+            from(project(":csms").tasks.named("bootJar"))
+        }
+        into("station-sim") {
+            from(project(":station-sim").tasks.named("installDist"))
+        }
+        into("sim-console") {
+            from(project(":sim-console").tasks.named("installDist"))
+        }
+        from(layout.projectDirectory.file("README.md"))
+        from(layout.projectDirectory.file("LICENSE"))
+        from(layout.projectDirectory.file("NOTICE"))
+        from(layout.projectDirectory.file("CHANGELOG.md"))
+        into("docs") {
+            from(layout.projectDirectory.dir("docs")) {
+                include("*.md")
+                include("assets/**")
+            }
+        }
+    }
+}

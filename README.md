@@ -94,7 +94,18 @@ consumers. → [docs/LAYERS.md](docs/LAYERS.md) §4
 
 ## Quick start
 
-All you need is **JDK 17 and git**. The Gradle wrapper fetches the rest.
+Every tagged release carries a **`swapve-<version>.zip`** with the CSMS, the station simulator
+and the control console already built — JDK 17 is the only requirement:
+
+```bash
+unzip swapve-0.2.0.zip && cd swapve-0.2.0
+java -jar csms/csms.jar --csms.security.profile=NONE   # terminal A
+./station-sim/bin/station-sim --station-id CS001       # terminal B — one swap, then exits
+./sim-console/bin/sim-console                          # optional — drive it from a browser
+```
+
+To build it from source instead, all you need is **JDK 17 and git**. The Gradle wrapper fetches
+the rest.
 
 ```bash
 git clone https://github.com/ZANNABI-LAB/swapve.git && cd swapve
@@ -114,12 +125,9 @@ git clone https://github.com/ZANNABI-LAB/swapve.git && cd swapve
 ```
 
 ```
-station-sim → ws://localhost:8080/ocpp/CS001 (순서 In-Out, 배터리 2 개)
-교환 완주: requestId=1001, 오간 메시지 42 건
+station-sim → ws://localhost:8080/ocpp/CS001 (order In-Out, 2 batteries)
+Exchange complete: requestId=1001, 42 messages exchanged
 ```
-
-<sub>The simulator's console output is currently Korean: *"swap complete: requestId=1001,
-42 messages exchanged."* Log message localization is still open, together with the docs.</sub>
 
 **Terminal C** — query exactly what an app would see.
 
@@ -182,7 +190,7 @@ The console drives the *test rig*. It is not a CSMS and does not pretend to be o
 |---|---|---|
 | `./gradlew build` | 54s – 1m25s | 368 tests + 5 module boundary checks passed |
 | `./gradlew :csms:bootRun` | ~20s after the command (server itself boots in 2.8s) | `Started CsmsApplicationKt` · `Tomcat started on port 8080` |
-| `./gradlew :station-sim:run …` | 13s | `교환 완주: requestId=1001, 오간 메시지 42 건` (swap complete, 42 messages) |
+| `./gradlew :station-sim:run …` | 13s | `Exchange complete: requestId=1001, 42 messages exchanged` |
 | Confirmed on the CSMS side | — | `BatteryIn → HalfIn`, `BatteryOut → Completed` |
 
 **Measured with Gradle dependencies already cached.** A first `./gradlew build` on a fresh clone
