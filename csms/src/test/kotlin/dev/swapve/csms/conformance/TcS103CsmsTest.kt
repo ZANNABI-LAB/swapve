@@ -153,7 +153,8 @@ class TcS103CsmsTest {
                 .firstOrNull { it.action == BatterySwapWire.REQUEST_BATTERY_SWAP }
                 ?.resultPayload(),
         )
-        assertEquals(BatterySwapWire.GENERIC_ACCEPTED, response.path("status").asText())
+        // step 2 원문: `status = Accepted`. 기댓값은 리터럴이다 — [ConformanceScenario] 의 전사 규약.
+        assertEquals("Accepted", response.path("status").asText())
     }
 
     // ------------------------------------------------------------------ ★★ Tool validation: step 6/10/14/18
@@ -164,6 +165,10 @@ class TcS103CsmsTest {
      * `TransactionEventResponse` 스키마에는 top-level `required` 가 없다. 즉 `idTokenInfo`
      * 를 통째로 빼도 스키마는 통과한다. 그런데 Tool validation 은 그 안의 `status` 가
      * `Accepted` 이길 요구한다. **적합성 시험만이 이것을 잡는다.**
+     *
+     * 그러니 이 시험의 기댓값이 우리 상수여서는 안 된다. `0d9faea` 는 함정 2 를 고치면서
+     * *"함정 1 은 같은 방식으로 확인하지 않았다"* 고 적어 두었는데, 확인해 보니 같은 종류였다.
+     * 아래 두 기댓값은 리터럴이다 — [ConformanceScenario] 의 전사 규약.
      */
     @Test
     fun `step 6·10·14·18 — 무인가 TransactionEvent 에도 응답의 idTokenInfo_status 가 Accepted 다`() {
@@ -179,8 +184,10 @@ class TcS103CsmsTest {
         // 전제 확인 — 요청은 전부 **인가 대상이 아니다.**
         requests.forEach { record ->
             val idToken = record.callPayload().path("idToken")
+            // `idToken.type` 은 **스키마가 제약하지 않는 자리**다(자유 문자열). 상수를 기댓값으로
+            // 쓰면 오타든 잘못 고른 값이든 스키마도 시험도 잡지 않는다. 리터럴이다 — 전사 규약 참조.
             assertEquals(
-                BatterySwapWire.ID_TOKEN_TYPE_NO_AUTHORIZATION,
+                "NoAuthorization",
                 idToken.path("type").asText(),
                 "전제조건: BatterySwapCtrlr.Idtoken 은 설정하지 않는다",
             )
@@ -193,7 +200,7 @@ class TcS103CsmsTest {
             val info = record.resultPayload().path("idTokenInfo")
             assertTrue(info.isObject, "step $step — idTokenInfo 가 없다: ${record.payload}")
             assertEquals(
-                BatterySwapWire.AUTHORIZATION_ACCEPTED,
+                "Accepted",
                 info.path("status").asText(),
                 "step $step — idTokenInfo.status",
             )
@@ -206,17 +213,22 @@ class TcS103CsmsTest {
     fun `step 5·9 — 시작 사건은 CablePluggedIn 과 EVConnected 이고 evse_connectorId 가 1 이다`() {
         val run = runSequence(TestStations.TC_S_103_STARTED)
 
+        // 필터의 값도 리터럴이다. `TX_STARTED` 를 Ended 로 뒤집으면 발신과 필터가 같이 바뀌어
+        // 이 시험이 초록으로 남는다 — 셋 다 `TransactionEventEnumType` 의 정당한 멤버라
+        // `WireContractTest` 의 스키마 대조도 통과한다. 전사 규약 참조.
         val started = run.transactionEvents().filter {
-            it.path("eventType").asText() == BatterySwapWire.TX_STARTED
+            it.path("eventType").asText() == "Started"
         }
         assertEquals(2, started.size, "step 5 와 9")
 
         started.forEachIndexed { index, event ->
             val step = listOf(5, 9)[index]
-            assertEquals(BatterySwapWire.TRIGGER_REASON_CABLE_PLUGGED_IN, event.path("triggerReason").asText(), "step $step")
+            // step 5·9 원문: `triggerReason = CablePluggedIn`. 리터럴이다 — 전사 규약 참조.
+            assertEquals("CablePluggedIn", event.path("triggerReason").asText(), "step $step")
             // ★ 함정 3 — EVConnected 이지 Charging 이 아니다 (TxStartPoint = EVConnected, S04.FR.08).
+            // 함정을 적어 두고 기댓값으로 우리 상수를 쓰면 그 함정을 못 잡는다. 함정 2 가 그랬다(`0d9faea`).
             assertEquals(
-                BatterySwapWire.CHARGING_STATE_EV_CONNECTED,
+                "EVConnected",
                 event.path("transactionInfo").path("chargingState").asText(),
                 "step $step — chargingState 는 EVConnected 다",
             )
@@ -241,7 +253,7 @@ class TcS103CsmsTest {
         val run = runSequence(TestStations.TC_S_103_ENDED)
 
         val ended = run.transactionEvents().filter {
-            it.path("eventType").asText() == BatterySwapWire.TX_ENDED
+            it.path("eventType").asText() == "Ended"
         }
         assertEquals(2, ended.size, "step 13 과 17")
 
@@ -289,7 +301,7 @@ class TcS103CsmsTest {
 
         // 이 두 트랜잭션의 Started 는 전선 위에 없었다.
         val startedIds = run.transactionEvents()
-            .filter { it.path("eventType").asText() == BatterySwapWire.TX_STARTED }
+            .filter { it.path("eventType").asText() == "Started" }
             .map { it.transactionId() }
         assertTrue(
             ConformanceScenario.TX_DISPENSED_C !in startedIds && ConformanceScenario.TX_DISPENSED_D !in startedIds,
@@ -324,8 +336,10 @@ class TcS103CsmsTest {
 
         val batteryIn = swapCalls[0]
         val batteryOut = swapCalls[1]
-        assertEquals(BatterySwapWire.BATTERY_IN, batteryIn.path("eventType").asText(), "step 11")
-        assertEquals(BatterySwapWire.BATTERY_OUT, batteryOut.path("eventType").asText(), "step 21")
+        // step 11·21 원문: `eventType = BatteryIn` · `BatteryOut`. 리터럴이다 — 전사 규약 참조.
+        // 둘이 뒤바뀌어도 스키마는 통과한다 — `BatterySwapEventTypeEnumType` 의 정당한 멤버다.
+        assertEquals("BatteryIn", batteryIn.path("eventType").asText(), "step 11")
+        assertEquals("BatteryOut", batteryOut.path("eventType").asText(), "step 21")
 
         // S02.FR.02 — 이어지는 BatterySwapRequest 는 **같은 requestId 를 써야 한다(SHALL)**.
         val requestId = assertIs<RemoteSwapStart.Accepted>(run.outcome).key.requestId.value

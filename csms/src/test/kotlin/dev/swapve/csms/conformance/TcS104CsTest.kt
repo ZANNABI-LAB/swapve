@@ -264,7 +264,9 @@ class TcS104CsTest {
                     ?.callPayload(),
                 "GetBaseReportRequest 가 나가지 않았다",
             )
-            assertEquals(BatterySwapWire.REPORT_BASE_FULL_INVENTORY, request.path("reportBase").asText())
+            // step 1 원문: `reportBase = FullInventory`. 리터럴이다 — 전사 규약 참조.
+            // `ConfigurationInventory` 도 `ReportBaseEnumType` 의 정당한 멤버라 스키마는 갈라내지 못한다.
+            assertEquals("FullInventory", request.path("reportBase").asText())
             assertEquals(requestId, request.path("requestId").asInt())
         }
     }

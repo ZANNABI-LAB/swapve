@@ -29,6 +29,22 @@ import kotlin.test.assertTrue
  * 그 값들을 시험 코드에 흩어 적으면 나중에 스펙과 한 줄씩 대조할 수 없다. 여기 모아 두면
  * 이 파일 하나가 **스펙 원문의 기계 판독 가능한 사본**이 된다.
  *
+ * ### ★ 와이어 값의 기댓값은 **리터럴로 적는다**
+ *
+ * 이 패키지의 단언에서 **와이어로 나가는 값**(`status` · `triggerReason` · `chargingState` ·
+ * `eventType` · `reasonCode` · `reportBase` · `vendorId`)의 기댓값은 `BatterySwapWire` 나
+ * `BatteryRejectionReason` 이 아니라 **리터럴**이다. 상수를 기댓값으로 쓰면 그 상수로 만든 값을
+ * 같은 상수와 견주는 꼴이라, 상수를 잘못 고쳐도 시험이 초록으로 남는다 — `0d9faea` 에서
+ * 실제로 그랬다(값을 되돌려도 게이트 6개가 전부 통과했다).
+ *
+ * 리터럴이 외부 심판이 되는 것은 아니다. 사는 것은 **기댓값과 상수가 서로 다른 두 자리에 있게
+ * 된 것**이고, 그래서 상수를 조용히 고치면 시험이 깨진다. 리터럴의 출처는 각 자리의 주석에
+ * 적은 Part 6 원문이다. **지우거나 상수로 되돌리지 말 것.**
+ *
+ * 반대로 **고를 것이 없는 자리**에서는 상수를 그대로 쓴다 — `it.action == BATTERY_SWAP` 같은
+ * 필터는 어느 메시지인지를 가리킬 뿐 기댓값이 아니고, 도메인 객체끼리의 비교
+ * (`rejection.reason == NO_BATTERY_AVAILABLE`) 도 와이어 값을 견주는 것이 아니다.
+ *
  * ### 시험계(Test System) 역할은 station-sim 이 맡는다
  *
  * 시험 대상(System under test)은 **CSMS** 다. 시뮬레이터는 스펙 시퀀스를 그대로 연기하고,

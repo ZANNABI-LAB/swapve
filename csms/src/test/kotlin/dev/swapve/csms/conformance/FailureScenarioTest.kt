@@ -232,10 +232,15 @@ class FailureScenarioTest {
             "미등록 배터리가 있는데 customData 거부가 붙지 않았다",
         )
         val customData = rejection.path("customData")
-        assertEquals(BatterySwapWire.VENDOR_ID_BATTERY_SWAP_RESPONSE, customData.path("vendorId").asText())
-        assertEquals(BatterySwapWire.GENERIC_REJECTED, customData.path("status").asText())
+        // §4.8 원문: `vendorId = org.openchargealliance.batteryswapresponse`, 그 안에 `status` 와
+        // `statusInfo.reasonCode`. 기댓값은 리터럴이다 — [ConformanceScenario] 의 전사 규약.
+        // ★ 이 셋은 **스키마가 하나도 검사하지 않는다.** `CustomDataType` 이 요구하는 것은
+        // `vendorId` 가 있다는 것뿐이고, 값은 길이만 본다. 이 자리에서 상수를 기댓값으로 쓰면
+        // 남이 못 알아듣는 벤더 식별자를 보내도 시험은 영영 초록이다.
+        assertEquals("org.openchargealliance.batteryswapresponse", customData.path("vendorId").asText())
+        assertEquals("Rejected", customData.path("status").asText())
         assertEquals(
-            BatteryRejectionReason.BATTERY_UNKNOWN.wireValue,
+            "BatteryUnknown",
             customData.path("statusInfo").path("reasonCode").asText(),
         )
 

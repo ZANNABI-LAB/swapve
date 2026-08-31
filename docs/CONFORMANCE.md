@@ -117,12 +117,28 @@ a stand-in.
 | OCPP-J framing · correlation | ⚠️ **partly, three times** | Three third-party implementations have accepted our CALL, CALLRESULT and CALLERROR frames and correlated them by `messageId` (see below). Between those runs, `OcppFrameCodecTest` decodes the Part 4 §4.2.1–4.2.4 example frames verbatim and `ProtocolContractTest` asserts against string literals rather than production constants |
 | Timeouts · reconnection | ⚠️ **partly, once** | A third-party JVM CSMS was stood up locally and driven through both a stalled reply and a mid-swap disconnect (see below). Between those runs, `OcppSessionTimeoutTest` pins Part 4 §4.1.1 behaviour, but the reading of the specification is ours and is shared by both ends |
 
-**What the literal assertions buy — and what they do not.** `ProtocolContractTest` writes its
-expectations as string literals in the test file instead of referencing `BatterySwapWire` or
-`AvailabilityState`, because comparing a constant to itself is not a comparison. This does **not**
-create an external referee — the literals were transcribed by us too. What it buys is exactly one
-thing: the expected value and the production constant now live in two separate places, so quietly
-changing the constant turns a test red.
+**What the literal assertions buy — and what they do not.** `ProtocolContractTest` and every
+conformance case in this document write their expectations as string literals in the test file
+instead of referencing `BatterySwapWire` or `BatteryRejectionReason`, because comparing a constant
+to itself is not a comparison. This does **not** create an external referee — the literals were
+transcribed by us too. What it buys is exactly one thing: the expected value and the production
+constant now live in two separate places, so quietly changing the constant turns a test red.
+
+**This was measured, not assumed.** The claim above was once false where it mattered most: an
+assertion annotated as guarding a specific trap was comparing the trap's own constant to itself, and
+reverting the constant left all six gates green. So the conformance suite was checked by mutation.
+Thirteen mutations were applied one at a time, each replacing a constant with **another value the
+standard also permits** — `Accepted`↔`Rejected`, `BatteryIn`↔`BatteryOut`, `Started`↔`Ended`,
+`EVConnected`→`Charging`, `FullInventory`→`ConfigurationInventory`, `NoAuthorization`→`Central`,
+and so on. Every one of the thirteen turned a conformance test red, and the schema validation stayed
+green throughout — which is the point, since a permitted-but-wrong value is precisely what a schema
+cannot see. Six of the mutated fields (`idToken.type`, `statusInfo.reasonCode` and the `customData`
+vendor identifier among them) are not constrained by any schema at all, so the literal assertion is
+the **only** check on them.
+
+**Where this is not done yet.** Twelve assertions in the `station-sim` test suite still compare a
+wire value against the constant that produced it. They are listed as outstanding rather than fixed
+here, because a limits section that reports only the holes already closed is not a limits section.
 
 **Where the literals come from.** The specification PDFs are not in this repository — no tracked
 file is one. The literals were transcribed from Part 6 Tool validation into the comments that sit

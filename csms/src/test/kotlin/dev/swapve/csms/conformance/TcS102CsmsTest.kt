@@ -85,7 +85,10 @@ class TcS102CsmsTest {
             // step 2: 시험계 → RequestBatterySwapResponse(status=Rejected,
             //                    statusInfo.reasonCode=NoBatteryAvailable)
             val rejected = assertIs<RemoteSwapStart.Rejected>(outcome, "거부되지 않았다: $outcome")
-            assertEquals(BatteryRejectionReason.NO_BATTERY_AVAILABLE.wireValue, rejected.rejection.reasonCode)
+            // `reasonCode` 는 **스테이션이 보낸 원문**이므로 기댓값은 리터럴이다 — 전사 규약.
+            // 바로 아래 `reason` 은 그 원문을 해석한 결과라 enum 으로 견준다. 둘은 다른 질문이다:
+            // 위는 "무엇이 왔는가", 아래는 "그것을 우리가 옳게 알아들었는가".
+            assertEquals("NoBatteryAvailable", rejected.rejection.reasonCode)
             assertEquals(BatteryRejectionReason.NO_BATTERY_AVAILABLE, rejected.rejection.reason)
 
             // CSMS 가 기록했다 (F1).
@@ -184,9 +187,12 @@ class TcS102CsmsTest {
                 ?.resultPayload(),
             "RequestBatterySwapResponse 가 없다",
         )
-        assertEquals(BatterySwapWire.GENERIC_REJECTED, response.path("status").asText())
+        // step 2 원문: `status = Rejected` · `statusInfo.reasonCode = NoBatteryAvailable` (S02.FR.04).
+        // 기댓값은 리터럴이다 — [ConformanceScenario] 의 전사 규약. `reasonCode` 는 특히 그렇다:
+        // 스키마가 maxLength 밖에 보지 않아 오타든 잘못 고른 사유든 검증을 그냥 통과한다.
+        assertEquals("Rejected", response.path("status").asText())
         assertEquals(
-            BatteryRejectionReason.NO_BATTERY_AVAILABLE.wireValue,
+            "NoBatteryAvailable",
             response.path("statusInfo").path("reasonCode").asText(),
         )
 

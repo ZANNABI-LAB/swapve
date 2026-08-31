@@ -51,7 +51,7 @@ A fourth group, **observations**, is read-only and covered in [§4](#4-observati
 
 ## 2. Where every operation sits
 
-All 24 public functions and 4 public properties of `StationSimulator`, with nothing left out.
+All 24 public functions and 6 public properties of `StationSimulator`, with nothing left out.
 
 ### Acts — change a fact, then announce it
 
@@ -94,6 +94,7 @@ All 24 public functions and 4 public properties of `StationSimulator`, with noth
 | `eventLog` | every frame sent and received, verbatim ([§4](#4-observation-is-derived-from-the-event-log)) |
 | `isConnected` | whether the transport is open; `false` rather than throwing when there is none |
 | `subprotocol` | whatever the server picked in the handshake, reported verbatim ([§3](#3-there-is-no-ordering-gate-and-that-is-deliberate)); `null` when there is no open transport |
+| `lastTransmitFailure` | the reason the last attempted transmission never left the station, or `null` when it did; a successful transmission clears it ([§4](#4-observation-is-derived-from-the-event-log)) |
 | `unsupportedActions` | the actions the peer answered `NotImplemented`/`NotSupported` to, in the order they were first sent ([§4](#4-observation-is-derived-from-the-event-log)) |
 | `slotState(slotId)` | `EMPTY` or `HOLDS_BATTERY`, in domain vocabulary — `Available`/`Occupied` never leaves the wire boundary |
 | `batteryAt(slotId)` | the battery in the slot, or `null` |
