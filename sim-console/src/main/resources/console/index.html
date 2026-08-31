@@ -12,7 +12,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>SwapVe — 시뮬레이터 제어 콘솔</title>
+<title>SwapVe — simulator control console</title>
 <style>
   :root { color-scheme: light dark; }
   body {
@@ -73,30 +73,30 @@
 </head>
 <body>
 
-<h1>SwapVe — 시뮬레이터 제어 콘솔</h1>
+<h1>SwapVe — simulator control console</h1>
 <p class="lede">
-  스테이션 <b>시뮬레이터</b>를 조종하는 시험계 화면입니다. 관제 서버(CSMS)가 아닙니다 —
-  교환 이력·지표는 CSMS 의 REST API 에 있습니다.
+  This drives the station <b>simulator</b> — it is the test system, not the CSMS. Swap history
+  and metrics live behind the CSMS REST API.
 </p>
 
 <fieldset>
-  <legend>스테이션 붙이기</legend>
-  <label>CSMS URL <span>스테이션 식별자 제외</span><input id="csmsUrl"></label>
-  <label>stationId <span>스테이션 식별자</span><input id="stationId" value="CS001"></label>
-  <label>슬롯 <span>=EVSE 수</span><input id="slots" class="narrow" value="4"></label>
-  <label>세트 <span>한 번에 오가는 수</span><input id="setSize" class="narrow" value="2"></label>
-  <label>순서 <span>SwapOrder</span>
+  <legend>Attach a station</legend>
+  <label>CSMS URL <span>without the station id</span><input id="csmsUrl"></label>
+  <label>stationId <span>station identifier</span><input id="stationId" value="CS001"></label>
+  <label>Slots <span>= EVSE count</span><input id="slots" class="narrow" value="4"></label>
+  <label>Set <span>batteries per exchange</span><input id="setSize" class="narrow" value="2"></label>
+  <label>Order <span>SwapOrder</span>
     <select id="swapOrder"><option>In-Out</option><option>Out-In</option></select>
   </label>
-  <label>인가 토큰 <span>IdToken</span><input id="idToken" value="RFID-0001"></label>
-  <button id="attach">붙이기</button>
+  <label>Authorization token <span>IdToken</span><input id="idToken" value="RFID-0001"></label>
+  <button id="attach">Attach</button>
   <div id="attachError"></div>
 </fieldset>
 
-<h2>붙어 있는 스테이션</h2>
+<h2>Attached stations</h2>
 <div id="stations"></div>
 
-<h2>장애 주입 — PLAN §5.4 실패 시나리오</h2>
+<h2>Fault injection — the failure scenarios of PLAN §5.4</h2>
 <ul class="faults" id="faults"></ul>
 
 <script>
@@ -116,33 +116,33 @@ var state = { defaultCsmsUrl: "", faults: [], stations: [] };
  */
 var OPS = [
   { op: "connect", label: "connect", group: "Acts",
-    effect: "전송을 연다. 핸드셰이크만 오간다" },
+    effect: "Opens the transport. Nothing but the handshake goes out" },
   { op: "disconnect", label: "disconnect", group: "Acts",
-    effect: "소켓만 닫는다 — 세션·슬롯·requestId 는 살아 있다" },
+    effect: "Closes the socket only — the session, the slots and the requestId stay alive" },
   { op: "reconnect", label: "reconnect", group: "Acts",
-    effect: "같은 세션·슬롯 위에 전송만 다시 연다" },
+    effect: "Reopens the transport over the same session and slots" },
   { op: "boot", label: "boot", group: "Acts",
-    effect: "BootNotification → 슬롯마다 NotifyEvent → SecurityEventNotification → 배터리가 있는 슬롯마다 TransactionEvent(Started)" },
+    effect: "BootNotification → a NotifyEvent per slot → SecurityEventNotification → a TransactionEvent(Started) for every slot holding a battery" },
   { op: "reboot", label: "reboot", group: "Acts",
-    effect: "끊었다 붙고 새 트랜잭션 번호로 다시 연다 (S04.FR.11). 배터리는 그대로 있다" },
+    effect: "Drops and reconnects, then reopens under fresh transaction ids (S04.FR.11). The batteries stay where they are" },
   { op: "insertBatteries", label: "insertBatteries", group: "Acts", needs: "F5",
-    effect: "투입 슬롯이 배터리를 받고 BatterySwap(BatteryIn) 한 건이 나간다" },
+    effect: "The insert slots take a battery and one BatterySwap(BatteryIn) goes out" },
   { op: "removeBatteries", label: "removeBatteries", group: "Acts",
-    effect: "반출 슬롯이 배터리를 내주고 BatterySwap(BatteryOut) 한 건이 나간다" },
+    effect: "The dispense slots give up their battery and one BatterySwap(BatteryOut) goes out" },
   { op: "advanceCharging", label: "advanceCharging", group: "Acts", args: "charging",
-    effect: "SoC 를 올리고 TransactionEvent(Updated) 를 보낸다. 상한에 닿으면 트랜잭션은 열린 채 급전만 멈춘다" },
+    effect: "Raises the SoC and sends a TransactionEvent(Updated). At the ceiling the transaction stays open and only the charging stops" },
 
   { op: "authorize", label: "authorize", group: "Reports",
-    effect: "Authorize 를 보낸다. 슬롯은 하나도 움직이지 않는다" },
+    effect: "Sends an Authorize. Not one slot moves" },
   { op: "reportChargingStarted", label: "reportChargingStarted", group: "Reports",
-    effect: "투입된 슬롯마다 TransactionEvent(Updated, Charging). 안의 사실은 그대로다" },
+    effect: "A TransactionEvent(Updated, Charging) per filled slot. Nothing inside changes" },
   { op: "reportBatteryOutTimeout", label: "reportBatteryOutTimeout", group: "Reports", needs: "F2",
-    effect: "미회수 배터리를 실은 BatterySwap(BatteryOutTimeout). 배터리는 슬롯에 그대로 남는다" },
+    effect: "A BatterySwap(BatteryOutTimeout) carrying the uncollected battery. The battery stays in its slot" },
   { op: "resendLastBatterySwap", label: "resendLastBatterySwap", group: "Reports",
-    effect: "마지막으로 보낸 BatterySwap 프레임을 다시 보낸다",
+    effect: "Sends the last BatterySwap frame again",
     variants: [
-      { label: "같은 messageId (F6)", params: { sameMessageId: true }, needs: "F6" },
-      { label: "새 messageId (F4)", params: { sameMessageId: false }, needs: "F4" }
+      { label: "same messageId (F6)", params: { sameMessageId: true }, needs: "F6" },
+      { label: "new messageId (F4)", params: { sameMessageId: false }, needs: "F4" }
     ] }
 ];
 
@@ -180,7 +180,7 @@ function request(method, path, body) {
     body: body ? JSON.stringify(body) : undefined
   }).then(function (response) {
     return response.json().catch(function () { return {}; }).then(function (json) {
-      if (!response.ok) throw new Error((json.error || "요청이 실패했습니다") + " (" + response.status + ")");
+      if (!response.ok) throw new Error((json.error || "The request failed") + " (" + response.status + ")");
       return json;
     });
   });
@@ -204,11 +204,11 @@ function faultText(id) {
 
 function slotTable(station) {
   var slots = slotsOf(station);
-  if (!slots.length) return el("p", "슬롯 정보 없음", "none");
+  if (!slots.length) return el("p", "No slot information", "none");
 
   var table = el("table");
   var head = el("tr");
-  ["슬롯", "역할", "배터리", "SoC", "SoH", "충전 트랜잭션"].forEach(function (title) {
+  ["Slot", "Role", "Battery", "SoC", "SoH", "Charging transaction"].forEach(function (title) {
     head.appendChild(el("th", title));
   });
   table.appendChild(head);
@@ -216,20 +216,20 @@ function slotTable(station) {
   slots.forEach(function (slot) {
     var row = el("tr");
     row.appendChild(el("td", slot.slotId));
-    row.appendChild(el("td", slot.role === "INSERT" ? "투입" : slot.role === "DISPENSE" ? "반출" : "—"));
+    row.appendChild(el("td", slot.role === "INSERT" ? "insert" : slot.role === "DISPENSE" ? "dispense" : "—"));
     if (slot.battery) {
       row.appendChild(el("td", slot.battery.serialNumber));
       row.appendChild(el("td", percent(slot.battery.soC)));
       row.appendChild(el("td", percent(slot.battery.soH)));
     } else {
-      row.appendChild(el("td", "비어 있음", "empty"));
+      row.appendChild(el("td", "empty", "empty"));
       row.appendChild(el("td", "—", "empty"));
       row.appendChild(el("td", "—", "empty"));
     }
     // 급전 멈춤은 트랜잭션 칸 **안**에 적는다. 멈춘 것은 트랜잭션이 아니라 에너지 흐름이고,
     // 두 값을 나란히 두어야 "트랜잭션은 살아 있는데 급전만 멈췄다"가 한 눈에 읽힌다.
     var transaction = el("td", orDash(slot.chargingTransactionId));
-    if (slot.chargingSuspended) transaction.appendChild(el("span", "  ·  급전 멈춤(상한 도달)", "suspended"));
+    if (slot.chargingSuspended) transaction.appendChild(el("span", "  ·  charging suspended (ceiling reached)", "suspended"));
     row.appendChild(transaction);
     table.appendChild(row);
   });
@@ -246,33 +246,33 @@ function slotTable(station) {
  */
 function disabledReason(station, op, form) {
   if (station.progress === "RUNNING" || station.progress === "AWAITING_REMOTE_START") {
-    return "각본이 도는 중이라 서버가 409 로 거절한다";
+    return "a script is running — the server would answer 409";
   }
   if (op === "connect" || op === "reconnect") {
-    return station.connected ? "이미 붙어 있다" : null;
+    return station.connected ? "already attached" : null;
   }
   // 상대가 먼저 닫으면 소켓은 죽었는데 전송 객체는 남는다. 그때 connected 는 거짓이지만
   // connect/reconnect 는 서버에서 "이미 연결돼 있다"로 막히므로, disconnect 를 함께 막으면
   // 화면에서 되살릴 길이 없어진다. 붙어 있지 않을 때 눌러도 하는 일이 없을 뿐이다.
   if (op === "disconnect") return null;
-  if (!station.connected) return "붙어 있지 않다 — 먼저 connect 를 걸어야 한다";
+  if (!station.connected) return "not attached — connect first";
 
   if (op === "insertBatteries") {
     var empty = slotsOf(station).filter(function (slot) {
       return slot.role === "INSERT" && !slot.battery;
     });
-    return empty.length ? null : "투입 슬롯이 모두 차 있다 — 넣을 자리가 없다";
+    return empty.length ? null : "every insert slot is full — there is nowhere to put one";
   }
   if (op === "removeBatteries") {
     var loaded = slotsOf(station).filter(function (slot) {
       return slot.role === "DISPENSE" && slot.battery;
     });
-    return loaded.length ? null : "반출 슬롯에 내줄 배터리가 없다";
+    return loaded.length ? null : "no battery in the dispense slots to give out";
   }
   if (op === "advanceCharging") {
     var slot = selectedSlot(station, form);
-    if (!slot) return "충전할 슬롯을 고르지 않았다";
-    return slot.battery ? null : "슬롯 " + slot.slotId + " 은 비어 있다 — 빈 슬롯은 충전되지 않는다";
+    if (!slot) return "no slot chosen to charge";
+    return slot.battery ? null : "slot " + slot.slotId + " is empty — an empty slot does not charge";
   }
   return null;
 }
@@ -320,8 +320,8 @@ function opButton(station, spec, variant) {
   var button = el("button", variant ? variant.label : spec.label);
   var reason = disabledReason(station, spec.op, form);
   var title = spec.effect;
-  if (needs) title += "\n손으로 거는 " + needs + ": " + faultText(needs);
-  button.title = reason ? "누를 수 없다 — " + reason + "\n\n" + title : title;
+  if (needs) title += "\nBy hand this is " + needs + ": " + faultText(needs);
+  button.title = reason ? "cannot be pressed — " + reason + "\n\n" + title : title;
   button.disabled = !!reason;
 
   button.onclick = function () {
@@ -344,7 +344,7 @@ function chargingArgs(station, form) {
   var select = el("select");
   select.id = "op-slot-" + station.stationId;
   slotsOf(station).forEach(function (slot) {
-    var option = el("option", "슬롯 " + slot.slotId);
+    var option = el("option", "slot " + slot.slotId);
     option.value = String(slot.slotId);
     if (String(slot.slotId) === String(form.slotId)) option.selected = true;
     select.appendChild(option);
@@ -381,9 +381,9 @@ function opRow(station, group) {
 
 function opPanel(station) {
   var panel = el("fieldset", null, "ops");
-  panel.appendChild(el("legend", "한 걸음씩 조종하기 — 각본이 아니라 조작 한 건"));
+  panel.appendChild(el("legend", "One step at a time — a single operation, not a script"));
   panel.appendChild(el("div",
-    "순서를 검사하지 않습니다. authorize 없이 insertBatteries 를 누르는 것이 곧 F5 입니다 — " +
+    "No ordering is enforced. Pressing insertBatteries without authorize is exactly F5 — " +
     faultText("F5"),
     "lede"));
 
@@ -402,23 +402,23 @@ function eventTable(station) {
   var box = el("details");
   box.open = !!eventsOpen[station.stationId];
   box.ontoggle = function () { eventsOpen[station.stationId] = box.open; };
-  box.appendChild(el("summary", "오간 프레임 " + events.length + " 건 (최신이 위)"));
+  box.appendChild(el("summary", events.length + " frames exchanged (newest first)"));
 
   if (!events.length) {
-    box.appendChild(el("p", "아직 오간 프레임이 없습니다.", "none"));
+    box.appendChild(el("p", "No frames have been exchanged yet.", "none"));
     return box;
   }
 
   var table = el("table");
   var head = el("tr");
-  ["seq", "방향", "action", "시각"].forEach(function (title) { head.appendChild(el("th", title)); });
+  ["seq", "direction", "action", "time"].forEach(function (title) { head.appendChild(el("th", title)); });
   table.appendChild(head);
 
   // 스냅샷이 이미 최신을 앞에 두고 내려온다. 화면에서 다시 정렬하지 않는다.
   events.forEach(function (event) {
     var row = el("tr");
     row.appendChild(el("td", orDash(event.seq)));
-    row.appendChild(el("td", event.direction === "OUTBOUND" ? "보냄" : event.direction === "INBOUND" ? "받음" : orDash(event.direction)));
+    row.appendChild(el("td", event.direction === "OUTBOUND" ? "sent" : event.direction === "INBOUND" ? "received" : orDash(event.direction)));
     row.appendChild(el("td", orDash(event.action)));
     row.appendChild(el("td", orDash(event.occurredAt)));
     table.appendChild(row);
@@ -433,25 +433,25 @@ function stationCard(station) {
   var header = el("header");
   header.appendChild(el("b", station.stationId));
   header.appendChild(el("span", station.progress, "badge " + station.progress));
-  header.appendChild(el("span", station.connected ? "연결됨" : "끊김", "badge"));
+  header.appendChild(el("span", station.connected ? "connected" : "disconnected", "badge"));
   // 협상 결과는 붙어 있을 때만 있다. 없으면 배지 자체를 그리지 않는다 — 모르는 값이다.
   if (station.subprotocol) header.appendChild(el("span", station.subprotocol, "badge sub"));
-  if (station.fault) header.appendChild(el("span", "장애 " + station.fault, "badge"));
+  if (station.fault) header.appendChild(el("span", "fault " + station.fault, "badge"));
   card.appendChild(header);
 
   card.appendChild(el("div",
     station.connectUrl +
-    "  ·  순서 " + station.swapOrder +
-    "  ·  토큰 " + station.idToken + "/" + station.idTokenType +
+    "  ·  order " + station.swapOrder +
+    "  ·  token " + station.idToken + "/" + station.idTokenType +
     "  ·  requestId " + orDash(station.requestId) +
-    "  ·  오간 메시지 " + station.messageCount + " 건",
+    "  ·  " + station.messageCount + " messages exchanged",
     "meta"));
 
   card.appendChild(slotTable(station));
 
   if (station.progress === "AWAITING_REMOTE_START") {
     card.appendChild(el("div",
-      "CSMS 가 개시해야 하는 시나리오입니다 (S02). 다른 터미널에서:\n" +
+      "This scenario has to be started by the CSMS (S02). From another terminal:\n" +
       "curl -X POST " + csmsHost(station.csmsUrl) + "/api/swaps -H 'Content-Type: application/json' \\\n" +
       "     -d '{\"stationId\":\"" + station.stationId + "\",\"idToken\":{\"idToken\":\"" +
       station.idToken + "\",\"type\":\"" + station.idTokenType + "\"}}'",
@@ -462,14 +462,14 @@ function stationCard(station) {
   // 거절할 사실에만 쓰고, 전송 실패는 다시 눌러 볼 수 있는 상황이다. 붙어 있어도 뜰 수
   // 있다는 것이 이 줄의 요점이다 — connected 는 소켓을 답하지 전송의 성패를 답하지 않는다.
   if (station.lastTransmitFailure) {
-    card.appendChild(el("div", "마지막 전송이 나가지 못했습니다: " + station.lastTransmitFailure, "error"));
+    card.appendChild(el("div", "The last transmission never left: " + station.lastTransmitFailure, "error"));
   }
   // 위 줄과 **다른 사실이다** — 저쪽은 나가지 못한 것이고 이쪽은 나갔는데 답이 오지 않은
   // 것이다. 프레임이 선로에 올랐으므로 상대가 처리했을 수도 있고, 그래서 다음 수가 다르다
   // (재전송이 멱등해야 하는 상황이다). 한 줄로 합치면 그 구분이 화면에서 사라진다.
   // 여기도 보여 주기만 한다: disabledReason 은 이 값을 읽지 않는다.
   if (station.lastCallTimeout) {
-    card.appendChild(el("div", "보냈지만 응답이 오지 않았습니다: " + station.lastCallTimeout, "error"));
+    card.appendChild(el("div", "Sent, but no answer came back: " + station.lastCallTimeout, "error"));
   }
   // CSMS 가 모른다고 답한 action 들. 위 줄과 달리 **쌓인다** — 상대가 그것을 모른다는 사실은
   // 나중에 거짓이 되지 않는다. 여기도 보여 주기만 한다: disabledReason 은 이 목록을 읽지
@@ -477,14 +477,14 @@ function stationCard(station) {
   // 일이고, 그러면 그 답이 틀렸을 때 화면에 아무것도 남지 않는다.
   if (station.unsupportedActions && station.unsupportedActions.length) {
     card.appendChild(el("div",
-      "CSMS 가 모른다고 답한 action (통보라 넘어갔습니다): " + station.unsupportedActions.join(", "),
+      "Actions the CSMS said it does not know (notifications, so we carried on): " + station.unsupportedActions.join(", "),
       "note"));
   }
   if (station.note) card.appendChild(el("div", station.note, "note"));
   if (station.error) card.appendChild(el("div", station.error, "error"));
 
   var actions = el("div", null, "actions");
-  var swap = el("button", "교환 시작");
+  var swap = el("button", "Start exchange");
   swap.onclick = function () { startSwap(station.stationId, null); };
   actions.appendChild(swap);
 
@@ -495,7 +495,7 @@ function stationCard(station) {
     actions.appendChild(button);
   });
 
-  var detach = el("button", "내리기");
+  var detach = el("button", "Detach");
   detach.onclick = function () {
     request("DELETE", "/api/stations/" + encodeURIComponent(station.stationId)).then(refresh).catch(showError);
   };
@@ -555,7 +555,7 @@ function render() {
   var container = document.getElementById("stations");
   container.textContent = "";
   if (!state.stations.length) {
-    container.appendChild(el("p", "아직 붙은 스테이션이 없습니다.", "none"));
+    container.appendChild(el("p", "No stations are attached yet.", "none"));
   } else {
     state.stations.forEach(function (station) {
       // 한 대의 렌더 실패가 화면 전체를 죽이지 않게 한다 — 나머지 스테이션은 계속 보여야 한다.
@@ -563,7 +563,7 @@ function render() {
         container.appendChild(stationCard(station));
       } catch (failure) {
         container.appendChild(el("div",
-          orDash(station && station.stationId) + " 를 그리지 못했습니다: " + failure.message,
+          orDash(station && station.stationId) + " could not be drawn: " + failure.message,
           "error"));
       }
     });

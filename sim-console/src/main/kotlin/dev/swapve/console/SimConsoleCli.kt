@@ -15,16 +15,16 @@ import java.util.concurrent.CountDownLatch
 object SimConsoleCli {
 
     private val USAGE = """
-        sim-console — 스테이션 시뮬레이터 제어 콘솔 (데모용)
+        sim-console — a control console for the station simulator (for demonstration)
 
-          --port <n>        콘솔이 뜰 포트. 기본 ${SimConsoleServer.DEFAULT_PORT}
-                            (CSMS 의 8080 과 부딪히지 않는 값이어야 한다)
-          --bind <addr>     바인딩 주소. 기본 ${SimConsoleServer.DEFAULT_BIND_ADDRESS}
-                            loopback 이 아니면 --user 와 --password 가 필요하다
-          --csms-url <url>  화면에 채워 둘 CSMS 엔드포인트 (스테이션 식별자 제외).
-                            기본 ${SimConsoleServer.DEFAULT_CSMS_URL}
-          --user <name>     콘솔 Basic 인증 사용자명
-          --password <pw>   콘솔 Basic 인증 비밀번호
+          --port <n>        Port for the console. Default ${SimConsoleServer.DEFAULT_PORT}
+                            (it must not collide with the CSMS on 8080)
+          --bind <addr>     Bind address. Default ${SimConsoleServer.DEFAULT_BIND_ADDRESS}
+                            Anything but loopback requires --user and --password
+          --csms-url <url>  CSMS endpoint to prefill on screen, without the station id.
+                            Default ${SimConsoleServer.DEFAULT_CSMS_URL}
+          --user <name>     Basic auth user name for the console
+          --password <pw>   Basic auth password for the console
     """.trimIndent()
 
     @JvmStatic
@@ -35,14 +35,14 @@ object SimConsoleCli {
         }
 
         val options = parse(args)
-        val port = options["port"]?.let { it.toIntOrNull() ?: error("숫자가 아닌 값: --port $it") }
+        val port = options["port"]?.let { it.toIntOrNull() ?: error("not a number: --port $it") }
             ?: SimConsoleServer.DEFAULT_PORT
         val csmsUrl = options["csms-url"] ?: SimConsoleServer.DEFAULT_CSMS_URL
         val bindAddress = options["bind"] ?: SimConsoleServer.DEFAULT_BIND_ADDRESS
         val user = options["user"]
         val password = options["password"]
         require((user == null) == (password == null)) {
-            "--user 와 --password 는 함께 지정해야 한다\n\n$USAGE"
+            "--user and --password must be given together\n\n$USAGE"
         }
         val credentials = user?.let { SimConsoleServer.Credentials(it, requireNotNull(password)) }
 
@@ -56,8 +56,8 @@ object SimConsoleCli {
         // CSMS 쪽에는 죽은 연결이 남는다.
         Runtime.getRuntime().addShutdownHook(Thread { server.close() })
 
-        println("sim-console → http://$bindAddress:${server.port} (CSMS 기본값 $csmsUrl)")
-        println("브라우저로 열어 스테이션을 붙이십시오. 종료는 Ctrl+C.")
+        println("sim-console → http://$bindAddress:${server.port} (CSMS default $csmsUrl)")
+        println("Open it in a browser and attach a station. Ctrl+C to stop.")
 
         // 서버 스레드는 전부 데몬이다 — 여기서 막지 않으면 JVM 이 곧바로 끝난다.
         // 사람이 Ctrl+C 로 끊을 때까지 기다린다.
@@ -70,8 +70,8 @@ object SimConsoleCli {
         var index = 0
         while (index < args.size) {
             val token = args[index]
-            require(token.startsWith("--")) { "모르는 인자: $token\n\n$USAGE" }
-            require(index + 1 < args.size) { "값이 없는 인자: $token\n\n$USAGE" }
+            require(token.startsWith("--")) { "unknown argument: $token\n\n$USAGE" }
+            require(index + 1 < args.size) { "argument without a value: $token\n\n$USAGE" }
             options[token.removePrefix("--")] = args[index + 1]
             index += 2
         }

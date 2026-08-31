@@ -19,29 +19,31 @@ import kotlin.system.exitProcess
 object StationSimCli {
 
     private val USAGE = """
-        station-sim — OCPP 2.1 배터리 교환 스테이션 시뮬레이터
+        station-sim — an OCPP 2.1 battery swap station simulator
 
-          --csms-url <url>          CSMS 엔드포인트 (스테이션 식별자 제외). 기본 ws://localhost:8080/ocpp
-          --station-id <id>         스테이션 식별자. 기본 CS001
-          --username <value>        Basic 인증 사용자명. 기본 station-id
-          --password <value>        Basic 인증 비밀번호. 생략하면 Authorization 헤더를 보내지 않는다
-          --slots <n>               슬롯(=EVSE) 수. 기본 4
-          --set-size <n>            한 번에 오가는 배터리 수. 기본 2
-          --swap-order <In-Out|Out-In>  교환 순서. 기본 In-Out
-          --id-token <value>        교환 인가 토큰. 기본 RFID-0001
-          --id-token-type <type>    토큰 종류. 기본 ISO14443
-          --charging-id-token <v>   충전 트랜잭션용 대체 토큰(BatterySwapCtrlr.IdToken).
-                                    생략하면 인가 없는 트랜잭션으로 보고한다
-          --request-id <n>          교환 상관 번호. 기본 1001.
-                                    --remote-start 면 CSMS 가 보낸 값으로 덮인다 (S02.FR.02)
-          --remote-start            ★ S02 — 스스로 시작하지 않고 CSMS 의
-                                    RequestBatterySwapRequest 를 기다린다.
-                                    앱이 교환을 거는 표준 유즈케이스다:
+          --csms-url <url>          CSMS endpoint, without the station id. Default ws://localhost:8080/ocpp
+          --station-id <id>         Station identifier. Default CS001
+          --username <value>        Basic auth user name. Defaults to the station id
+          --password <value>        Basic auth password. Omit it and no Authorization header is sent
+          --slots <n>               Number of slots (= EVSEs). Default 4
+          --set-size <n>            Batteries moved per exchange. Default 2
+          --swap-order <In-Out|Out-In>  Exchange order. Default In-Out
+          --id-token <value>        Authorization token for the swap. Default RFID-0001
+          --id-token-type <type>    Token type. Default ISO14443
+          --charging-id-token <v>   Separate token for the charging transactions
+                                    (BatterySwapCtrlr.IdToken). Omit it and they are reported
+                                    as unauthorized transactions
+          --request-id <n>          Correlation number for the swap. Default 1001.
+                                    With --remote-start the CSMS value overwrites it (S02.FR.02)
+          --remote-start            ★ S02 — do not start on our own; wait for the CSMS to send
+                                    a RequestBatterySwapRequest. This is the standard use case,
+                                    an app asking for the swap:
                                       POST /api/swaps {"stationId": ..., "idToken": ...}
-          --fault-f6                ★ F6 — 출고 직전에 연결이 끊긴 상황을 재현한다.
-                                    입고까지 진행한 뒤 끊고, 재접속해 **같은 messageId 로**
-                                    BatteryIn 을 재전송한다. 상대 CSMS 가 멱등 원장을
-                                    가졌다면 저장된 응답을 다시 낼 뿐 장부는 늘지 않는다.
+          --fault-f6                ★ F6 — reproduce a connection lost just before the battery
+                                    goes out. Run as far as BatteryIn, drop, reconnect, and
+                                    resend BatteryIn **under the same messageId**. A CSMS with
+                                    an idempotency ledger replays its stored response and its
+                                    books do not grow.
     """.trimIndent()
 
     @JvmStatic
@@ -54,15 +56,15 @@ object StationSimCli {
         val remoteStart = args.any { it == REMOTE_START_FLAG }
         val faultF6 = args.any { it == FAULT_F6_FLAG }
         require(!(remoteStart && faultF6)) {
-            "$REMOTE_START_FLAG 과 $FAULT_F6_FLAG 를 함께 쓸 수 없다 — F6 은 스테이션이 개시하는 경로다"
+            "$REMOTE_START_FLAG and $FAULT_F6_FLAG cannot be used together — F6 is a station-initiated path"
         }
         val options = parse(args.filterNot { it == REMOTE_START_FLAG || it == FAULT_F6_FLAG }.toTypedArray())
         val config = buildConfig(options)
 
-        println("station-sim → ${config.connectUrl} (순서 ${config.swapOrder.wireValue}, 배터리 ${config.insertSlots.size} 개)")
+        println("station-sim → ${config.connectUrl} (order ${config.swapOrder.wireValue}, ${config.insertSlots.size} batteries)")
 
         val faults = if (faultF6) {
-            FaultInjection.failingAt(SimStep.BATTERY_OUT, "교환 도중 연결이 끊겼다")
+            FaultInjection.failingAt(SimStep.BATTERY_OUT, "the connection dropped mid-exchange")
         } else {
             FaultInjection.None
         }
@@ -74,10 +76,10 @@ object StationSimCli {
         try {
             runScenario(config, faults, remoteStart, faultF6)
         } catch (fault: SimulatedFault) {
-            System.err.println("station-sim 중단: ${fault.message}")
+            System.err.println("station-sim stopped: ${fault.message}")
             exitProcess(1)
         } catch (failed: CallFailed) {
-            System.err.println("station-sim 중단: ${failed.message}")
+            System.err.println("station-sim stopped: ${failed.message}")
             exitProcess(1)
         }
     }
@@ -97,7 +99,7 @@ object StationSimCli {
                     // S02 — 개시 주체가 CSMS(앱)다. 인가도 CSMS 가 이미 했으므로 여기서
                     // Authorize 를 보내지 않는다.
                     simulator.boot()
-                    println("S02 대기 중 — CSMS 의 RequestBatterySwap 을 기다린다.")
+                    println("Waiting for S02 — the CSMS has to send RequestBatterySwap.")
                     println("  curl -X POST localhost:8080/api/swaps -H 'Content-Type: application/json' \\")
                     println("       -d '{\"stationId\":\"${config.stationId}\",\"idToken\":" +
                         "{\"idToken\":\"${config.idToken.idToken}\",\"type\":\"${config.idToken.type}\"}}'")
@@ -111,9 +113,9 @@ object StationSimCli {
                 }
             }
             if (faultF6) {
-                println("F6 완주: requestId=$requestId, 오간 메시지 ${simulator.eventLog.size()} 건")
+                println("F6 complete: requestId=$requestId, ${simulator.eventLog.size()} messages exchanged")
             } else {
-                println("교환 완주: requestId=$requestId, 오간 메시지 ${simulator.eventLog.size()} 건")
+                println("Exchange complete: requestId=$requestId, ${simulator.eventLog.size()} messages exchanged")
             }
         }
     }
@@ -137,26 +139,26 @@ object StationSimCli {
         // 입고까지 가고 출고 직전에 끊긴다.
         try {
             simulator.runSwap()
-            error("F6 인데 장애가 주입되지 않았다 — 출고 직전에 끊겼어야 한다")
+            error("F6 ran without the fault firing — the drop should have happened just before BatteryOut")
         } catch (fault: SimulatedFault) {
-            println("F6 장애 주입: ${fault.message}")
+            println("F6 fault fired: ${fault.message}")
         }
 
         val batteryIn = simulator.eventLog.of(config.stationId)
             .lastOrNull {
                 it.direction == MessageDirection.OUTBOUND && it.action == BatterySwapWire.BATTERY_SWAP
             }
-            ?: error("BatteryIn 이 나가지 않았다 — 되보낼 것이 없다")
-        println("F6 첫 BatteryIn: messageId=${batteryIn.messageId}, 응답 ${simulator.repliesTo(batteryIn.messageId)} 건")
+            ?: error("no BatteryIn went out — there is nothing to resend")
+        println("F6 first BatteryIn: messageId=${batteryIn.messageId}, ${simulator.repliesTo(batteryIn.messageId)} replies")
 
         simulator.disconnect()
         simulator.reconnect()
         simulator.resendLastBatterySwap(sameMessageId = true)
 
         val replies = simulator.repliesTo(batteryIn.messageId)
-        println("F6 재전송 뒤: 같은 messageId 에 대한 응답 $replies 건")
+        println("F6 after the resend: $replies replies to that same messageId")
         check(replies >= 2) {
-            "재전송에 대한 응답이 오지 않았다 — 상대가 재전송을 조용히 버렸다 (messageId=${batteryIn.messageId})"
+            "no answer to the resend — the peer dropped it silently (messageId=${batteryIn.messageId})"
         }
     }
 
@@ -171,7 +173,7 @@ object StationSimCli {
         val slotCount = options.int("slots", 4)
         val setSize = options.int("set-size", 2)
         require(slotCount >= setSize * 2) {
-            "슬롯이 부족하다: 투입 $setSize 개 + 반출 $setSize 개 = ${setSize * 2} 개가 필요한데 $slotCount 개다"
+            "not enough slots: $setSize to insert + $setSize to dispense = ${setSize * 2} needed, but there are $slotCount"
         }
 
         val insertSlots = (1..setSize).toList()
@@ -214,7 +216,7 @@ object StationSimCli {
     private fun swapOrderOf(value: String?): SwapOrder {
         if (value == null) return SwapOrder.IN_OUT
         return SwapOrder.entries.firstOrNull { it.wireValue.equals(value, ignoreCase = true) || it.name == value }
-            ?: error("모르는 교환 순서: $value (In-Out 또는 Out-In)")
+            ?: error("unknown swap order: $value (In-Out or Out-In)")
     }
 
     /** `--key value` 짝만 읽는다. 외부 파서 라이브러리를 쓰지 않는다 — 의존성 0 이 원칙이다. */
@@ -223,8 +225,8 @@ object StationSimCli {
         var index = 0
         while (index < args.size) {
             val token = args[index]
-            require(token.startsWith("--")) { "모르는 인자: $token\n\n$USAGE" }
-            require(index + 1 < args.size) { "값이 없는 인자: $token\n\n$USAGE" }
+            require(token.startsWith("--")) { "unknown argument: $token\n\n$USAGE" }
+            require(index + 1 < args.size) { "argument without a value: $token\n\n$USAGE" }
             options[token.removePrefix("--")] = args[index + 1]
             index += 2
         }
@@ -232,5 +234,5 @@ object StationSimCli {
     }
 
     private fun Map<String, String>.int(key: String, fallback: Int): Int =
-        this[key]?.let { it.toIntOrNull() ?: error("숫자가 아닌 값: --$key $it") } ?: fallback
+        this[key]?.let { it.toIntOrNull() ?: error("not a number: --$key $it") } ?: fallback
 }
