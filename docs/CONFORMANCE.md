@@ -154,6 +154,14 @@ production code at all. The simulator's default boot reason is a literal in `Sta
 mutating the constant changed nothing anywhere. It is a published library constant and stays, but
 it is worth knowing that it guards nothing.
 
+**One class of documentation claim is now checked mechanically.** `docs/VIRTUAL-STATION.md` §2
+opens by saying it lists *all* public functions and properties of `StationSimulator` "with nothing
+left out" — three claims in one sentence, all of which go quietly false when a member is added.
+It went false twice in two days. `DocumentedSurfaceAuditTest` now counts the public members in the
+source and compares both the counts and every individual name against the document, so adding a
+member without documenting it turns `build` red. It checks the completeness of the list, not the
+truth of the descriptions beside it; those are still held by review alone.
+
 **Where the literals come from.** The specification PDFs are not in this repository — no tracked
 file is one. The literals were transcribed from Part 6 Tool validation into the comments that sit
 next to them, and cross-checked against the schema `enum`s where a schema has one. Four fields have

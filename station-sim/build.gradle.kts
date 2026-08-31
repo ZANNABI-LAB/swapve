@@ -106,3 +106,31 @@ val checkNoForbiddenDependencies by tasks.registering {
 tasks.named("check") {
     dependsOn(checkNoForbiddenDependencies)
 }
+
+/**
+ * ★ **`DocumentedSurfaceAuditTest` 가 소스와 문서를 런타임에 읽는다** — 그래서 입력 선언이 있다.
+ *
+ * `StationSimulator` 의 공개 멤버를 바꾸거나 `VIRTUAL-STATION.md` 의 숫자를 고쳐도
+ * `station-sim` 의 바이트코드는 그대로다. 선언이 없으면 Gradle 이 `test` 를 up-to-date 로
+ * 건너뛰어, **문서를 거짓으로 만들어 놓고도 시험이 아예 돌지 않고 초록으로 보인다.**
+ * `csms` 의 `wireLanguageSources` 선언이 같은 사고를 겪고 남은 자리다.
+ *
+ * 경로도 시험이 작업 디렉토리에서 추정하지 않는다. 추정이 빗나가면 파일을 못 찾은 채
+ * 지나갈 수 있으므로, **입력으로 선언한 바로 그 경로**를 시스템 프로퍼티로 그대로 넘긴다.
+ *
+ * 새 게이트를 만들지 않는다 — `:station-sim:test` 는 L1 `build` 가 이미 도는 자리다.
+ */
+val documentedSurfaceSource = layout.projectDirectory.file("src/main/kotlin/dev/swapve/station/StationSimulator.kt")
+val documentedSurfaceDoc = rootProject.layout.projectDirectory.file("docs/VIRTUAL-STATION.md")
+
+tasks.named<Test>("test") {
+    inputs.file(documentedSurfaceSource)
+        .withPropertyName("documentedSurfaceSource")
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.file(documentedSurfaceDoc)
+        .withPropertyName("documentedSurfaceDoc")
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+
+    systemProperty("swapve.docs.stationSimulatorSource", documentedSurfaceSource.asFile.absolutePath)
+    systemProperty("swapve.docs.virtualStationDoc", documentedSurfaceDoc.asFile.absolutePath)
+}
