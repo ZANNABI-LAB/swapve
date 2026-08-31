@@ -13,6 +13,12 @@ repository.
 
 ### Added
 
+- A **read-only operations screen** at `/` on the CSMS, backed by two new endpoints —
+  `GET /api/stations` (every station this CSMS knows, merged from the boot registry and the
+  event log, with whether a session is registered) and `GET /api/stations/{id}/events` (the tail
+  of the frames exchanged with it, payloads verbatim). The frames were always recorded; there was
+  no way to read them back. Like the simulator console it is a single static page with no CDN,
+  font, or framework link, and a build check now enforces that for this module too.
 - A **release bundle** (`swapve-<version>.zip`) is now attached to every tagged release. It
   carries the CSMS as an executable jar plus the station simulator and the control console as
   ready-to-run distributions, so the tools can be used without building from source. This is
@@ -24,6 +30,12 @@ repository.
   messages the server puts on screen (operation rejections, the reason a transmission never
   left, the F1–F6 scenario descriptions). Comments and KDoc stay Korean; they do not reach the
   wire or the screen. The console screenshots in the documentation were retaken.
+- Both screens now share one palette taken from the project banner. The simulator console keeps
+  its information and layout unchanged — only typography, spacing, and state colours moved.
+- The station simulator and the console no longer print SLF4J's "no providers were found"
+  warning on startup. Neither calls SLF4J; the warning came from a transitive `slf4j-api` with no
+  binding, and a no-op binding now silences it. The published libraries are untouched, so they
+  still leave the logging choice to whoever depends on them.
 
 ## [0.2.0] — 2026-08-27
 
