@@ -125,6 +125,35 @@ class JdbcOcppEventLog(private val jdbc: JdbcTemplate) : OcppEventSink {
             Timestamp.from(from),
         )
 
+    /**
+     * 한 스테이션의 **가장 최근** 기록 [limit] 개를, 오래된 것부터.
+     *
+     * [of] 로도 같은 것을 얻을 수 있지만 그쪽은 전량을 읽는다. 화면은 꼬리만 보므로,
+     * 스테이션 하나에 십만 건이 쌓인 상태에서 그것을 통째로 실어 나를 이유가 없다.
+     * 정렬을 두 번 하는 것은 **DB 는 최신순으로 자르고 화면은 시간순으로 읽기** 때문이다.
+     */
+    fun recent(stationId: String, limit: Int): List<OcppEventRecord> =
+        jdbc.query(
+            """
+            SELECT station_id, seq, direction, action, message_id, payload, occurred_at
+            FROM ocpp_event
+            WHERE station_id = ?
+            ORDER BY seq DESC
+            LIMIT ?
+            """.trimIndent(),
+            ::map,
+            stationId,
+            limit,
+        ).reversed()
+
+    /** 한 스테이션에 쌓인 기록 수. 화면이 "몇 건 중 몇 건을 보고 있는지" 말할 수 있게 한다. */
+    fun countOf(stationId: String): Int =
+        jdbc.queryForObject(
+            "SELECT COUNT(*) FROM ocpp_event WHERE station_id = ?",
+            Int::class.java,
+            stationId,
+        ) ?: 0
+
     fun size(): Int =
         jdbc.queryForObject("SELECT COUNT(*) FROM ocpp_event", Int::class.java) ?: 0
 

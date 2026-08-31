@@ -307,6 +307,10 @@ swapve/
 
 ## REST API
 
+**읽기 전용 운영 화면이 `/` 에 뜹니다.** 이 CSMS 가 아는 스테이션과, 각각과 오간 프레임을
+원문 그대로 보여 줍니다. 시뮬레이터 콘솔과 같은 규칙의 정적 페이지 한 장이며 CDN 도
+프레임워크도 링크하지 않습니다. 자세한 것은 [docs/API.md](docs/API.md) 에 있습니다.
+
 표준이 앱 시나리오를 이미 정의해 두었습니다 — **S02**: *"EV Driver requests CSMS to initiate a
 battery swap **via a smartphone app, e.g. by scanning a QR code**"*. 즉
 `앱 → CSMS → RequestBatterySwap → 스테이션` 이 표준 유즈케이스입니다. 앱 구현은 범위 밖이지만

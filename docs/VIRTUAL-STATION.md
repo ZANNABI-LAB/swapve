@@ -11,6 +11,10 @@
 
 ![The control console with one station attached](assets/console-overview.png)
 
+<sub>The console and the CSMS operations screen share one palette, taken from the project banner.
+Both are single static files with no CDN, font, or framework link — a build check walks them to
+keep it that way.</sub>
+
 <sub>**The console is that station made visible.** The screen is still in Korean; reading it: the
 header says *"SwapVe — simulator control console. This drives station simulators; it is not a
 management server. Swap history and metrics live in the CSMS REST API."* The form attaches a station

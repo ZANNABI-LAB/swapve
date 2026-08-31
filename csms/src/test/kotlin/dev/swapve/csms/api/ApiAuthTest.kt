@@ -48,6 +48,21 @@ class ApiAuthTest {
             assertEquals("UNAUTHORIZED", mapper.readTree(requireNotNull(response.body)).path("error").asText())
         }
 
+        /**
+         * ★ **운영 화면이 읽는 두 엔드포인트도 같은 문 뒤에 있다.**
+         *
+         * 필터는 `/api` 아래를 통째로 덮으므로 새 엔드포인트는 저절로 보호된다 — 그런데
+         * **저절로 되는 것과 그것을 아무도 확인하지 않는 것은 다르다.** 등록 패턴이 언젠가
+         * 좁아지면 이 시험만이 그것을 잡는다. 프레임 원문이 나가는 자리라 특히 그렇다.
+         */
+        @Test
+        fun `스테이션 목록과 프레임도 자격증명 없이는 못 본다`() {
+            listOf("/api/stations", "/api/stations/CS001/events").forEach { path ->
+                val response = TestRestTemplate().getForEntity(url(path), String::class.java)
+                assertEquals(401, response.statusCode.value(), "$path 가 자격증명 없이 열렸다")
+            }
+        }
+
         @Test
         fun `비밀번호가 틀리면 401 로 거절한다`() {
             val response = TestRestTemplate().withBasicAuth(TestCredentials.API_USER, "wrong")

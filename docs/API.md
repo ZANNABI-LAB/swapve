@@ -80,6 +80,8 @@ Content-Type: application/json; charset=utf-8
 | `GET` | `/api/metrics/swaps` | Success rate · duration · failure reasons (criterion S5) |
 | `GET` | `/api/stations/{stationId}/charging-transactions` | That station's charging transactions (S04) |
 | `GET` | `/api/stations/{stationId}/charging-transactions/{transactionId}` | One charging transaction |
+| `GET` | `/api/stations` | Every station this CSMS knows, and whether a session is registered |
+| `GET` | `/api/stations/{stationId}/events` | The tail of the frames exchanged with that station, payloads verbatim |
 
 > **Charging is not a sub-resource of a swap.** Charging an incoming battery continues for days
 > after the swap has ended. See the section on it below.
@@ -543,6 +545,66 @@ Every contract in this document is pinned by an executing test.
 | `DurationSummaryTest` | The pure calculation of percentiles, means, and empty samples |
 | `SwapIdsTest` | Composite key ↔ URL token |
 | `ChargingApiTest` | Charging queries — slot, battery, and SoC are readable, and **charging survives the swap completing** |
+
+## `GET /api/stations` · `GET /api/stations/{stationId}/events` — what the operations screen reads
+
+These two exist because a **test tool** has to let a person see what actually crossed the wire.
+The frames were always recorded; there was simply no way to read them back.
+
+`GET /api/stations` returns one entry per station, merged from two sources — the boot registry and
+the event log. A station that connected before this process started appears with
+`"registration": null` rather than not appearing at all; leaving it out would make a restarted
+CSMS claim nothing had ever happened.
+
+```json
+[
+  {
+    "stationId": "CS001",
+    "sessionRegistered": true,
+    "messageCount": 42,
+    "registration": {
+      "operatorId": "swapve", "vendorName": "SwapVe", "model": "SwapVe-Sim",
+      "serialNumber": null, "firmwareVersion": null,
+      "bootReason": "PowerUp", "authMethod": "NONE", "bootedAt": "2026-08-31T09:20:41.890Z"
+    }
+  }
+]
+```
+
+⚠️ **`sessionRegistered` is not "a frame will reach it."** A socket can die between the last frame
+and the teardown that unregisters the session. The authoritative answer is what a send returns —
+`SessionRegistry` says so in its own KDoc, and the screen repeats it as a footnote.
+
+`GET /api/stations/{stationId}/events?limit=200` returns the **most recent** frames, oldest first,
+with `payload` **exactly as stored**. Re-formatting it would defeat the purpose of opening the
+screen at all. `limit` is capped at 1000 because a single response carries whole frames; `total`
+is always the real count, so the screen can say "showing 200 of 316" instead of implying that is
+everything.
+
+```json
+{
+  "stationId": "CS001", "total": 316, "limit": 200,
+  "events": [
+    {
+      "seq": 117, "direction": "INBOUND", "action": "BootNotification",
+      "messageId": "e063733d-073e-4b0d-9fd8-7b3b24c2f5fa",
+      "occurredAt": "2026-08-25T01:29:50.380Z",
+      "payload": "[2,\"e063733d-…\",\"BootNotification\",{…}]"
+    }
+  ]
+}
+```
+
+The screen that reads them is served at `/` by the CSMS itself — a static page, no CDN, no
+framework, same rule as the simulator console.
+
+![The CSMS operations screen — the stations it knows](assets/csms-operations.png)
+
+Selecting a station lists every frame exchanged with it. Clicking a row opens the payload; it is
+pretty-printed only when it parses as JSON, and shown raw when it does not — unreadable beats
+absent.
+
+![Frames, with one payload opened](assets/csms-frames.png)
 
 ```bash
 ./gradlew :csms:test --tests 'dev.swapve.csms.api.*'

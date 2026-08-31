@@ -319,6 +319,10 @@ control server must never gain a dependency that lets it drive a station.
 
 ## REST API
 
+**A read-only operations screen is served at `/`.** It lists the stations this CSMS knows and
+every frame exchanged with each one, payloads verbatim — a static page with no CDN or framework,
+the same rule the simulator console follows. See [docs/API.md](docs/API.md).
+
 The standard already defines the app scenario. **S02**: *"EV Driver requests CSMS to initiate a
 battery swap **via a smartphone app, e.g. by scanning a QR code**."* So
 `app → CSMS → RequestBatterySwap → station` is the standard use case. Building the app is out of
