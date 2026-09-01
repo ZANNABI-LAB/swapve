@@ -158,6 +158,24 @@ rebuilt from the event log against the in-memory registries.
 | Serializing concurrent sends | `transmit` must be thread-safe. `csms` uses `ConcurrentWebSocketSessionDecorator` |
 | Keeping `ledger` and `serializer` **alive longer than the session** | Both are keyed by `stationId`. For idempotency to survive a reconnect, they have to be held outside (failure scenario F6) |
 
+### Which entry point — measured against our own consumers
+
+There are three, and the right one depends on **who owns the lifetime of the two things that must
+outlive a connection**: the idempotency ledger and the per-station serializer. Both are keyed by
+`stationId`, and rebuilding either on reconnect makes a retransmission look new — a battery swap
+counted twice.
+
+| Use | When | Who does it here |
+|---|---|---|
+| `OcppSession(...)` directly | Something already owns object lifetimes — a DI container, or a process that holds exactly one station | `csms` (Spring holds the ledger and serializer as beans) and `station-sim` (one station, nothing to share) |
+| `OcppSessions.open(...)` | Kotlin, no framework. It holds the four shared pieces so reconnecting is correct by construction | `OcppSessionsAsync` is built on it |
+| `OcppSessionsAsync` | The consumer is not written in Kotlin — see [§4](#4-can-you-use-it-from-java--measured) | `java-compat` |
+
+**The constructor stays public deliberately.** The question of closing it was raised and settled
+by looking at what actually uses it: both production consumers in this repository call it, and
+both have a reason that `OcppSessions` cannot serve — the lifetime is already owned elsewhere.
+Closing it would not push those callers toward the safer path; it would only make them rebuild it.
+
 ---
 
 ## 4. Can you use it from Java — measured
