@@ -47,8 +47,8 @@
 
 ```kotlin
 dependencies {
-    implementation("io.github.zannabi-lab:ocpp-core:0.2.0")   // 코덱 · 스키마 검증 · 세션
-    implementation("io.github.zannabi-lab:swap-domain:0.2.0") // 교환 상태머신, 의존성 0
+    implementation("io.github.zannabi-lab:ocpp-core:0.3.0")   // 코덱 · 스키마 검증 · 세션
+    implementation("io.github.zannabi-lab:swap-domain:0.3.0") // 교환 상태머신, 의존성 0
 }
 ```
 
@@ -96,7 +96,7 @@ when (val result = session.call(OcppCall("RequestBatterySwap", payload))) {
 이미 빌드된 채로 들어 있고, JDK 17 만 있으면 됩니다.
 
 ```bash
-unzip swapve-0.2.0.zip && cd swapve-0.2.0
+unzip swapve-0.3.0.zip && cd swapve-0.3.0
 java -jar csms/csms.jar --csms.security.profile=NONE   # 터미널 A
 ./station-sim/bin/station-sim --station-id CS001       # 터미널 B — 교환 1건을 완주하고 끝난다
 ./sim-console/bin/sim-console                          # 선택 — 브라우저에서 조종한다

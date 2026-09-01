@@ -9,7 +9,7 @@ This project follows [Semantic Versioning](https://semver.org/). While the major
 deliberate: the shape of these types has not yet been tested against a consumer other than this
 repository.
 
-## [Unreleased]
+## [0.3.0] — 2026-09-01
 
 ### Added
 
@@ -199,7 +199,8 @@ resolution from Central by a consumer project — deliberately kept as a record 
 <sub>`0.0.1` and `0.1.0` link to the commit that set the version rather than to a tag: both were
 uploaded to Central without a git tag ever being created. Tagging starts at `v0.2.0`.</sub>
 
-[Unreleased]: https://github.com/ZANNABI-LAB/swapve/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/ZANNABI-LAB/swapve/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/ZANNABI-LAB/swapve/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/ZANNABI-LAB/swapve/compare/eb95179...v0.2.0
 [0.1.0]: https://github.com/ZANNABI-LAB/swapve/commit/eb95179
 [0.0.1]: https://github.com/ZANNABI-LAB/swapve/commit/e1d07c9

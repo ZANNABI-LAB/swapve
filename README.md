@@ -48,8 +48,8 @@
 
 ```kotlin
 dependencies {
-    implementation("io.github.zannabi-lab:ocpp-core:0.2.0")   // codec · schema validation · session
-    implementation("io.github.zannabi-lab:swap-domain:0.2.0") // the swap state machine, zero dependencies
+    implementation("io.github.zannabi-lab:ocpp-core:0.3.0")   // codec · schema validation · session
+    implementation("io.github.zannabi-lab:swap-domain:0.3.0") // the swap state machine, zero dependencies
 }
 ```
 
@@ -98,7 +98,7 @@ Every tagged release carries a **`swapve-<version>.zip`** with the CSMS, the sta
 and the control console already built — JDK 17 is the only requirement:
 
 ```bash
-unzip swapve-0.2.0.zip && cd swapve-0.2.0
+unzip swapve-0.3.0.zip && cd swapve-0.3.0
 java -jar csms/csms.jar --csms.security.profile=NONE   # terminal A
 ./station-sim/bin/station-sim --station-id CS001       # terminal B — one swap, then exits
 ./sim-console/bin/sim-console                          # optional — drive it from a browser
