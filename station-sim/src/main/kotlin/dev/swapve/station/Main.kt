@@ -18,7 +18,7 @@ import kotlin.system.exitProcess
  */
 object StationSimCli {
 
-    private val USAGE = """
+    internal val USAGE = """
         station-sim — an OCPP 2.1 battery swap station simulator
 
           --csms-url <url>          CSMS endpoint, without the station id. Default ws://localhost:8080/ocpp
@@ -55,11 +55,21 @@ object StationSimCli {
 
         val remoteStart = args.any { it == REMOTE_START_FLAG }
         val faultF6 = args.any { it == FAULT_F6_FLAG }
-        require(!(remoteStart && faultF6)) {
-            "$REMOTE_START_FLAG and $FAULT_F6_FLAG cannot be used together — F6 is a station-initiated path"
+
+        // `require` 와 `error` 를 그대로 새어 나가게 두면 오타 하나에 스택트레이스가 뜬다.
+        // 종료 코드는 다른 실패와 같은 1 이다 — 이 프로그램의 실패는 한 종류다.
+        val config = try {
+            require(!(remoteStart && faultF6)) {
+                "$REMOTE_START_FLAG and $FAULT_F6_FLAG cannot be used together — F6 is a station-initiated path"
+            }
+            buildConfig(parse(args.filterNot { it == REMOTE_START_FLAG || it == FAULT_F6_FLAG }.toTypedArray()))
+        } catch (invalid: IllegalArgumentException) {
+            System.err.println(invalid.message)
+            exitProcess(1)
+        } catch (invalid: IllegalStateException) {
+            System.err.println(invalid.message)
+            exitProcess(1)
         }
-        val options = parse(args.filterNot { it == REMOTE_START_FLAG || it == FAULT_F6_FLAG }.toTypedArray())
-        val config = buildConfig(options)
 
         println("station-sim → ${config.connectUrl} (order ${config.swapOrder.wireValue}, ${config.insertSlots.size} batteries)")
 
@@ -219,15 +229,31 @@ object StationSimCli {
             ?: error("unknown swap order: $value (In-Out or Out-In)")
     }
 
+    /**
+     * 값을 받는 옵션 전부. **모르는 이름은 조용히 무시하지 않는다** — `--slot 6` 은 오타지만
+     * 파서에게는 `--` 로 시작하는 정상적인 짝이라, 예전에는 아무 말 없이 기본 4 슬롯으로
+     * 떴다. 준 값이 무시된 것을 준 사람이 알 길이 없었다. 값 없는 플래그
+     * ([REMOTE_START_FLAG] · [FAULT_F6_FLAG])는 여기 오기 전에 걸러진다.
+     */
+    internal val KNOWN = setOf(
+        "csms-url", "station-id", "username", "password", "slots", "set-size",
+        "swap-order", "id-token", "id-token-type", "charging-id-token", "request-id",
+    )
+
     /** `--key value` 짝만 읽는다. 외부 파서 라이브러리를 쓰지 않는다 — 의존성 0 이 원칙이다. */
-    private fun parse(args: Array<String>): Map<String, String> {
+    internal fun parse(args: Array<String>): Map<String, String> {
         val options = LinkedHashMap<String, String>()
         var index = 0
         while (index < args.size) {
             val token = args[index]
             require(token.startsWith("--")) { "unknown argument: $token\n\n$USAGE" }
             require(index + 1 < args.size) { "argument without a value: $token\n\n$USAGE" }
-            options[token.removePrefix("--")] = args[index + 1]
+            val key = token.removePrefix("--")
+            require(key in KNOWN) {
+                "unknown option: $token (known: ${KNOWN.joinToString { "--$it" }}, " +
+                    "$REMOTE_START_FLAG, $FAULT_F6_FLAG)\n\n$USAGE"
+            }
+            options[key] = args[index + 1]
             index += 2
         }
         return options

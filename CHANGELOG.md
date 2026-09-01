@@ -35,6 +35,12 @@ repository.
   of the frames exchanged with it, payloads verbatim). The frames were always recorded; there was
   no way to read them back. Like the simulator console it is a single static page with no CDN,
   font, or framework link, and a build check now enforces that for this module too.
+- **`sim-console` has its own tests** — the module's 1,321 lines were covered only indirectly,
+  by an integration test in `csms` that stands up a CSMS and drives a whole exchange. That test
+  never reaches argument parsing, authentication rejection, routing, or method handling, so those
+  now have tests that start nothing but the console itself. `station-sim` got the same for its
+  CLI, including a check that every option its usage text documents is one the parser actually
+  accepts — otherwise someone following the documentation gets turned away.
 - A **release bundle** (`swapve-<version>.zip`) is now attached to every tagged release. It
   carries the CSMS as an executable jar plus the station simulator and the control console as
   ready-to-run distributions, so the tools can be used without building from source. This is
@@ -52,6 +58,17 @@ repository.
   warning on startup. Neither calls SLF4J; the warning came from a transitive `slf4j-api` with no
   binding, and a no-op binding now silences it. The published libraries are untouched, so they
   still leave the logging choice to whoever depends on them.
+
+### Fixed
+
+- **A mistyped command-line option is no longer ignored in silence.** Both CLIs read `--key
+  value` pairs and accepted any key that started with `--`, so `--prot 9000` or `--slot 6` was
+  parsed, discarded, and the program started on the default — the person who passed the value had
+  no way to learn it had been dropped. This was found by writing the first tests `sim-console`
+  has ever had, and confirmed by running the console with a mistyped flag. Both now list what
+  they accept, and a wrong argument prints that list instead of a stack trace.
+- `station-sim` no longer exits with a stack trace when an argument does not parse. It says what
+  was wrong and exits 1, like its other failures.
 
 ## [0.2.0] — 2026-08-27
 
