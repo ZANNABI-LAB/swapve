@@ -180,7 +180,7 @@ Closing it would not push those callers toward the safer path; it would only mak
 
 ## 4. Can you use it from Java — measured
 
-**This was measured rather than guessed.** The `java-compat` module holds **18 tests written
+**This was measured rather than guessed.** The `java-compat` module holds **20 tests written
 purely in Java**, and they run as part of `./gradlew build`. That module contains no Kotlin at
 all — if it did, `checkNoKotlinSources` would break the build (the gate was confirmed to go red).
 
@@ -191,7 +191,7 @@ all — if it did, `checkNoKotlinSources` would break the build (the gate was co
 | **L3 session** | ✅ **works through `OcppSessionsAsync`** | `SessionFromJavaTest` — a session is opened, an inbound CALL is answered, an outbound CALL completes with its result. Not one line of reflection, and not one `kotlin.*` import |
 | L3 session, **without** that entry point | ❌ **does not work** | `RawSessionIsKotlinOnlyTest` — see below |
 
-### Four points of friction in L1 and L2 (all workable)
+### Five points of friction, all workable
 
 1. **Default arguments are invisible.** Kotlin's `OcppFrameCodec()` becomes
    `new OcppFrameCodec(new ObjectMapper())` in Java; `validate(frame)` becomes `validate(frame, null)`.
@@ -200,6 +200,12 @@ all — if it did, `checkNoKotlinSources` would break the build (the gate was co
 4. **A `sealed interface` is not friction.** From Java it is just an interface, and JDK 17's
    `instanceof` patterns work on it directly. Because outcomes arrive as values, no `try/catch` is
    needed either.
+5. **A Kotlin property is a getter.** `session.stationId` is written `session.getStationId()`, and
+   the same holds for what a result carries — `accepted.getMessageId()`. This is the one item on
+   the list that reaches L3 as well, and it is where a consumer prototype actually tripped.
+   `SessionFromJavaTest` calls both, so the sentence is held down by a test rather than by prose.
+
+The first four are L1 and L2; the fifth applies wherever a Kotlin property is read.
 
 ```java
 OcppFrameCodec codec = new OcppFrameCodec(new ObjectMapper());

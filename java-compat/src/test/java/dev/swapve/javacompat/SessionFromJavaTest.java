@@ -73,6 +73,10 @@ class SessionFromJavaTest {
                     (stationId, call) ->
                             CompletableFuture.completedFuture(new InboundResponse.Respond(payload())));
 
+            // Kotlin 의 `val` 프로퍼티는 Java 에서 게터다 — 소비자 시제품이 실제로 걸린
+            // 자리이므로 docs/LAYERS.md §4 의 마찰 목록에 적고, 그 문장을 여기서 붙든다.
+            assertEquals("ST-JAVA-01", session.getStationId());
+
             session.receive("[2,\"19223201\",\"Heartbeat\",{}]").get(5, TimeUnit.SECONDS);
 
             String reply = sent.poll(5, TimeUnit.SECONDS);

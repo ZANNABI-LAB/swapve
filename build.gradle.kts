@@ -252,3 +252,124 @@ val releaseBundle by tasks.registering(Zip::class) {
         }
     }
 }
+
+/**
+ * ★ **두 벌의 README 가 조용히 갈리지 않게 대조한다** (`README.md` ↔ `README.ko.md`).
+ *
+ * ```
+ * ./gradlew checkReadmeTranslationsInSync     # `build` 에 이미 물려 있다
+ * ```
+ *
+ * `docs/` 는 영문 단일본이지만 README 만은 두 벌 전문으로 유지한다. 그 값을 치르는 대신
+ * **갈리면 알아채야 한다** — 실제로 갈렸던 자리가 둘 있다. 한쪽만 고친 문장(`0.3.0` 에서
+ * 세션 층이 Java 에서 호출 가능해졌는데 한글판 문구가 남아 있었다)과, 한글판 문서 표에서만
+ * 빠져 있던 `docs/VIRTUAL-STATION.md` 링크다. 사람의 눈으로는 두 번 다 놓쳤다.
+ *
+ * 대조하는 것은 **번역할 수 없는 것 셋**뿐이다 — 절의 개수, Maven 좌표, 링크 대상.
+ * 산문은 언어마다 다를 수밖에 없으므로 건드리지 않는다. 절 **제목**도 마찬가지다.
+ *
+ * 새 게이트를 만들지 않는다 — 루트의 `check` 에 매달아 두면 L1 `build` 가 이미 도는
+ * 자리에서 돈다 (`java-compat:checkNoKotlinSources` 와 같은 취지다).
+ */
+val readmeTranslations = listOf("README.md", "README.ko.md")
+
+val checkReadmeTranslationsInSync by tasks.registering {
+    group = "verification"
+    description = "README.md 와 README.ko.md 의 절 개수 · Maven 좌표 · 링크 대상을 대조한다"
+
+    val readmes = readmeTranslations.map { layout.projectDirectory.file(it) }
+    val expectedVersion = version.toString()
+    val projectDir = layout.projectDirectory.asFile
+
+    inputs.files(readmes)
+
+    doLast {
+        val sections = mutableMapOf<String, List<String>>()
+        val coordinates = mutableMapOf<String, Set<String>>()
+        val links = mutableMapOf<String, Set<String>>()
+
+        val coordinatePattern = Regex("""io\.github\.zannabi-lab:[\w.-]+:[\w.-]+""")
+        val linkPattern = Regex("""]\(([^)\s]+)\)""")
+
+        readmes.forEach { readme ->
+            val file = readme.asFile
+            check(file.isFile) { "${file.name} 이 없다 — 파일을 옮겼으면 이 검사도 함께 고친다" }
+            val text = file.readText()
+
+            sections[file.name] = text.lines().filter { it.startsWith("## ") }
+            coordinates[file.name] = coordinatePattern.findAll(text).map { it.value }.toSet()
+
+            // 두 파일은 서로를 가리키므로 그 한 쌍만 빼고 대조한다.
+            links[file.name] = linkPattern.findAll(text)
+                .map { it.groupValues[1] }
+                .filterNot { it in readmeTranslations }
+                .toSet()
+        }
+
+        val (english, korean) = readmeTranslations
+
+        // 절이 하나도 안 잡히면 이 검사는 아무것도 지키지 않는다 — 훑은 수를 함께 본다.
+        check(sections.getValue(english).isNotEmpty()) {
+            "README.md 에서 절(`## `)을 하나도 찾지 못했다 — 형식이 바뀌었으면 이 검사도 함께 고친다"
+        }
+
+        val problems = buildList {
+            val enSections = sections.getValue(english)
+            val koSections = sections.getValue(korean)
+            if (enSections.size != koSections.size) {
+                add(
+                    "절의 개수가 다르다 — $english ${enSections.size}개 · $korean ${koSections.size}개\n" +
+                        "  $english: ${enSections.joinToString(" · ") { it.removePrefix("## ") }}\n" +
+                        "  $korean: ${koSections.joinToString(" · ") { it.removePrefix("## ") }}",
+                )
+            }
+
+            if (coordinates.getValue(english) != coordinates.getValue(korean)) {
+                add(
+                    "Maven 좌표가 다르다 — $english ${coordinates.getValue(english).sorted()} · " +
+                        "$korean ${coordinates.getValue(korean).sorted()}",
+                )
+            }
+
+            val staleCoordinates = coordinates.getValue(english).filterNot { it.endsWith(":$expectedVersion") }
+            if (staleCoordinates.isNotEmpty()) {
+                add("좌표의 버전이 $expectedVersion 이 아니다: ${staleCoordinates.sorted()}")
+            }
+
+            val onlyInEnglish = links.getValue(english) - links.getValue(korean)
+            val onlyInKorean = links.getValue(korean) - links.getValue(english)
+            if (onlyInEnglish.isNotEmpty() || onlyInKorean.isNotEmpty()) {
+                add(
+                    "링크 대상이 다르다 — $english 에만 ${onlyInEnglish.sorted()} · " +
+                        "$korean 에만 ${onlyInKorean.sorted()}",
+                )
+            }
+
+            // 저장소 안을 가리키는 링크는 실제로 그 파일이 있어야 한다. 절 앵커(`#…`)는
+            // 파일 경로만 떼어 확인한다 — 앵커 자체까지 보려면 헤더를 파싱해야 하고,
+            // 그것은 이 검사가 지키려는 것과 다른 일이다.
+            val brokenLinks = links.values.flatten().toSortedSet()
+                .filterNot { it.startsWith("http") || it.startsWith("#") }
+                .filterNot { projectDir.resolve(it.substringBefore('#')).exists() }
+            if (brokenLinks.isNotEmpty()) {
+                add("저장소 안에 없는 파일을 가리킨다: $brokenLinks")
+            }
+        }
+
+        check(problems.isEmpty()) {
+            "README 두 벌이 갈렸다:\n" + problems.joinToString("\n")
+        }
+    }
+}
+
+tasks.register("check") {
+    group = "verification"
+    description = "루트에 있는 파일들의 검사 — README 두 벌 대조가 여기 매달린다"
+    dependsOn(checkReadmeTranslationsInSync)
+}
+
+tasks.register("build") {
+    group = "build"
+    description = "루트 `check` 를 `./gradlew build` 가 함께 돌게 한다 (게이트를 늘리지 않는다)"
+    dependsOn("check")
+}
