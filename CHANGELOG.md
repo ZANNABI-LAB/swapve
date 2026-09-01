@@ -48,6 +48,15 @@ repository.
 
 ### Changed
 
+- **Releasing the tools no longer forces a library version.** A tag ran Maven Central upload and
+  the release-bundle attachment as one sequence, so a stretch where only the screens, the CLIs
+  and the documentation changed — which happened, 47 files and 2,251 lines with not one line in
+  `ocpp-core` or `swap-domain` — could not produce a zip without publishing a library version
+  that had nothing new in it. Central does not accept the same version twice, so there was no
+  other route. The workflow now decides from the diff: if neither published module's main sources
+  changed since the previous tag, it skips the upload and attaches the zip. `force_publish` on a
+  manual run overrides it. Skipping is the safe direction — a version published in error cannot
+  be withdrawn, while one not published can go out with the next tag.
 - Every string a person sees at runtime is now English — the console screen, both CLIs, and the
   messages the server puts on screen (operation rejections, the reason a transmission never
   left, the F1–F6 scenario descriptions). Comments and KDoc stay Korean; they do not reach the
