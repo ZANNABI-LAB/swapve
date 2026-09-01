@@ -130,6 +130,10 @@ The public API is four members — `suspend call()` · `suspend send()` · `susp
 **There is no transport SPI interface.** It takes a function, because an interface with exactly one
 implementation is not extensibility — it is debt.
 
+**Consumers that are not written in Kotlin use `OcppSessionsAsync`**, which is the same session
+behind `CompletableFuture`s and an `Executor` you own. What that costs, and the one thing it
+cannot give back, is measured in [§4](#4-can-you-use-it-from-java--measured).
+
 ### D — the domain is a pure state machine
 
 ```kotlin
@@ -158,7 +162,7 @@ rebuilt from the event log against the in-memory registries.
 
 ## 4. Can you use it from Java — measured
 
-**This was measured rather than guessed.** The `java-compat` module holds **13 tests written
+**This was measured rather than guessed.** The `java-compat` module holds **18 tests written
 purely in Java**, and they run as part of `./gradlew build`. That module contains no Kotlin at
 all — if it did, `checkNoKotlinSources` would break the build (the gate was confirmed to go red).
 
@@ -166,7 +170,8 @@ all — if it did, `checkNoKotlinSources` would break the build (the gate was co
 |---|---|---|
 | **L1 framing** | ✅ **works** | `CodecFromJavaTest` — encode, decode, round-trip from Java |
 | **L2 schema validation** | ✅ **works** | `SchemaValidationFromJavaTest` — against the 181 official schemas |
-| **L3 session** | ❌ **does not work** | `SessionIsKotlinOnlyTest` — see below |
+| **L3 session** | ✅ **works through `OcppSessionsAsync`** | `SessionFromJavaTest` — a session is opened, an inbound CALL is answered, an outbound CALL completes with its result. Not one line of reflection, and not one `kotlin.*` import |
+| L3 session, **without** that entry point | ❌ **does not work** | `RawSessionIsKotlinOnlyTest` — see below |
 
 ### Four points of friction in L1 and L2 (all workable)
 
@@ -184,35 +189,53 @@ DecodeOutcome outcome = codec.decode(line);
 if (outcome instanceof DecodeOutcome.Decoded decoded) { … }
 ```
 
-### L3 cannot be used from Java — and the wall was not coroutines
+### What blocked L3 — the wall was one value class
 
 An attempt to write a Java test that stands up a session **failed at compile time**, for a reason
-that sits in front of `suspend`:
+that sits in front of `suspend`. The first diagnosis of it was wrong, and the correction is worth
+keeping because it changed what the fix had to be.
 
-- **Every constructor of `OcppSession` demands a `DefaultConstructorMarker`.** Default arguments
-  mean only the compiler-internal constructor is exposed, so there is **no public constructor Java
-  can call at all**.
-- The accessor for `DEFAULT_CALL_TIMEOUT` is **mangled** to `getDEFAULT_CALL_TIMEOUT-UwyO8pc`,
-  because `kotlin.time.Duration` is a value class. **A hyphen is not valid in a Java identifier.**
+**What was written first:** *"Kotlin's default arguments mean only the compiler-internal
+constructor is exposed."* **That is not the cause.** Default arguments alone leave the
+all-arguments constructor `public`, and Java calls it.
 
-So the question of unwrapping `suspend` into a `Continuation` never even arises. **The constructor
-is what blocks you.**
+**What is actually the cause:** `callTimeout` is a `kotlin.time.Duration`, which is a **value
+class**. A function taking one is name-mangled to avoid a signature clash — but **a constructor
+cannot be mangled, because its name is `<init>`**. So Kotlin drops the all-arguments constructor
+to `private` and exposes only ones demanding a `DefaultConstructorMarker`. The same applies to
+`OcppSessions`, which takes a `Duration` too. Separately, the accessor for `DEFAULT_CALL_TIMEOUT`
+is mangled to `getDEFAULT_CALL_TIMEOUT-UwyO8pc`, and **a hyphen is not a valid Java identifier**.
 
-`SessionIsKotlinOnlyTest` **pins this finding.** If the wall ever falls — to `@JvmOverloads` or a
-`java.time.Duration` overload — that test goes red, and what needs fixing is not the code but
-**the verdict in this section**.
+**`suspend` was never the wall.** Past the constructor, `open`, `call` and `receive` are ordinary
+public methods with no value-class parameter, and a Java implementation of a `suspend` function
+type is a `Function2`/`Function3` that returns its value directly. This was confirmed by a
+prototype that reached through the private constructor by reflection and then drove a full
+session — inbound CALL answered, outbound CALL correlated — from Java alone.
 
-### Does this change the library's direction — no
+What that cost the consumer was the call site: implementing `Continuation`, comparing against
+`COROUTINE_SUSPENDED`, and unwrapping `kotlin.Result.Failure` every time. **`OcppSessionsAsync`
+is that list, written once.**
 
-The finding does not hurt, because **the layers were already split**. What a Java consumer usually
-wants is **the codec and schema validation** (the near-absence of a 2.1 codec on the JVM is the
-reason for publishing at all — the procedure is in [PUBLISHING.md](PUBLISHING.md)). That layer
-**is open**.
+`RawSessionIsKotlinOnlyTest` pins both halves — that no public constructor is Java-callable, and
+that the reason is the value class. If either changes, the entry point's rationale changes with
+it.
 
-Opening the session layer to Java is possible — `@JvmOverloads` on the constructors, an overload
-taking `callTimeout` as a `java.time.Duration`, a blocking facade over `suspend`. **Not now.**
-Widening a public API with no consumer makes the walk-back a breaking change, and that cost is
-better weighed once a real requirement appears. The trigger is **an actual Java consumer**.
+### What the entry point costs, and what it cannot give back
+
+`OcppSessionsAsync` takes an `Executor` and returns `CompletableFuture`s. Every callback returns
+one too, rather than there being a blocking overload of each: a blocking implementation wraps its
+result in `completedFuture`, and that line states in the consumer's own code that the callback
+holds the calling thread.
+
+| | A Kotlin caller | A Java caller through the entry point |
+|---|---|---|
+| Waiting for a response | Suspends. **Costs no thread** | Costs the thread that waits. **On JDK 21+, pass `Executors.newVirtualThreadPerTaskExecutor()` and that thread is virtual**, which closes the gap. Nothing in this library pins one — the only `synchronized` blocks guard in-memory collections and do no I/O |
+| Cancellation | Inherited. A parent's cancellation kills the call | **Not inherited.** Java has no ambient context, so a future is cancelled only by `cancel()` or `close()` |
+| Structured concurrency | Free — a child cannot outlive its parent | Absent. `close()` stands in for it: closing one session cancels that session's work, closing the `OcppSessionsAsync` cancels every session's. Without it, a handler future that never completes would hold that session's request queue open for good |
+| Arrival order of `receive` | **Yours to keep** | **Kept for requests**, because a future invites being fired several at once. Responses (CALLRESULT · CALLERROR · CALLRESULTERROR) deliberately skip that queue — they are correlated by `messageId`, so they have no order to keep, and putting one behind a slow request handler would time out an outbound `call` the peer had already answered |
+
+The library still owns no threads: `close()` cancels the coroutines it started and leaves the
+executor alone, so the ownership rule in §3 is unchanged — only stated in a type Java already has.
 
 ## 5. Why it is split this way
 

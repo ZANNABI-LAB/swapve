@@ -13,6 +13,22 @@ repository.
 
 ### Added
 
+- **`OcppSessionsAsync` — the session layer is now usable from Java.** L1 framing and L2 schema
+  validation always were; L3 was not, and the wall turned out to be one thing: `callTimeout` is a
+  `kotlin.time.Duration`, a value class, and a constructor taking one cannot be name-mangled, so
+  Kotlin drops the all-arguments constructor to `private`. `suspend` was never the obstacle —
+  what it cost a Java consumer was a hand-written `Continuation`, a `COROUTINE_SUSPENDED`
+  comparison and unwrapping `kotlin.Result.Failure` at every call site. The new entry point is
+  that list written once: it takes an `Executor` you own and hands back `CompletableFuture`s, and
+  `java-compat` now drives a whole session from Java with no reflection and no `kotlin.*` import.
+  Two things are worth knowing before using it — waiting on a future costs a thread, so on JDK 21
+  and later pass `Executors.newVirtualThreadPerTaskExecutor()`; and cancellation is not inherited
+  the way it is for a Kotlin caller. Both are set out in `docs/LAYERS.md` §4. Kotlin callers
+  should keep using `OcppSessions`; nothing about it changed.
+  Received frames keep their order **for requests only**. Responses skip that queue on purpose:
+  they are correlated by `messageId` and have no order to keep, and queuing one behind a slow
+  request handler would report a timeout for a call the peer had already answered.
+
 - A **read-only operations screen** at `/` on the CSMS, backed by two new endpoints —
   `GET /api/stations` (every station this CSMS knows, merged from the boot registry and the
   event log, with whether a session is registered) and `GET /api/stations/{id}/events` (the tail

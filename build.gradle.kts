@@ -97,7 +97,8 @@ subprojects {
                     "ocpp-core" ->
                         "OCPP 2.1 (OCPP-J) framing, official JSON schema validation, and a session layer for the JVM. " +
                             "Framework-agnostic. Payloads are Jackson JsonNode - there are no generated message DTOs. " +
-                            "The codec and schema layers are callable from Java; the session layer is Kotlin-only (coroutines)."
+                            "Callable from Java throughout: the codec and schema layers directly, the session layer " +
+                            "through OcppSessionsAsync, which takes an Executor and returns CompletableFutures."
                     else ->
                         "OCPP 2.1 Battery Swap (Block S) domain model: swap state machine, slot model, and invariants. " +
                             "No I/O, no dependencies. Written for Kotlin consumers - the identifiers are value classes, " +
