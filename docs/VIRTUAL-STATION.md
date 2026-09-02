@@ -12,12 +12,14 @@
 ![The control console with one station attached](assets/console-overview.png)
 
 <sub>The console and the CSMS operations screen share one palette, taken from the project banner.
-Both are single static files with no CDN, font, or framework link — a build check walks them to
-keep it that way.</sub>
+**Both are served as a single static file that fetches nothing at runtime**, and a build check walks
+them to keep it that way. They get there differently: the CSMS screen is written by hand, while the
+console is a React application that `vite-plugin-singlefile` inlines into one page at build time —
+so the check on the console reads the **build output**, which is what actually ships.</sub>
 
-<sub>**The console is that station made visible.** The screen is still in Korean; reading it: the
-header says *"SwapVe — simulator control console. This drives station simulators; it is not a
-management server. Swap history and metrics live in the CSMS REST API."* The form attaches a station
+<sub>**The console is that station made visible.** The header reads *"SwapVe — simulator control
+console. This drives the station simulator — it is the test system, not the CSMS. Swap history and
+metrics live behind the CSMS REST API."* The form attaches a station
 — CSMS URL, stationId, slot count (`=EVSE`), set size, `SwapOrder`, authorization token. The
 attached station sits below it, and at the foot of the page are the F1–F6 failure scenarios with
 what each is expected to do. Localizing the runtime strings is still open.</sub>

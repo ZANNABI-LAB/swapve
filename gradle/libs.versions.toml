@@ -16,6 +16,12 @@ spring-dependency-management = "1.1.7"
 maven-publish = "0.34.0"
 # API 문서. javadoc jar 를 채운다 — 좌표로 받은 소비자가 문서를 보는 다른 경로가 없다.
 dokka = "2.0.0"
+# 콘솔 화면의 빌드 체인. **Node 를 이 플러그인이 직접 내려받는다** — README 가 약속한
+# "JDK 17 과 git 뿐"을 지키기 위해서다. Gradle 배포판을 래퍼가 받아오는 것과 같은 방식이다.
+node-gradle = "7.1.0"
+# 화면 빌드에 쓰는 Node. LTS 에 고정한다 — 산출물이 기계마다 달라지지 않게.
+# vite 7 이 요구하는 하한이 22.12 다(`^20.19.0 || >=22.12.0`) — 그 아래로 내리면 빌드가 선다.
+nodejs = "22.23.2"
 
 [libraries]
 jackson-databind = { module = "com.fasterxml.jackson.core:jackson-databind", version.ref = "jackson" }
@@ -55,3 +61,4 @@ spring-boot = { id = "org.springframework.boot", version.ref = "spring-boot" }
 spring-dependency-management = { id = "io.spring.dependency-management", version.ref = "spring-dependency-management" }
 maven-publish = { id = "com.vanniktech.maven.publish", version.ref = "maven-publish" }
 dokka = { id = "org.jetbrains.dokka", version.ref = "dokka" }
+node-gradle = { id = "com.github.node-gradle.node", version.ref = "node-gradle" }

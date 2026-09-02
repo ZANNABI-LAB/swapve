@@ -1,0 +1,102 @@
+  /* 배너(docs/assets/hero.png)의 색을 그대로 쓴다 — 거의 검은 배경 위의 네온 그린.
+     CSMS 운영 화면(csms/src/main/resources/static/index.html)과 같은 토큰이다.
+     두 화면은 다른 프로세스가 서빙하므로 CSS 를 공유할 수 없다. 값이 갈리면 눈에 띈다. */
+  :root {
+    --bg: #07090a;
+    --surface: #0e1214;
+    --surface-2: #141a1c;
+    --line: #1f2a2c;
+    --text: #d6e2dc;
+    --muted: #7d8f88;
+    --accent: #4ecf27;
+    --accent-dim: #2f7a1c;
+    --info: #57c7ff;
+    --warn: #ffb454;
+    --error: #ff6b6b;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0; padding: 1.5rem 1.5rem 4rem;
+    background: var(--bg); color: var(--text);
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+    font-size: 14px; line-height: 1.55;
+  }
+  h1 { font-size: 1.25rem; margin: 0 0 .25rem; letter-spacing: .02em; }
+  h1 .mark { color: var(--accent); }
+  h2 { font-size: .95rem; margin: 2rem 0 .75rem; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+  p.lede { margin: 0 0 1.5rem; color: var(--muted); }
+  b { color: var(--text); }
+
+  fieldset { border: 1px solid var(--line); border-radius: 6px; padding: .75rem 1rem 1rem; background: var(--surface); }
+  legend { padding: 0 .4rem; color: var(--muted); letter-spacing: .05em; text-transform: uppercase; font-size: .82rem; }
+  label { display: inline-block; margin: .25rem .75rem .25rem 0; }
+  label span { display: block; font-size: .78rem; color: var(--muted); }
+
+  input, select, button { font: inherit; padding: .25rem .45rem; }
+  input, select {
+    background: var(--bg); color: var(--text);
+    border: 1px solid var(--line); border-radius: 4px;
+  }
+  input:focus, select:focus { outline: none; border-color: var(--accent-dim); }
+  input { width: 12rem; }
+  input.narrow { width: 4rem; }
+  button {
+    cursor: pointer; border-radius: 4px;
+    border: 1px solid var(--line); background: var(--surface-2); color: var(--text);
+  }
+  button:hover:enabled { border-color: var(--accent-dim); color: var(--accent); }
+
+  .card {
+    border: 1px solid var(--line); border-radius: 6px;
+    padding: .9rem 1rem; margin: .75rem 0; background: var(--surface);
+  }
+  .card header { display: flex; align-items: baseline; gap: .5rem; flex-wrap: wrap; }
+  .card header b { font-size: 1.05rem; letter-spacing: .02em; }
+  .meta { font-size: .85rem; color: var(--muted); margin: .35rem 0 .6rem; }
+
+  .badge { border-radius: 999px; padding: .05rem .55rem; font-size: .78rem; border: 1px solid var(--line); color: var(--muted); }
+  .badge.sub { border-style: dashed; }
+  .badge.live { color: var(--accent); border-color: var(--accent-dim); }
+  .badge.down { color: var(--muted); border-style: dashed; }
+  .ATTACHED { color: var(--muted); }
+  .RUNNING, .AWAITING_REMOTE_START { color: var(--warn); border-color: var(--warn); }
+  .COMPLETED { color: var(--accent); border-color: var(--accent); }
+  .REJECTED, .FAILED { color: var(--error); border-color: var(--error); }
+
+  table { border-collapse: collapse; width: 100%; max-width: 46rem; margin: .25rem 0 .75rem; }
+  th, td { text-align: left; padding: .25rem .5rem; border-bottom: 1px solid var(--line); }
+  th { font-size: .78rem; color: var(--muted); font-weight: normal; letter-spacing: .05em; text-transform: uppercase; }
+  td.empty { color: var(--muted); }
+  td .suspended { color: var(--warn); }
+
+  .actions { display: flex; gap: .35rem; flex-wrap: wrap; }
+  /* 각본(.actions)과 한 걸음(.ops)은 손이 닿는 결과가 다르다 — 눈으로도 갈라 둔다. */
+  .ops { margin: .75rem 0 0; border-style: dashed; padding: .4rem .75rem .6rem; background: transparent; }
+  .ops legend { text-transform: none; letter-spacing: 0; font-size: .85rem; }
+  .ops .row { display: flex; gap: .35rem; flex-wrap: wrap; align-items: center; margin: .25rem 0; }
+  .ops .row > i { font-style: normal; font-size: .78rem; color: var(--muted); min-width: 3.5rem; }
+  .ops button { border-style: dashed; background: transparent; }
+  .ops button:disabled { cursor: not-allowed; opacity: .35; }
+  .ops input, .ops select { padding: .1rem .3rem; }
+  /* 라벨이 잘리면 무엇을 넣는 칸인지 알 수 없다 — byPercent 가 그랬다. */
+  .ops input { width: 7rem; }
+  .ops .lede { margin: .1rem 0 .4rem; font-size: .8rem; color: var(--muted); }
+
+  details { margin: .5rem 0 0; }
+  summary { cursor: pointer; font-size: .85rem; color: var(--muted); }
+  summary:hover { color: var(--accent); }
+
+  .note, .hint, .error {
+    border-left: 3px solid; padding: .35rem .6rem; margin: .4rem 0;
+    font-size: .85rem; white-space: pre-wrap; word-break: break-all;
+    background: var(--surface-2);
+  }
+  .note { border-color: var(--warn); }
+  .hint { border-color: var(--info); }
+  .error { border-color: var(--error); color: var(--error); }
+
+  .faults li { margin: .2rem 0; }
+  .faults b { display: inline-block; min-width: 11rem; color: var(--accent); }
+  .none { color: var(--muted); font-style: italic; }

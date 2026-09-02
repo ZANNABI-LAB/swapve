@@ -153,8 +153,10 @@ curl -X POST localhost:8080/api/swaps -H 'Content-Type: application/json' \
 `localhost:8090` 에서 **붙이기 → 교환 시작**. **F1~F6 버튼**이 실패 시나리오를 그대로
 겁니다 — "배터리 부족을 재현"이 클릭 한 번입니다.
 
-- 화면은 **정적 HTML 한 장**이고 외부 CDN·폰트·프레임워크를 링크하지 않습니다. HTTP 서버도
-  JDK 내장 `com.sun.net.httpserver` 입니다 — **네트워크 없는 곳에서도 뜹니다**
+- 화면은 **React** 로 쓰고 빌드 때 **정적 HTML 한 장**으로 인라인합니다. 실행 중에 밖에서
+  받아오는 것이 없어 **네트워크 없는 곳에서도 뜹니다**. HTTP 서버도 JDK 내장
+  `com.sun.net.httpserver` 이고, 화면을 굽는 데 필요한 Node 는 Gradle 이 내려받으므로
+  **필요한 것은 여전히 JDK 17 과 git 뿐입니다**
 - **F1(배터리 부족)은 개시 주체가 CSMS 인 시나리오라**(S02.FR.04) 콘솔이 대기 상태로
   들어갑니다. 화면에 뜨는 `curl` 한 줄을 그대로 치면 거부 사유가 화면에 남습니다
 - 제어 API 도 있습니다 — `POST /api/stations` · `POST /api/stations/{id}/swap`

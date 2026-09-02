@@ -155,8 +155,10 @@ replacing it**, and everything above still works:
 Open `localhost:8090`, then **Connect → Start swap**. The **F1–F6 buttons** fire the failure
 scenarios — "reproduce an empty-inventory rejection" is one click.
 
-- The page is **a single static HTML file** with no CDN, font, or framework links. The HTTP server
-  is the JDK's own `com.sun.net.httpserver` — **it comes up with no network at all**
+- The page is written in **React** and inlined into **a single static HTML file** at build time —
+  nothing is fetched at runtime, so **it comes up with no network at all**. The HTTP server is the
+  JDK's own `com.sun.net.httpserver`, and Gradle downloads the Node it needs to build the page, so
+  **JDK 17 and git are still all you need**
 - **F1 (no battery available) is a CSMS-initiated scenario** (S02.FR.04), so the console goes into
   standby and prints the exact `curl` line to paste; the rejection reason then lands on screen
 - There is a control API too — `POST /api/stations` · `POST /api/stations/{id}/swap`

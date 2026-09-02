@@ -595,7 +595,12 @@ class SimConsoleControlTest {
 
         assertEquals(200, page.statusCode())
         assertContains(page.headers().firstValue("Content-Type").orElse(""), "text/html")
-        assertContains(page.body(), "시뮬레이터 제어 콘솔")
+        // 화면이 React 로 옮겨간 뒤로는 **본문이 번들 안에 있다.** 그래서 눈에 보이는 문구
+        // 대신 두 가지를 본다 — 문서의 제목(무엇이 서빙됐는지)과 React 가 붙을 자리.
+        // 예전에는 파일 맨 위 주석의 한국어 문구를 봤는데, 그것은 화면이 아니라 **주석**에
+        // 걸린 단언이었다. 주석이 사라지자 시험이 깨졌고, 그 자리가 취약했다는 뜻이다.
+        assertContains(page.body(), "<title>SwapVe — simulator control console</title>")
+        assertContains(page.body(), """id="root"""")
     }
 
     // ------------------------------------------------------------------ 공통
